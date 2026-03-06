@@ -56,17 +56,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // 카드 플립 애니메이션 컨트롤러
+    // 카메라 전환 blur 애니메이션 컨트롤러 (Apple 스타일)
+    // 시각 전용 애니메이션 컨트롤러 (카드 회전 + blur)
+    // 실제 카메라 전환은 _handleCameraFlip()에서 flipCamera()로 처리
     _flipController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 600),
     );
-    _flipController.addListener(() {
-      if (!_hasSwappedCamera && _flipController.value >= 0.5) {
-        _hasSwappedCamera = true;
-        ref.read(cameraProvider.notifier).flipCameraForAnimation();
-      }
-    });
 
     // 상태바 투명 + 아이콘 흰색 (카메라 화면)
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -103,7 +99,22 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Future<void> _handleCameraFlip() async {
     if (_flipController.isAnimating) return;
     _hasSwappedCamera = false;
-    await _flipController.forward(from: 0.0);
+
+    // 시각 애니메이션 시작 (카드 회전 + blur)
+    _flipController.forward(from: 0.0);
+
+    // blur peak 시점(0.2 × 600ms = 120ms) 대기 후 카메라 전환
+    // flipCamera() 내부: hardware(~200ms) + 100ms delay → 완료 ~420ms
+    // blur hold 종료: 0.8 × 600ms = 480ms → 60ms 여유
+    await Future.delayed(const Duration(milliseconds: 120));
+    if (mounted) {
+      await ref.read(cameraProvider.notifier).flipCamera();
+    }
+
+    // 애니메이션이 끝나지 않았으면 마저 완료 대기
+    if (_flipController.isAnimating) {
+      await _flipController.forward();
+    }
     _flipController.value = 0.0;
   }
 
@@ -251,14 +262,37 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             ),
           ),
 
-          // 6-b. 온보딩 힌트 오버레이
-          if (_showSwipeHint) _buildSwipeHint(),
+          // 6-b. 카메라 전환 blur 오버레이 (완전 불투명 → 글리치 완전 차단)
+          AnimatedBuilder(
+            animation: _flipController,
+            builder: (context, _) {
+              final v = _flipController.value;
+              if (v == 0.0) return const SizedBox.shrink();
+              // 0→0.2: blur 급속 증가, 0.2→0.8: 완전 불투명 유지, 0.8→1.0: 감소
+              // 카메라 전환(~420ms)이 hold 종료(480ms)보다 먼저 완료됨을 보장
+              final double progress;
+              if (v < 0.2) {
+                progress = v / 0.2;
+              } else if (v < 0.8) {
+                progress = 1.0;
+              } else {
+                progress = 1.0 - (v - 0.8) / 0.2;
+              }
+              final sigma = progress * 30.0;
+              final dimOpacity = progress * 0.82;
+              return IgnorePointer(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                  child: ColoredBox(
+                    color: Colors.black.withOpacity(dimOpacity),
+                  ),
+                ),
+              );
+            },
+          ),
 
-          // 7. 카메라 전환 중 플래시 오버레이 (좌우반전 글리치 방지)
-          if (cameraState.isFlipping)
-            const SizedBox.expand(
-              child: ColoredBox(color: Colors.black),
-            ),
+          // 6-c. 온보딩 힌트 오버레이
+          if (_showSwipeHint) _buildSwipeHint(),
 
           // 8. 에러 표시
           if (cameraState.errorMessage != null)
@@ -305,12 +339,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       ),
     );
 
+    // 카드 플립 3D 회전 (시각 애니메이션)
     return AnimatedBuilder(
       animation: _flipController,
       builder: (context, child) {
         final v = _flipController.value;
         if (v == 0.0) return child!;
-        // 0→0.5: 0→π/2 (edge-on), 0.5→1.0: -π/2→0 (coming from other side)
+        // 0→0.5: 0→π/2 (edge-on), 0.5→1.0: -π/2→0 (reveal)
         final angle = v <= 0.5 ? v * pi : (v - 1.0) * pi;
         return Transform(
           alignment: Alignment.center,

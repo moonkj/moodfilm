@@ -143,17 +143,8 @@ class CameraNotifier extends StateNotifier<CameraState> {
     final isFront = !state.isFrontCamera;
     state = state.copyWith(isFlipping: true);
     await CameraEngine.flipCamera();
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 100)); // blur가 glitch 커버
     state = state.copyWith(isFrontCamera: isFront, isFlipping: false);
-  }
-
-  // 카드 플립 애니메이션용: 애니메이션 midpoint에서 호출
-  // state 즉시 업데이트, native flip은 fire-and-forget
-  Future<void> flipCameraForAnimation() async {
-    HapticUtils.cameraFlip();
-    final isFront = !state.isFrontCamera;
-    state = state.copyWith(isFrontCamera: isFront);
-    CameraEngine.flipCamera(); // 결과 기다리지 않음 (애니메이션이 전환 커버)
   }
 
   Future<void> setExposure(double ev) async {
