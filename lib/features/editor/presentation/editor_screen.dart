@@ -6,6 +6,7 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/theme/liquid_glass_decoration.dart';
+import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 
 /// 편집 화면
@@ -338,16 +339,66 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
   // MARK: - 저장
 
   Future<void> _saveImage() async {
-    // TODO: FilterEngine.processImage() 호출 후 갤러리 저장
-    if (mounted) {
+    if (widget.imagePath == null) return;
+
+    // 저장 중 표시
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('저장 중...'),
+        backgroundColor: AppColors.darkSurface,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 10),
+      ),
+    );
+
+    try {
+      final outputPath = await FilterEngine.processImage(
+        sourcePath: widget.imagePath!,
+        lutFileName: _selectedFilter?.lutFileName ?? 'milk.cube',
+        intensity: _filterIntensity,
+        adjustments: {
+          'exposure': _exposure,
+          'contrast': _contrast,
+          'warmth': _warmth,
+          'saturation': _saturation,
+          'fade': _fade,
+        },
+        effects: {
+          'filmGrain': _grain,
+        },
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (outputPath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('갤러리에 저장되었습니다'),
+            backgroundColor: AppColors.darkSurface,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('저장에 실패했습니다'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('저장되었습니다'),
-          backgroundColor: AppColors.darkSurface,
+        SnackBar(
+          content: Text('오류: $e'),
+          backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
-      Navigator.of(context).pop();
     }
   }
 }

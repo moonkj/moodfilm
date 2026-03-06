@@ -6,7 +6,7 @@
 ## 전체 진행률
 
 ```
-Phase 1: Foundation      [████████░░] W1 완료 / W2-3 진행 예정
+Phase 1: Foundation      [██████████] W1-W3 완료
 Phase 2: Core Features   [░░░░░░░░░░] W4-6 예정
 Phase 3: Polish          [░░░░░░░░░░] W7-9 예정
 Phase 4: QA & Launch     [░░░░░░░░░░] W10-12 예정
@@ -90,12 +90,12 @@ flutter build ios --release --no-codesign
 
 ---
 
-### ⏳ W3 — LUT 필터 엔진 (예정)
+### ✅ W3 — LUT 필터 엔진 (완료)
 
-- [ ] 무료 8종 LUT .cube 파일 제작 (Milk, Cream, Sky, Cloud, Film98, Disposable, Soft Pink, Lavender)
-- [ ] CIColorCube 실시간 30fps 성능 확인
-- [ ] 필터 전환 crossfade 200ms 애니메이션 연결
-- [ ] 필터 강도 슬라이더 연동
+- [x] 무료 8종 LUT .cube 파일 (`assets/luts/`: milk, cream, sky, cloud, film98, disposable, soft_pink, lavender)
+- [x] 필터 전환 crossfade 200ms 애니메이션 (white flash 30ms→200ms fade)
+- [x] 필터 강도 슬라이더 (상단 tune 버튼 → AnimatedContainer 슬라이더)
+- [ ] CIColorCube 실시간 30fps 성능 확인 (실기기 테스트 필요)
 - [ ] 썸네일 이미지 8개 생성 → `assets/thumbnails/`
 
 ---
@@ -108,10 +108,11 @@ flutter build ios --release --no-codesign
 - [ ] 썸네일 12개 추가
 
 ### ⏳ W5 — 편집 화면 완성
-- [ ] `FilterEngine.processImage()` Native 구현 (iOS `FilterEngine/` Swift 폴더)
-- [ ] 갤러리 Import → 필터 Full-res 처리 → 저장
-- [ ] 6종 슬라이더 실제 CIFilter 연결 (Exposure, Contrast, Warmth, Saturation, Grain, Fade)
-- [ ] Split-View Before/After 완성
+- [x] `FilterEnginePlugin.swift` Native 구현 (Full-res 처리 + 갤러리 저장)
+- [x] EditorScreen 저장 버튼 실제 연결 (`FilterEngine.processImage()`)
+- [x] 6종 슬라이더 CIFilter 연결 (Exposure, Contrast, Warmth, Saturation, Grain, Fade)
+- [ ] 갤러리 Import (photo_manager 연동)
+- [ ] Split-View Before/After 개선 (filtered image 실제 반영)
 
 ### ⏳ W6 — 이펙트 시스템
 - [ ] Dreamy Glow 실시간 강도 조절
@@ -185,7 +186,7 @@ flutter build ios --release --no-codesign
 ## 다음 세션에서 할 일
 
 1. Pretendard 폰트 파일 4개 `assets/fonts/`에 추가
-2. LUT .cube 파일 8종 제작 및 `assets/luts/`에 추가 (W3)
-3. CIColorCube 실시간 30fps 성능 측정
-4. 필터 강도 슬라이더 연동 검증
-5. FilterEngine Native 구현 (편집 화면용)
+2. LUT 썸네일 이미지 8개 `assets/thumbnails/`에 추가
+3. CIColorCube 실시간 30fps 성능 측정 (실기기)
+4. 갤러리 Import (photo_manager 연동) — W5
+5. W4: 나머지 12종 LUT .cube 파일 제작

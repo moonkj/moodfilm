@@ -9,6 +9,7 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     CameraEnginePlugin.register(with: self.registrar(forPlugin: "CameraEnginePlugin")!)
+    FilterEnginePlugin.register(with: self.registrar(forPlugin: "FilterEnginePlugin")!)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

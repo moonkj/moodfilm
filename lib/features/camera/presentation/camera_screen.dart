@@ -32,6 +32,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   late final AnimationController _flipController;
   bool _hasSwappedCamera = false;
 
+  // 필터 전환 flash
+  bool _filterFlash = false;
+
+  // 강도 슬라이더
+  bool _showIntensitySlider = false;
+
   // 제스처 상태
   double _exposureDragStart = 0;
   double _exposureEVAtDragStart = 0;
@@ -183,11 +189,28 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     ];
   }
 
+  void _triggerFilterFlash() {
+    setState(() => _filterFlash = true);
+    Future.delayed(const Duration(milliseconds: 40), () {
+      if (mounted) setState(() => _filterFlash = false);
+    });
+  }
+
   // MARK: - Build
 
   @override
   Widget build(BuildContext context) {
     final cameraState = ref.watch(cameraProvider);
+
+    // 필터 변경 감지 → flash 트리거
+    ref.listen<FilterModel?>(
+      cameraProvider.select((s) => s.activeFilter),
+      (previous, next) {
+        if (previous?.id != next?.id && previous != null) {
+          _triggerFilterFlash();
+        }
+      },
+    );
 
     return Scaffold(
       backgroundColor: AppColors.cameraBg,
@@ -219,7 +242,16 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           // 5. 하단 컨트롤 (필터바 + 셔터 + 갤러리)
           _buildBottomControls(cameraState),
 
-          // 6. 온보딩 힌트 오버레이
+          // 6-a. 필터 전환 flash (200ms crossfade 효과)
+          IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _filterFlash ? 0.18 : 0.0,
+              duration: Duration(milliseconds: _filterFlash ? 30 : 200),
+              child: const ColoredBox(color: Colors.white),
+            ),
+          ),
+
+          // 6-b. 온보딩 힌트 오버레이
           if (_showSwipeHint) _buildSwipeHint(),
 
           // 7. 카메라 전환 중 플래시 오버레이 (좌우반전 글리치 방지)
@@ -346,13 +378,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
             ),
 
-            // 플래시 버튼
+            // 필터 강도 토글
             LiquidGlassPill(
-              onTap: () {}, // TODO: 플래시 토글
+              onTap: () => setState(() => _showIntensitySlider = !_showIntensitySlider),
               padding: const EdgeInsets.all(10),
-              child: const Icon(
-                Icons.flash_off_rounded,
-                color: AppColors.shutter,
+              child: Icon(
+                Icons.tune_rounded,
+                color: _showIntensitySlider
+                    ? AppColors.accent
+                    : AppColors.shutter,
                 size: 20,
               ),
             ),
@@ -373,6 +407,53 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 강도 슬라이더 (토글로 표시/숨김)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              height: _showIntensitySlider ? 44 : 0,
+              child: _showIntensitySlider
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimensions.paddingM,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.wb_sunny_outlined,
+                              color: Colors.white54, size: 16),
+                          Expanded(
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 2,
+                                thumbShape: const RoundSliderThumbShape(
+                                    enabledThumbRadius: 8),
+                                overlayShape: SliderComponentShape.noOverlay,
+                              ),
+                              child: Slider(
+                                value: cameraState.filterIntensity,
+                                min: 0.0,
+                                max: 1.0,
+                                onChanged: (v) => ref
+                                    .read(cameraProvider.notifier)
+                                    .setFilterIntensity(v),
+                                activeColor: Colors.white,
+                                inactiveColor: Colors.white24,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${(cameraState.filterIntensity * 100).toInt()}%',
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
             // 필터 스크롤 바
             RepaintBoundary(
               child: ClipRect(
