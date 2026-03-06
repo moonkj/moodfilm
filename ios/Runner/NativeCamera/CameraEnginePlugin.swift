@@ -70,6 +70,12 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
         case "isFrontCamera":
             result(cameraSession != nil)
 
+        case "startRecording":
+            handleStartRecording(result: result)
+
+        case "stopRecording":
+            handleStopRecording(result: result)
+
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -168,6 +174,43 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
     private func handleCapturePhoto(result: @escaping FlutterResult) {
         pendingCapturResult = result
         cameraSession?.capturePhoto()
+    }
+
+    // MARK: - 동영상 녹화
+
+    private func handleStartRecording(result: @escaping FlutterResult) {
+        guard let session = cameraSession else {
+            result(FlutterError(code: "NO_SESSION", message: "카메라 세션 없음", details: nil))
+            return
+        }
+        let outputPath = NSTemporaryDirectory() + "moodfilm_video_\(Int(Date().timeIntervalSince1970)).mp4"
+        session.startRecording(outputPath: outputPath)
+        result(outputPath)
+    }
+
+    private func handleStopRecording(result: @escaping FlutterResult) {
+        guard let session = cameraSession else {
+            result(FlutterError(code: "NO_SESSION", message: "카메라 세션 없음", details: nil))
+            return
+        }
+        session.stopRecording { [weak self] path in
+            guard let path = path else {
+                result(FlutterError(code: "RECORD_FAILED", message: "녹화 저장 실패", details: nil))
+                return
+            }
+            // 갤러리 저장
+            PHPhotoLibrary.requestAuthorization { status in
+                guard status == .authorized || status == .limited else {
+                    DispatchQueue.main.async { result(path) }
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: URL(fileURLWithPath: path))
+                }) { _, _ in
+                    DispatchQueue.main.async { result(path) }
+                }
+            }
+        }
     }
 }
 

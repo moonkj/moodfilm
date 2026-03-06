@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/models/effect_model.dart';
@@ -8,6 +9,8 @@ import '../models/camera_state.dart';
 
 class CameraNotifier extends StateNotifier<CameraState> {
   CameraNotifier() : super(const CameraState());
+
+  Timer? _recordingTimer;
 
   // MARK: - 초기화
 
@@ -44,6 +47,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
   @override
   void dispose() {
+    _recordingTimer?.cancel();
     CameraEngine.dispose();
     super.dispose();
   }
@@ -162,6 +166,46 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
   void clearError() {
     state = state.copyWith(errorMessage: null);
+  }
+
+  // MARK: - 카메라 모드 전환
+
+  void toggleCameraMode() {
+    if (state.isRecording) return;
+    final newMode = state.cameraMode == CameraMode.photo ? CameraMode.video : CameraMode.photo;
+    state = state.copyWith(cameraMode: newMode);
+    HapticUtils.filterChange();
+  }
+
+  // MARK: - 동영상 녹화
+
+  Future<void> startRecording() async {
+    if (!state.isReady || state.isRecording) return;
+    HapticUtils.shutter();
+    // 상태 먼저 업데이트 → UI 즉시 반응
+    state = state.copyWith(isRecording: true, recordingSeconds: 0);
+    // 녹화 시작 (비동기, await 불필요)
+    CameraEngine.startRecording();
+
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (state.isRecording) {
+        state = state.copyWith(recordingSeconds: state.recordingSeconds + 1);
+      }
+    });
+  }
+
+  Future<void> stopRecording() async {
+    if (!state.isRecording) return;
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+
+    HapticUtils.saveSuccess();
+    final path = await CameraEngine.stopRecording();
+    state = state.copyWith(
+      isRecording: false,
+      recordingSeconds: 0,
+      lastCapturedPath: path,
+    );
   }
 }
 

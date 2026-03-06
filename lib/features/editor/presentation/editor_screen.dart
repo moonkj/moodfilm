@@ -34,6 +34,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
   double _grain = 0;
   double _fade = 0;
 
+  // 이펙트 값
+  double _dreamyGlow = 0;
+  double _filmGrain = 0;
+
   // Before/After Split View
   bool _showSplitView = false;
   double _splitPosition = 0.5; // 0.0 ~ 1.0
@@ -328,10 +332,81 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
   // MARK: - 이펙트 패널
 
   Widget _buildEffectPanel() {
-    return const Center(
-      child: Text(
-        'W6에서 구현 예정',
-        style: TextStyle(color: Colors.white38),
+    return ListView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.paddingM,
+        vertical: AppDimensions.paddingS,
+      ),
+      children: [
+        _buildEffectTile(
+          icon: Icons.flare_rounded,
+          label: 'Dreamy Glow',
+          description: '몽환적인 빛번짐',
+          value: _dreamyGlow,
+          onChanged: (v) => setState(() => _dreamyGlow = v),
+        ),
+        const SizedBox(height: 8),
+        _buildEffectTile(
+          icon: Icons.grain_rounded,
+          label: 'Film Grain',
+          description: '필름 노이즈 텍스처',
+          value: _filmGrain,
+          onChanged: (v) => setState(() => _filmGrain = v),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEffectTile({
+    required IconData icon,
+    required String label,
+    required String description,
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.darkBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.accent, size: 18),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppTypography.filterName.copyWith(color: Colors.white)),
+                  Text(description, style: AppTypography.caption),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                '${(value * 100).toInt()}%',
+                style: AppTypography.caption.copyWith(color: Colors.white60),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+            ),
+            child: Slider(
+              value: value,
+              min: 0.0,
+              max: 1.0,
+              onChanged: onChanged,
+              activeColor: AppColors.accent,
+              inactiveColor: Colors.white24,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -364,7 +439,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
           'fade': _fade,
         },
         effects: {
-          'filmGrain': _grain,
+          'filmGrain': _filmGrain,
+          'dreamyGlow': _dreamyGlow,
         },
       );
 

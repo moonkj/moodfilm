@@ -2,6 +2,7 @@ import '../../../core/models/filter_model.dart';
 import '../../../core/models/effect_model.dart';
 
 enum CameraStatus { uninitialized, initializing, ready, capturing, error }
+enum CameraMode { photo, video }
 
 class CameraState {
   final CameraStatus status;
@@ -15,6 +16,9 @@ class CameraState {
   final String? errorMessage;
   final String? lastCapturedPath;
   final bool isFlipping; // 카메라 전환 중 플래시 오버레이용
+  final CameraMode cameraMode; // 사진 / 동영상 모드
+  final bool isRecording; // 동영상 녹화 중
+  final int recordingSeconds; // 녹화 경과 시간(초)
 
   const CameraState({
     this.status = CameraStatus.uninitialized,
@@ -28,6 +32,9 @@ class CameraState {
     this.errorMessage,
     this.lastCapturedPath,
     this.isFlipping = false,
+    this.cameraMode = CameraMode.photo,
+    this.isRecording = false,
+    this.recordingSeconds = 0,
   });
 
   CameraState copyWith({
@@ -42,6 +49,9 @@ class CameraState {
     String? errorMessage,
     String? lastCapturedPath,
     bool? isFlipping,
+    CameraMode? cameraMode,
+    bool? isRecording,
+    int? recordingSeconds,
   }) {
     return CameraState(
       status: status ?? this.status,
@@ -55,9 +65,13 @@ class CameraState {
       errorMessage: errorMessage ?? this.errorMessage,
       lastCapturedPath: lastCapturedPath ?? this.lastCapturedPath,
       isFlipping: isFlipping ?? this.isFlipping,
+      cameraMode: cameraMode ?? this.cameraMode,
+      isRecording: isRecording ?? this.isRecording,
+      recordingSeconds: recordingSeconds ?? this.recordingSeconds,
     );
   }
 
   bool get isReady => status == CameraStatus.ready;
   bool get isCapturing => status == CameraStatus.capturing;
+  bool get isVideoMode => cameraMode == CameraMode.video;
 }

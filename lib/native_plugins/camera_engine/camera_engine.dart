@@ -77,4 +77,17 @@ class CameraEngine {
   static Future<bool> isFrontCamera() async {
     return await _channel.invokeMethod<bool>('isFrontCamera') ?? true;
   }
+
+  /// 동영상 녹화 시작
+  /// Returns: 임시 출력 파일 경로
+  static Future<String> startRecording() async {
+    final path = await _channel.invokeMethod<String>('startRecording');
+    return path!;
+  }
+
+  /// 동영상 녹화 종료 + 갤러리 저장
+  /// Returns: 저장된 파일 경로
+  static Future<String?> stopRecording() async {
+    return _channel.invokeMethod<String>('stopRecording');
+  }
 }

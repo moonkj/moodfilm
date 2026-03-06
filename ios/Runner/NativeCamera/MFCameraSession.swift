@@ -21,6 +21,7 @@ class MFCameraSession: NSObject {
 
     private let captureSession = AVCaptureSession()
     private var videoOutput: AVCaptureVideoDataOutput?
+    private var audioOutput: AVCaptureAudioDataOutput?
     private var photoOutput: AVCapturePhotoOutput?
     private var currentDevice: AVCaptureDevice?
     private var isFront = true
@@ -30,6 +31,10 @@ class MFCameraSession: NSObject {
 
     var currentExposure: Float = 0.0 // -2EV ~ +2EV
     var currentZoom: CGFloat = 1.0
+
+    // MARK: - 동영상 녹화
+    private let recorder = MFVideoRecorder()
+    var isRecording: Bool { recorder.isRecording }
 
     // MARK: - Setup
 
@@ -75,10 +80,21 @@ class MFCameraSession: NSObject {
 
         if captureSession.canAddOutput(videoOut) {
             captureSession.addOutput(videoOut)
-            // isVideoMirrored은 AVCaptureVideoDataOutput 픽셀 데이터에 적용 안됨
-            // captureOutput에서 CIImage transform으로 직접 처리
         }
         videoOutput = videoOut
+
+        // 오디오 입력 + 출력 (녹화용)
+        if let audioDev = AVCaptureDevice.default(for: .audio),
+           let audioIn = try? AVCaptureDeviceInput(device: audioDev),
+           captureSession.canAddInput(audioIn) {
+            captureSession.addInput(audioIn)
+        }
+        let audioOut = AVCaptureAudioDataOutput()
+        audioOut.setSampleBufferDelegate(self, queue: processingQueue)
+        if captureSession.canAddOutput(audioOut) {
+            captureSession.addOutput(audioOut)
+        }
+        audioOutput = audioOut
 
         // 사진 출력
         let photoOut = AVCapturePhotoOutput()
@@ -168,47 +184,84 @@ class MFCameraSession: NSObject {
         settings.isHighResolutionPhotoEnabled = true
         photoOutput?.capturePhoto(with: settings, delegate: self)
     }
+
+    // MARK: - 동영상 녹화
+
+    func startRecording(outputPath: String) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            // 오디오 세션을 녹화 모드로 전환 (sessionQueue에서 실행 → 메인 스레드 block 방지)
+            let audioSession = AVAudioSession.sharedInstance()
+            try? audioSession.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
+            try? audioSession.setActive(true)
+
+            self.recorder.startRecording(
+                outputPath: outputPath,
+                videoSize: CGSize(width: 1920, height: 1080)
+            )
+        }
+    }
+
+    func stopRecording(completion: @escaping (String?) -> Void) {
+        recorder.stopRecording { url in
+            completion(url?.path)
+        }
+    }
 }
 
-// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate + AVCaptureAudioDataOutputSampleBufferDelegate
 
-extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate {
+extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
+
+        // 오디오 버퍼 처리 (녹화에만 사용)
+        if output === audioOutput {
+            recorder.appendAudioBuffer(sampleBuffer)
+            return
+        }
+
+        // 영상 버퍼 처리
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         let needsProcessing = lutEngine.intensity > 0 && (
             lutEngine.hasLUT || lutEngine.glowIntensity > 0 || lutEngine.grainIntensity > 0
         )
-        guard needsProcessing else {
-            delegate?.cameraSession(self, didOutput: pixelBuffer)
-            return
+
+        let outputBuffer: CVPixelBuffer
+        if needsProcessing {
+            let ciImage = lutEngine.apply(to: CIImage(cvPixelBuffer: pixelBuffer))
+            var processed: CVPixelBuffer?
+            let attrs: [String: Any] = [
+                kCVPixelBufferMetalCompatibilityKey as String: true,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+            ]
+            CVPixelBufferCreate(kCFAllocatorDefault,
+                                CVPixelBufferGetWidth(pixelBuffer),
+                                CVPixelBufferGetHeight(pixelBuffer),
+                                kCVPixelFormatType_32BGRA,
+                                attrs as CFDictionary,
+                                &processed)
+            if let proc = processed {
+                MFLUTEngine.ciContext.render(ciImage, to: proc,
+                                             bounds: CIImage(cvPixelBuffer: pixelBuffer).extent,
+                                             colorSpace: CGColorSpaceCreateDeviceRGB())
+                outputBuffer = proc
+            } else {
+                outputBuffer = pixelBuffer
+            }
+        } else {
+            outputBuffer = pixelBuffer
         }
 
-        let ciImage = lutEngine.apply(to: CIImage(cvPixelBuffer: pixelBuffer))
+        // 프리뷰 업데이트
+        delegate?.cameraSession(self, didOutput: outputBuffer)
 
-        var outputBuffer: CVPixelBuffer?
-        let attrs: [String: Any] = [
-            kCVPixelBufferCGImageCompatibilityKey as String: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
-            kCVPixelBufferMetalCompatibilityKey as String: true,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
-        ]
-        CVPixelBufferCreate(kCFAllocatorDefault,
-                            CVPixelBufferGetWidth(pixelBuffer),
-                            CVPixelBufferGetHeight(pixelBuffer),
-                            kCVPixelFormatType_32BGRA,
-                            attrs as CFDictionary,
-                            &outputBuffer)
-
-        if let out = outputBuffer {
-            MFLUTEngine.ciContext.render(ciImage, to: out,
-                                         bounds: CIImage(cvPixelBuffer: pixelBuffer).extent,
-                                         colorSpace: CGColorSpaceCreateDeviceRGB())
-            delegate?.cameraSession(self, didOutput: out)
-        } else {
-            delegate?.cameraSession(self, didOutput: pixelBuffer)
+        // 녹화 중이면 recorder에 전달
+        if recorder.isRecording {
+            let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            recorder.appendVideoBuffer(outputBuffer, timestamp: timestamp)
         }
     }
 }

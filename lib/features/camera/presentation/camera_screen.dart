@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' show pi;
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -402,16 +403,19 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
             ),
 
-            // 앱 로고 (중앙)
-            const Text(
-              'MoodFilm',
-              style: TextStyle(
-                color: AppColors.shutter,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 1.5,
+            // 중앙: 앱 로고 또는 녹화 타이머
+            if (cameraState.isRecording)
+              _buildRecordingTimer(cameraState.recordingSeconds)
+            else
+              const Text(
+                'MoodFilm',
+                style: TextStyle(
+                  color: AppColors.shutter,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1.5,
+                ),
               ),
-            ),
 
             // 필터 강도 토글
             LiquidGlassPill(
@@ -499,6 +503,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
             ),
 
+            // 사진/동영상 모드 전환 탭
+            _buildModeSelector(cameraState),
+
             // 셔터 영역
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -514,11 +521,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   // 갤러리 썸네일 (좌측)
                   _buildGalleryButton(cameraState),
 
-                  // 셔터 버튼 (중앙)
-                  ShutterButton(
-                    isCapturing: cameraState.isCapturing,
-                    onTap: () => ref.read(cameraProvider.notifier).capturePhoto(),
-                  ),
+                  // 셔터 / 녹화 버튼 (중앙)
+                  if (cameraState.isVideoMode)
+                    _buildVideoRecordButton(cameraState)
+                  else
+                    ShutterButton(
+                      isCapturing: cameraState.isCapturing,
+                      onTap: () => ref.read(cameraProvider.notifier).capturePhoto(),
+                    ),
 
                   // 전면/후면 전환 (우측)
                   LiquidGlassPill(
@@ -539,14 +549,112 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
   }
 
-  Widget _buildGalleryButton(CameraState cameraState) {
+  // MARK: - 녹화 타이머
+
+  Widget _buildRecordingTimer(int seconds) {
+    final mm = (seconds ~/ 60).toString().padLeft(2, '0');
+    final ss = (seconds % 60).toString().padLeft(2, '0');
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$mm:$ss',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // MARK: - 모드 선택 탭 (사진 / 동영상)
+
+  Widget _buildModeSelector(CameraState cameraState) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildModeTab('사진', !cameraState.isVideoMode, cameraState),
+          const SizedBox(width: 24),
+          _buildModeTab('동영상', cameraState.isVideoMode, cameraState),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeTab(String label, bool isActive, CameraState cameraState) {
     return GestureDetector(
       onTap: () {
+        if (!cameraState.isRecording) {
+          ref.read(cameraProvider.notifier).toggleCameraMode();
+        }
+      },
+      child: AnimatedDefaultTextStyle(
+        duration: const Duration(milliseconds: 200),
+        style: TextStyle(
+          color: isActive ? Colors.white : Colors.white38,
+          fontSize: 13,
+          fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+          letterSpacing: 0.5,
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
+  // MARK: - 동영상 녹화 버튼
+
+  Widget _buildVideoRecordButton(CameraState cameraState) {
+    final isRecording = cameraState.isRecording;
+    return GestureDetector(
+      onTap: () {
+        if (isRecording) {
+          ref.read(cameraProvider.notifier).stopRecording();
+        } else {
+          ref.read(cameraProvider.notifier).startRecording();
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+        ),
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: isRecording ? 28 : 52,
+            height: isRecording ? 28 : 52,
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(isRecording ? 6 : 26),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGalleryButton(CameraState cameraState) {
+    return GestureDetector(
+      onTap: () => context.push('/gallery'),
+      onLongPress: () {
         if (cameraState.lastCapturedPath != null) {
           context.push('/editor', extra: cameraState.lastCapturedPath);
         }
       },
-      onLongPress: () => context.push('/editor'),
       child: Container(
         width: AppDimensions.galleryThumbnailSize,
         height: AppDimensions.galleryThumbnailSize,
@@ -558,8 +666,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         child: cameraState.lastCapturedPath != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(7),
-                child: Image.asset(
-                  cameraState.lastCapturedPath!,
+                child: Image.file(
+                  File(cameraState.lastCapturedPath!),
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(
                     Icons.photo_library_outlined,

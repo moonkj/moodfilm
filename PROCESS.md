@@ -111,16 +111,34 @@ flutter build ios --release --no-codesign
 - [x] `FilterEnginePlugin.swift` Native 구현 (Full-res 처리 + 갤러리 저장)
 - [x] EditorScreen 저장 버튼 실제 연결 (`FilterEngine.processImage()`)
 - [x] 6종 슬라이더 CIFilter 연결 (Exposure, Contrast, Warmth, Saturation, Grain, Fade)
-- [ ] 갤러리 Import (photo_manager 연동)
+- [x] 갤러리 Import (photo_manager 연동) — GalleryPickerScreen, /gallery 라우트, 카메라 갤러리 버튼 연결
 - [ ] Split-View Before/After 개선 (filtered image 실제 반영)
+- [x] **갤러리 일괄 필터 적용** — 다중 선택 모드, 필터 바텀시트 선택, 일괄 FilterEngine.processImage 처리 → 갤러리 저장
 
-### ⏳ W6 — 이펙트 시스템
-- [ ] Dreamy Glow 실시간 강도 조절
-- [ ] Film Grain 연동
-- [ ] Dust Texture (Pro, 오버레이 이미지)
-- [ ] Light Leak (Pro, 그라디언트)
-- [ ] Date Stamp (Pro, 날짜 텍스트)
-- [ ] 이펙트 탭 UI 완성
+### ✅ W5b — 실시간 필터 프리뷰
+- [x] **카메라 프리뷰 실시간 LUT 적용** — AVSampleBufferDisplayLayer + CIColorCube Metal 렌더링
+  - MFCameraSession에서 CVPixelBuffer → CIImage → LUT → Metal 텍스처로 출력
+  - Flutter Texture 위젯 대신 Metal 기반 실시간 렌더링 파이프라인 구축
+  - 목표: 30fps @ iPhone 14 이상, 전환 crossfade 유지
+  - 기술 스택: AVCaptureVideoDataOutput → CIFilter(LUT) → CIContext(metal) → CVPixelBuffer → FlutterTexture
+
+### ✅ W6 — 이펙트 시스템
+- [x] Dreamy Glow 슬라이더 (EditorScreen 이펙트 탭, FilterEngine.processImage effects 연결)
+- [x] Film Grain 슬라이더 연동
+- [x] 이펙트 탭 UI 완성
+- [ ] Dust Texture (Pro, 오버레이 이미지) — v1.1
+- [ ] Light Leak (Pro, 그라디언트) — v1.1
+- [ ] Date Stamp (Pro, 날짜 텍스트) — v1.1
+
+### ✅ W6b — 동영상 필터 녹화
+- [x] **AVAssetWriter 기반 필터 녹화** — 실시간 LUT 적용 + 동영상 저장
+  - MFCameraSession에 녹화 모드 추가 (captureVideo start/stop)
+  - AVAssetWriter + AVAssetWriterInput (H.264/HEVC) + AVAssetWriterInputPixelBufferAdaptor
+  - 각 프레임: CVPixelBuffer → CIImage → LUT → CIContext.render → AVAssetWriterInputPixelBufferAdaptor
+  - 오디오: AVCaptureAudioDataOutput 병렬 처리
+  - 완성 파일 → 갤러리 저장 (PHPhotoLibrary)
+  - Flutter: 녹화 버튼 (길게 누르기 or 별도 버튼), 타이머, 진행률 표시
+  - 목표: 1080p 30fps H.264, 최대 60초
 
 ---
 
@@ -165,7 +183,7 @@ flutter build ios --release --no-codesign
 
 | 버전 | 시점 | 주요 내용 |
 |------|------|-----------|
-| v1.1 | 런칭+1개월 | 동영상 촬영, Spring Blossom Pack, Dynamic Island 카운트다운 |
+| v1.1 | 런칭+1개월 | 동영상 필터 녹화 (W6b), Spring Blossom Pack, Dynamic Island 카운트다운 |
 | v1.2 | 런칭+2개월 | 오늘의 필터 위젯 (WidgetKit), ColorGrid 피드 미리보기 |
 | v1.3 | 런칭+3개월 | Mood Match AI 필터 추천 (on-device CoreML), Android 출시 |
 | v2.0 | 런칭+6개월 | 커스텀 필터 생성, 커뮤니티 공유, Mood Journal |
@@ -185,8 +203,8 @@ flutter build ios --release --no-codesign
 
 ## 다음 세션에서 할 일
 
-1. Pretendard 폰트 파일 4개 `assets/fonts/`에 추가
-2. LUT 썸네일 이미지 8개 `assets/thumbnails/`에 추가
-3. CIColorCube 실시간 30fps 성능 측정 (실기기)
-4. 갤러리 Import (photo_manager 연동) — W5
-5. W4: 나머지 12종 LUT .cube 파일 제작
+1. **W5b: 카메라 프리뷰 실시간 LUT 적용** — Metal 렌더링 파이프라인 구축
+2. **W6b: 동영상 필터 녹화** — AVAssetWriter + LUT 실시간 적용 + 갤러리 저장
+3. **W5: 갤러리 일괄 필터 적용** — 다중 선택 → 일괄 처리
+4. LUT 썸네일 이미지 20개 `assets/thumbnails/`에 추가
+5. W4: 나머지 12종 LUT .cube 파일 썸네일 확인
