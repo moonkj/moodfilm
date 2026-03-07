@@ -165,20 +165,84 @@ flutter build ios --release --no-codesign
 
 ---
 
-## Phase 4: QA & Launch (W10-12) — 예정
+## Phase 4: QA & Launch (W10-14) — 진행 중
 
 ### ⏳ W10 — 성능 테스트
 - [ ] 기기별 테스트 (iPhone 12 / 14 / 15 Pro / 16)
 - [ ] Instruments 메모리/GPU 프로파일링
 
-### ⏳ W11 — App Store 준비
-- [ ] 스크린샷 5장
-- [ ] 프리뷰 영상 30초
-- [ ] ASO 최적화
+### ⏳ W11 — BerryFilm 벤치마킹 기능 추가 (세션 11)
+> BerryFilm(₩3,300, 4.8★, 40종) 분석 결과 반영
 
-### ⏳ W12 — 소프트 런칭
-- [ ] TestFlight 베타 50명
-- [ ] App Store 제출
+- [ ] **iOS 최소버전 17 → 16** — Podfile / project.pbxproj / Info.plist 수정 (잠재 사용자 ~15% 확대)
+- [ ] **필터 30종으로 확장** (현재 22종 → +8종)
+  - blossom, latte, pale, vivid, mocha, winter, bronze, noir
+  - generate_luts.py 파라미터 추가 → filter_model.dart 등록 → 썸네일 생성
+- [ ] **Light Leak 이펙트** — MFLUTEngine에 CIFilter 기반 가장자리 빛번짐 추가
+  - EditorScreen 이펙트 탭에 Light Leak 슬라이더 추가
+
+### ⏳ W12 — 라이브포토 지원 (세션 12)
+> BerryFilm 동등 기능, 핵심 차별점
+
+- [ ] **Swift (MFCameraSession.swift)**
+  - `photoOutput.isLivePhotoCaptureEnabled = true`
+  - `AVCapturePhotoSettings.livePhotoMovieFileURL` 지정 (임시 MOV 경로)
+  - `didFinishProcessingPhoto` + `didFinishRecordingLivePhotoMovieForEventualFileAt` 구현
+  - `PHAssetCreationRequest` → `.photo` + `.pairedVideo` 쌍으로 갤러리 저장
+- [ ] **Flutter**
+  - `UserPreferences`에 `@HiveField(10) bool isLivePhotoEnabled` 추가
+  - `CameraEngine.setLivePhotoEnabled(bool)` 메서드 추가
+  - 카메라 UI: 라이브포토 토글 버튼 (⊙ 아이콘, 활성 시 노랑)
+  - 설정화면에 라이브포토 토글 추가
+  - 무음셔터 ↔ 라이브포토 상호 배타 처리 (동시 불가)
+- [ ] `build_runner build` — Hive 어댑터 재생성
+
+### ⏳ W13 — App Store 준비 (세션 13)
+
+**가격:** ₩2,500 (Tier 2, 목표 ₩2,200에 가장 근접한 Apple 한국 티어)
+
+**스크린샷 5장 구성 (6.5" + 5.5"):**
+
+| 순서 | 화면 | 메시지 |
+|------|------|--------|
+| 1 | 카메라 + 필터 적용 중 | "탭 한 번으로 감성 사진" |
+| 2 | 필터 바 30종 스크롤 | "30가지 감성 필터" |
+| 3 | Before/After Split View | "내 사진이 이렇게 달라져요" |
+| 4 | 에디터 슬라이더 | "세밀한 편집까지" |
+| 5 | 갤러리 완성본 | "갤러리 사진도 OK" |
+
+**메타데이터:**
+- 앱 이름: `MoodFilm - 감성 필터 카메라`
+- 부제목: `뽀얗고 감성적인 사진`
+- 키워드: `필터카메라,감성필터,사진필터,셀카필터,필름감성,인스타감성,LUT필터,카메라앱,사진편집,무드필터`
+- 카테고리: 사진 및 비디오 (Photography)
+- 연령등급: 4+
+
+**App Store Connect 체크리스트:**
+- [ ] 앱 레코드 생성 (bundle ID: com.moodfilm.moodfilm)
+- [ ] 가격 Tier 2 (₩2,500) 설정
+- [ ] 앱 설명 (한국어 4000자)
+- [ ] 키워드 입력
+- [ ] 스크린샷 업로드 (6.5" × 5장, 5.5" × 5장)
+- [ ] 개인정보처리방침 URL (GitHub Pages 또는 Notion)
+- [ ] 아이콘 1024×1024 JPG (알파채널 없음)
+- [ ] 빌드 업로드 (Xcode Archive → Distribute → App Store Connect)
+
+### ⏳ W14 — TestFlight + App Store 제출 (세션 14)
+
+**심사 거절 위험 요소 사전 점검:**
+
+| 항목 | 대응 |
+|------|------|
+| 카메라 권한 설명 | Info.plist 구체적 설명 완료 |
+| 개인정보처리방침 URL | 생성 필요 |
+| 미구현 탭/버튼 | PaywallScreen 등 제거 확인 |
+| 아이콘 알파채널 | 1024×1024 JPG 확인 |
+| 크래시 | TestFlight 내부 테스터 검증 |
+
+- [ ] TestFlight 내부 테스터 (본인 + 지인 5~10명)
+- [ ] 크래시 / 버그 수정
+- [ ] App Store 제출 → 심사 대기 (보통 24~48시간)
 
 ---
 
@@ -186,8 +250,8 @@ flutter build ios --release --no-codesign
 
 | 버전 | 시점 | 주요 내용 |
 |------|------|-----------|
-| v1.1 | 런칭+1개월 | 동영상 필터 녹화 (W6b), Spring Blossom Pack, Dynamic Island 카운트다운 |
-| v1.2 | 런칭+2개월 | 오늘의 필터 위젯 (WidgetKit), ColorGrid 피드 미리보기 |
+| v1.1 | 런칭+1개월 | 매달 신규 필터 2~3종 업데이트, Dust Texture / Date Stamp 이펙트 |
+| v1.2 | 런칭+2개월 | 오늘의 필터 위젯 (WidgetKit), 홈화면 바로가기 |
 | v1.3 | 런칭+3개월 | Mood Match AI 필터 추천 (on-device CoreML), Android 출시 |
 | v2.0 | 런칭+6개월 | 커스텀 필터 생성, 커뮤니티 공유, Mood Journal |
 
@@ -212,11 +276,14 @@ flutter build ios --release --no-codesign
 |------|------|------|
 | 2026-03-06 | riverpod_generator 제외 | hive_generator와 analyzer 버전 충돌. Provider 수동 작성으로 대체 |
 | 2026-03-06 | build_runner 버전 | ^2.4.13 사용 (^2.4.14는 hive_generator와 충돌) |
-| 2026-03-06 | iOS 최소 버전 | 17.0 (Liquid Glass는 iOS 26 조건부 적용) |
+| 2026-03-06 | iOS 최소 버전 | 17.0 → W11에서 16.0으로 낮출 예정 |
 | 2026-03-06 | Firebase 초기화 | main.dart에서 주석 처리. GoogleService-Info.plist 추가 후 활성화 필요 |
 | 2026-03-06 | 수익 모델 | 구독(월간/연간) 제거 → 1회 구매 ₩29,900 (`lifetime`)으로 단순화 |
 | 2026-03-07 | 수익 모델 재확정 | IAP 완전 제거 → App Store 유료 앱으로 전환. 모든 필터 무제한 제공 |
 | 2026-03-07 | EditorScreen | 열릴 때/슬라이더 변경 시 자동 필터 프리뷰 생성 (이전: Long press만 가능) |
+| 2026-03-07 | 앱 가격 확정 | ₩2,500 (Tier 2, 목표 ₩2,200 → 가장 근접한 Apple KR 티어) |
+| 2026-03-07 | 필터 확장 계획 | 22종 → 30종 (W11), 매달 2~3종 업데이트 (런칭 후) |
+| 2026-03-07 | BerryFilm 벤치마킹 | 라이브포토(W12), Light Leak(W11), 필터 30종(W11), iOS 16 지원(W11) |
 
 ---
 
