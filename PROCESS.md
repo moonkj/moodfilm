@@ -144,12 +144,12 @@ flutter build ios --release --no-codesign
 
 ## Phase 3: Polish & Business (W7-9) — 예정
 
-### ✅ W7 — UI/UX 완성 (부분 완료)
+### ✅ W7 — UI/UX 완성
 - [x] `withOpacity()` → `withValues(alpha:)` 전체 교체 (Flutter 3.x 코딩 규칙)
 - [x] VoiceOver Semantics 레이블 (셔터, 설정, 카메라 전환, 필터 아이템)
-- [ ] Liquid Glass 전체 적용 확인
-- [ ] 모션 디자인 스펙 전체 구현 (계획서 6-7 기준)
-- [ ] Reduce Motion 대응
+- [x] Liquid Glass 전체 적용 확인 (카메라 사이드버튼 glass, 에디터 dark pill)
+- [x] 모션 디자인: Haptic Feedback 전체 연결 (셔터/전환/필터/즐겨찾기), 필터이름 AnimatedSwitcher
+- [x] Reduce Motion 대응: MediaQuery.disableAnimations → AnimationController duration 0
 
 ### ✅ W8 — 필터 라이브러리 완성
 - [x] 필터 스크롤바 끝 "전체" 버튼 → /library 이동
