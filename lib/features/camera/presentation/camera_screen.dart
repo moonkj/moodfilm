@@ -559,17 +559,28 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         child: cameraState.lastCapturedPath != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(7),
-                child: Image.file(
-                  File(cameraState.lastCapturedPath!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      const Icon(Icons.photo_library_outlined, color: Color(0xFF8A8480), size: 20),
-                ),
+                child: _isVideoFile(cameraState.lastCapturedPath!)
+                    ? const ColoredBox(
+                        color: Color(0xFF1A1A1A),
+                        child: Center(
+                          child: Icon(Icons.play_circle_outline_rounded,
+                              color: Colors.white70, size: 22),
+                        ),
+                      )
+                    : Image.file(
+                        File(cameraState.lastCapturedPath!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.photo_library_outlined, color: Color(0xFF8A8480), size: 20),
+                      ),
               )
             : const Icon(Icons.photo_library_outlined, color: Color(0xFF8A8480), size: 20),
       ),
     );
   }
+
+  bool _isVideoFile(String path) =>
+      path.toLowerCase().endsWith('.mp4') || path.toLowerCase().endsWith('.mov');
 
   // MARK: - 동영상 녹화 버튼
 

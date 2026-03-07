@@ -33,6 +33,28 @@ class FilterEngine {
     });
   }
 
+  /// 동영상에 LUT 필터 적용 후 갤러리 저장
+  /// [sourcePath] 원본 동영상 경로
+  /// [lutFileName] .cube 파일명
+  /// [intensity] 0.0 ~ 1.0
+  /// [effects] 이펙트 타입 → 강도
+  /// Returns: 처리된 동영상 파일 경로
+  static Future<String?> processVideo({
+    required String sourcePath,
+    required String lutFileName,
+    required double intensity,
+    Map<String, double>? effects,
+    bool saveToGallery = true,
+  }) async {
+    return _channel.invokeMethod<String>('processVideo', {
+      'sourcePath': sourcePath,
+      'lutFile': lutFileName,
+      'intensity': intensity,
+      'effects': effects ?? {},
+      'saveToGallery': saveToGallery,
+    });
+  }
+
   /// 이미지 썸네일 생성 (필터 미리보기용)
   /// Returns: 썸네일 바이트 데이터
   static Future<List<int>?> generateThumbnail({

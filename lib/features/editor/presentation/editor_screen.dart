@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_typography.dart';
-import '../../../core/theme/liquid_glass_decoration.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';
@@ -21,12 +20,20 @@ class EditorScreen extends ConsumerStatefulWidget {
 
 class _EditorScreenState extends ConsumerState<EditorScreen> {
 
+  // 기본 조정
   double _exposure = 0;
   double _contrast = 0;
-  double _warmth = 0;
+  double _highlights = 0;
+  double _shadows = 0;
   double _saturation = 0;
-  double _grain = 0;
+  double _temperature = 0;
+  double _tint = 0;
+  // 디테일 조정
+  double _sharpness = 0;
   double _fade = 0;
+  double _vignette = 0;
+  double _skinTone = 0;
+  // 이펙트
   double _dreamyGlow = 0;
   double _filmGrain = 0;
   double _beauty = 0;
@@ -49,15 +56,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   bool _hasAdjustments() =>
-      _exposure != 0 || _contrast != 0 || _warmth != 0 ||
-      _saturation != 0 || _grain != 0 || _fade != 0;
+      _exposure != 0 || _contrast != 0 || _highlights != 0 || _shadows != 0 ||
+      _saturation != 0 || _temperature != 0 || _tint != 0 ||
+      _sharpness != 0 || _fade != 0 || _vignette != 0 || _skinTone != 0;
 
   bool _hasEffects() => _dreamyGlow != 0 || _filmGrain != 0 || _beauty != 0;
 
   void _resetAdjustments() {
     setState(() {
-      _exposure = 0; _contrast = 0; _warmth = 0;
-      _saturation = 0; _grain = 0; _fade = 0;
+      _exposure = 0; _contrast = 0; _highlights = 0; _shadows = 0;
+      _saturation = 0; _temperature = 0; _tint = 0;
+      _sharpness = 0; _fade = 0; _vignette = 0; _skinTone = 0;
     });
     _generatePreview();
   }
@@ -127,10 +136,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       sourcePath: widget.imagePath!,
       lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
       intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
-      adjustments: {
-        'exposure': _exposure, 'contrast': _contrast,
-        'warmth': _warmth, 'saturation': _saturation, 'fade': _fade,
-      },
+      adjustments: _buildAdjustments(),
       effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty},
     );
     if (mounted) {
@@ -146,29 +152,42 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            LiquidGlassPill(
-              onTap: () => Navigator.of(context).pop(),
-              padding: const EdgeInsets.all(10),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-            ),
-            LiquidGlassPill(
-              onTap: () => setState(() => _showSplitView = !_showSplitView),
-              padding: const EdgeInsets.all(10),
-              child: Icon(
-                Icons.compare_rounded,
-                color: _showSplitView ? AppColors.accent : Colors.white,
-                size: 20,
-              ),
-            ),
-            LiquidGlassPill(
-              onTap: _saveImage,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              child: const Text('저장',
-                  style: TextStyle(color: Colors.white, fontSize: 14,
-                      fontWeight: FontWeight.w600)),
-            ),
+            _darkCircleBtn(Icons.close_rounded, () => Navigator.of(context).pop()),
+            _darkPillBtn('저장', _saveImage),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _darkCircleBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40, height: 40,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 0.5),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
+  Widget _darkPillBtn(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 0.5),
+        ),
+        child: Text(label,
+            style: const TextStyle(color: Colors.white, fontSize: 14,
+                fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -271,26 +290,47 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           height: height,
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-                AppDimensions.paddingM, 24, AppDimensions.paddingM, 8),
+                AppDimensions.paddingM, 12, AppDimensions.paddingM, 8),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSlider('Exposure', _exposure, -1.0, 1.0,
+                _sectionLabel('기본'),
+                _buildSlider('노출', _exposure, -1.0, 1.0,
                     (v) => setState(() => _exposure = v),
                     onChangeEnd: (_) => _generatePreview()),
-                _buildSlider('Contrast', _contrast, -1.0, 1.0,
+                _buildSlider('대비', _contrast, -1.0, 1.0,
                     (v) => setState(() => _contrast = v),
                     onChangeEnd: (_) => _generatePreview()),
-                _buildSlider('Warmth', _warmth, -1.0, 1.0,
-                    (v) => setState(() => _warmth = v),
-                    onChangeEnd: (_) => _generatePreview()),
-                _buildSlider('Saturation', _saturation, -1.0, 1.0,
+                _buildSlider('채도', _saturation, -1.0, 1.0,
                     (v) => setState(() => _saturation = v),
                     onChangeEnd: (_) => _generatePreview()),
-                _buildSlider('Grain', _grain, 0.0, 1.0,
-                    (v) => setState(() => _grain = v),
+                _buildSlider('하이라이트', _highlights, -1.0, 1.0,
+                    (v) => setState(() => _highlights = v),
                     onChangeEnd: (_) => _generatePreview()),
-                _buildSlider('Fade', _fade, 0.0, 1.0,
+                _buildSlider('그림자', _shadows, -1.0, 1.0,
+                    (v) => setState(() => _shadows = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                const SizedBox(height: 4),
+                _sectionLabel('색온도'),
+                _buildSlider('온도', _temperature, -1.0, 1.0,
+                    (v) => setState(() => _temperature = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('틴트', _tint, -1.0, 1.0,
+                    (v) => setState(() => _tint = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('피부톤', _skinTone, -1.0, 1.0,
+                    (v) => setState(() => _skinTone = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                const SizedBox(height: 4),
+                _sectionLabel('디테일'),
+                _buildSlider('선명도', _sharpness, -1.0, 1.0,
+                    (v) => setState(() => _sharpness = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('페이드', _fade, 0.0, 1.0,
                     (v) => setState(() => _fade = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('비네트', _vignette, 0.0, 1.0,
+                    (v) => setState(() => _vignette = v),
                     onChangeEnd: (_) => _generatePreview()),
               ],
             ),
@@ -352,8 +392,20 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         children: [
           Stack(
             children: [
-              LiquidGlassPill(
-                padding: const EdgeInsets.all(12),
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.accent.withValues(alpha: 0.3)
+                      : Colors.black.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isActive
+                        ? AppColors.accent.withValues(alpha: 0.6)
+                        : Colors.white.withValues(alpha: 0.15),
+                    width: 0.5,
+                  ),
+                ),
                 child: Icon(icon,
                     color: isActive ? AppColors.accent : Colors.white,
                     size: 22),
@@ -481,7 +533,36 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     );
   }
 
+  Map<String, double> _buildAdjustments() => {
+    'exposure': _exposure,
+    'contrast': _contrast,
+    'highlights': _highlights,
+    'shadows': _shadows,
+    'saturation': _saturation,
+    'temperature': _temperature,
+    'tint': _tint,
+    'sharpness': _sharpness,
+    'fade': _fade,
+    'vignette': _vignette,
+    'skinTone': _skinTone,
+  };
+
   Widget _buildEditPanel() => const SizedBox.shrink(); // 미사용 (호환성용)
+
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white38,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
 
   Widget _buildSlider(String label, double value, double min, double max,
       ValueChanged<double> onChanged, {ValueChanged<double>? onChangeEnd}) {
@@ -533,10 +614,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         sourcePath: widget.imagePath!,
         lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
         intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
-        adjustments: {
-          'exposure': _exposure, 'contrast': _contrast,
-          'warmth': _warmth, 'saturation': _saturation, 'fade': _fade,
-        },
+        adjustments: _buildAdjustments(),
         effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty},
         saveToGallery: true,
       );

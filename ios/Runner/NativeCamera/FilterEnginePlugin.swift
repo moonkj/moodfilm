@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import CoreImage
+import AVFoundation
 import Photos
 
 /// 갤러리 이미지 필터 처리 플러그인
@@ -22,6 +23,8 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         switch call.method {
         case "processImage":
             handleProcessImage(call: call, result: result)
+        case "processVideo":
+            handleProcessVideo(call: call, result: result)
         case "generateThumbnail":
             handleGenerateThumbnail(call: call, result: result)
         default:
@@ -138,6 +141,86 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         }
     }
 
+    // MARK: - processVideo
+
+    private func handleProcessVideo(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let sourcePath = args["sourcePath"] as? String,
+              let lutFile = args["lutFile"] as? String,
+              let intensity = args["intensity"] as? Double else {
+            result(FlutterError(code: "INVALID_ARGS", message: "sourcePath, lutFile, intensity 필요", details: nil))
+            return
+        }
+
+        let effects = args["effects"] as? [String: Double] ?? [:]
+        let saveToGallery = args["saveToGallery"] as? Bool ?? true
+
+        let sourceURL = URL(fileURLWithPath: sourcePath)
+        let asset = AVURLAsset(url: sourceURL)
+
+        // 각 프레임에 적용할 LUT 엔진 (인스턴스 캡처용)
+        let engine = MFLUTEngine()
+        if !lutFile.isEmpty {
+            engine.loadLUT(named: lutFile)
+            engine.intensity = Float(intensity)
+        } else {
+            engine.intensity = 0.0
+        }
+        engine.glowIntensity = Float(effects["dreamyGlow"] ?? 0)
+        engine.grainIntensity = Float(effects["filmGrain"] ?? 0)
+        engine.beautyIntensity = Float(effects["beauty"] ?? 0)
+
+        // AVVideoComposition으로 각 프레임에 CIFilter 적용
+        let composition = AVVideoComposition(asset: asset) { request in
+            let filtered = engine.apply(to: request.sourceImage.clampedToExtent())
+                .cropped(to: request.sourceImage.extent)
+            request.finish(with: filtered, context: nil)
+        }
+
+        let outputPath = NSTemporaryDirectory() + "moodfilm_video_\(Int(Date().timeIntervalSince1970)).mp4"
+        let outputURL = URL(fileURLWithPath: outputPath)
+        try? FileManager.default.removeItem(at: outputURL)
+
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
+            result(FlutterError(code: "EXPORT_FAILED", message: "AVAssetExportSession 생성 실패", details: nil))
+            return
+        }
+
+        exportSession.videoComposition = composition
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+
+        exportSession.exportAsynchronously {
+            guard exportSession.status == .completed else {
+                DispatchQueue.main.async {
+                    result(FlutterError(
+                        code: "EXPORT_FAILED",
+                        message: exportSession.error?.localizedDescription ?? "내보내기 실패",
+                        details: nil
+                    ))
+                }
+                return
+            }
+
+            guard saveToGallery else {
+                DispatchQueue.main.async { result(outputPath) }
+                return
+            }
+
+            PHPhotoLibrary.requestAuthorization { status in
+                guard status == .authorized || status == .limited else {
+                    DispatchQueue.main.async { result(outputPath) }
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: outputURL)
+                }) { _, _ in
+                    DispatchQueue.main.async { result(outputPath) }
+                }
+            }
+        }
+    }
+
     // MARK: - generateThumbnail
 
     private func handleGenerateThumbnail(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -206,17 +289,32 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
 
     private func applyAdjustments(to image: CIImage, adjustments: [String: Double]) -> CIImage {
         var result = image
+        let extent = image.extent
 
-        // Exposure (CIExposureAdjust)
+        // 1. Exposure (CIExposureAdjust)
         if let ev = adjustments["exposure"], ev != 0 {
             if let filter = CIFilter(name: "CIExposureAdjust") {
                 filter.setValue(result, forKey: kCIInputImageKey)
-                filter.setValue(ev, forKey: kCIInputEVKey)
+                filter.setValue(ev * 2.0, forKey: kCIInputEVKey)
                 result = filter.outputImage ?? result
             }
         }
 
-        // Contrast + Saturation (CIColorControls)
+        // 2. Highlights + Shadows (CIHighlightShadowAdjust)
+        let highlights = adjustments["highlights"] ?? 0
+        let shadows = adjustments["shadows"] ?? 0
+        if highlights != 0 || shadows != 0 {
+            if let filter = CIFilter(name: "CIHighlightShadowAdjust") {
+                filter.setValue(result, forKey: kCIInputImageKey)
+                // inputHighlightAmount: 0~2, default 1.0 (낮을수록 하이라이트 복구)
+                filter.setValue(1.0 + Float(highlights) * 0.7, forKey: "inputHighlightAmount")
+                // inputShadowAmount: -1~1, default 0 (양수 = 그림자 밝히기)
+                filter.setValue(Float(shadows) * 0.7, forKey: "inputShadowAmount")
+                result = filter.outputImage ?? result
+            }
+        }
+
+        // 3. Contrast + Saturation (CIColorControls)
         let contrast = adjustments["contrast"] ?? 0
         let saturation = adjustments["saturation"] ?? 0
         if contrast != 0 || saturation != 0 {
@@ -228,19 +326,57 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             }
         }
 
-        // Warmth (CITemperatureAndTint) — warmth 값을 온도 오프셋으로 변환
-        if let warmth = adjustments["warmth"], warmth != 0 {
+        // 4. Temperature + Tint (CITemperatureAndTint)
+        // "temperature" 키 우선, 없으면 이전 "warmth" 키 호환
+        let temperature = adjustments["temperature"] ?? adjustments["warmth"] ?? 0
+        let tint = adjustments["tint"] ?? 0
+        if temperature != 0 || tint != 0 {
             if let filter = CIFilter(name: "CITemperatureAndTint") {
                 filter.setValue(result, forKey: kCIInputImageKey)
-                // neutral = CIVector(x: 6500 + warmth*1500, y: 0)
-                let temp = 6500.0 + warmth * 1500.0
+                let temp = 6500.0 + temperature * 1500.0
                 filter.setValue(CIVector(x: temp, y: 0), forKey: "inputNeutral")
-                filter.setValue(CIVector(x: 6500, y: 0), forKey: "inputTargetNeutral")
+                filter.setValue(CIVector(x: 6500.0, y: tint * 50.0), forKey: "inputTargetNeutral")
                 result = filter.outputImage ?? result
             }
         }
 
-        // Fade (밝기 + 알파 블렌드로 구현)
+        // 5. Skin Tone — CIHueAdjust: 피부 오렌지/핑크 계열 미세 보정
+        if let skinTone = adjustments["skinTone"], skinTone != 0 {
+            if let filter = CIFilter(name: "CIHueAdjust") {
+                filter.setValue(result, forKey: kCIInputImageKey)
+                filter.setValue(Float(skinTone) * 0.15, forKey: kCIInputAngleKey)
+                result = filter.outputImage ?? result
+            }
+        }
+
+        // 6. Sharpness / Blur (양수=선명, 음수=흐림)
+        if let sharpness = adjustments["sharpness"], sharpness != 0 {
+            if sharpness > 0 {
+                if let filter = CIFilter(name: "CISharpenLuminance") {
+                    filter.setValue(result, forKey: kCIInputImageKey)
+                    filter.setValue(Float(sharpness) * 1.5, forKey: kCIInputSharpnessKey)
+                    result = filter.outputImage?.cropped(to: extent) ?? result
+                }
+            } else {
+                if let filter = CIFilter(name: "CIGaussianBlur") {
+                    filter.setValue(result, forKey: kCIInputImageKey)
+                    filter.setValue(Float(-sharpness) * 4.0, forKey: kCIInputRadiusKey)
+                    result = filter.outputImage?.cropped(to: extent) ?? result
+                }
+            }
+        }
+
+        // 7. Vignette (CIVignette)
+        if let vignette = adjustments["vignette"], vignette > 0 {
+            if let filter = CIFilter(name: "CIVignette") {
+                filter.setValue(result, forKey: kCIInputImageKey)
+                filter.setValue(Float(vignette) * 2.0, forKey: kCIInputIntensityKey)
+                filter.setValue(Float(1.0 - vignette * 0.3), forKey: kCIInputRadiusKey)
+                result = filter.outputImage ?? result
+            }
+        }
+
+        // 8. Fade (CIColorMatrix — 밝기 압축으로 페이드 효과)
         if let fade = adjustments["fade"], fade > 0 {
             if let filter = CIFilter(name: "CIColorMatrix") {
                 filter.setValue(result, forKey: kCIInputImageKey)

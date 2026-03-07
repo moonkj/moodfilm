@@ -222,13 +222,18 @@ class CameraNotifier extends StateNotifier<CameraState> {
     _recordingTimer?.cancel();
     _recordingTimer = null;
 
-    HapticUtils.saveSuccess();
-    final path = await CameraEngine.stopRecording();
-    state = state.copyWith(
-      isRecording: false,
-      recordingSeconds: 0,
-      lastCapturedPath: path,
-    );
+    try {
+      final path = await CameraEngine.stopRecording();
+      HapticUtils.saveSuccess();
+      state = state.copyWith(
+        isRecording: false,
+        recordingSeconds: 0,
+        lastCapturedPath: path,
+      );
+    } catch (_) {
+      // 네이티브 실패 시에도 상태는 반드시 리셋
+      state = state.copyWith(isRecording: false, recordingSeconds: 0);
+    }
   }
 }
 

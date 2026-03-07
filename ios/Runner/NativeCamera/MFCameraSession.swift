@@ -232,11 +232,6 @@ class MFCameraSession: NSObject {
     func startRecording(outputPath: String) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
-            // 오디오 세션을 녹화 모드로 전환 (sessionQueue에서 실행 → 메인 스레드 block 방지)
-            let audioSession = AVAudioSession.sharedInstance()
-            try? audioSession.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
-            try? audioSession.setActive(true)
-
             self.recorder.startRecording(
                 outputPath: outputPath,
                 videoSize: CGSize(width: 1920, height: 1080)
@@ -245,8 +240,12 @@ class MFCameraSession: NSObject {
     }
 
     func stopRecording(completion: @escaping (String?) -> Void) {
-        recorder.stopRecording { url in
-            completion(url?.path)
+        // processingQueue로 직렬화: 진행 중인 appendVideoBuffer가 모두 끝난 뒤 stop
+        processingQueue.async { [weak self] in
+            guard let self = self else { completion(nil); return }
+            self.recorder.stopRecording { url in
+                completion(url?.path)
+            }
         }
     }
 
@@ -310,31 +309,34 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
 
         // 프리뷰: 항상 원본 1920×1080 버퍼 전달 (비율 크롭은 Flutter 레이어에서 처리)
         // 크롭은 실제 사진/동영상 저장 시에만 적용 (photoOutput 참조)
-        let needsFilter = lutEngine.intensity > 0 && (
-            lutEngine.hasLUT || lutEngine.glowIntensity > 0 ||
-            lutEngine.grainIntensity > 0 || lutEngine.beautyIntensity > 0
-        )
+        // LUT 필터와 이펙트를 독립적으로 체크 (AND 조건 제거)
+        let hasLUTFilter = lutEngine.intensity > 0 && lutEngine.hasLUT
+        let hasEffect = lutEngine.glowIntensity > 0 || lutEngine.grainIntensity > 0 || lutEngine.beautyIntensity > 0
+        let needsFilter = hasLUTFilter || hasEffect
 
         let outputBuffer: CVPixelBuffer
         if needsFilter {
             var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
             ciImage = lutEngine.apply(to: ciImage)
 
-            let outW = Int(ciImage.extent.width)
-            let outH = Int(ciImage.extent.height)
+            // extent 대신 원본 버퍼 크기 사용 (CIFilter extent 변동 방지)
+            let outW = CVPixelBufferGetWidth(pixelBuffer)
+            let outH = CVPixelBufferGetHeight(pixelBuffer)
             var processed: CVPixelBuffer?
             let attrs: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferMetalCompatibilityKey as String: true,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [:],
             ]
-            CVPixelBufferCreate(kCFAllocatorDefault, outW, outH,
+            let status = CVPixelBufferCreate(kCFAllocatorDefault, outW, outH,
                                 kCVPixelFormatType_32BGRA, attrs as CFDictionary, &processed)
-            if let proc = processed {
+            if status == kCVReturnSuccess, let proc = processed {
                 MFLUTEngine.ciContext.render(ciImage, to: proc,
-                                             bounds: ciImage.extent,
+                                             bounds: CGRect(x: 0, y: 0, width: outW, height: outH),
                                              colorSpace: CGColorSpaceCreateDeviceRGB())
                 outputBuffer = proc
             } else {
+                print("[MFCameraSession] CVPixelBufferCreate 실패: \(status)")
                 outputBuffer = pixelBuffer
             }
         } else {

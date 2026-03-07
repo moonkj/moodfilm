@@ -320,6 +320,82 @@ flutter build ios --release --no-codesign
 
 ---
 
+---
+
+## 세션 8 변경사항 (2026-03-07)
+
+### 동영상 필터 처리 추가
+
+**Native (FilterEnginePlugin.swift):**
+- `import AVFoundation` 추가
+- `handleProcessVideo` 메서드 추가:
+  - `AVVideoComposition(asset:applyingCIFiltersWithHandler:)` — 각 프레임에 CIColorCube LUT 적용
+  - `AVAssetExportSession` (AVAssetExportPresetHighestQuality) → 임시 MP4로 내보내기
+  - `PHPhotoLibrary.performChanges` → 갤러리 저장
+  - 완료 시 저장된 파일 경로 반환
+
+**Flutter (filter_engine.dart):**
+- `FilterEngine.processVideo()` static 메서드 추가
+  - 파라미터: `sourcePath`, `lutFileName`, `intensity`, `effects`, `saveToGallery`
+  - Method Channel: `processVideo`
+
+### VideoPlayerScreen 필터 UI 추가 (신규 파일)
+
+- `lib/features/gallery/presentation/video_player_screen.dart` 신규 생성
+- AppBar "필터 적용" TextButton → 바텀시트에서 필터 선택
+- `_applyFilter(FilterModel filter)` → `FilterEngine.processVideo()` 호출 + 처리 중 오버레이 표시
+- `_VideoFilterPickerSheet` — 무료 필터 가로 스크롤 목록
+
+### 갤러리 일괄 필터: 동영상 자동 건너뜀
+
+- `_applyBatchFilter`에서 `AssetType.video` 자산은 건너뛰고 `_processedCount` 증가 후 다음으로 진행
+
+### 갤러리 삭제 버그 수정
+
+**원인:** `deleteWithIds` 후 `PHAssetChangeRequest` 완료 전 `getAssetListPaged` 재호출 → count 동일 → 실패 판정
+
+**수정 내용:**
+- 낙관적 UI 업데이트: `deleteWithIds` 호출 후 즉시 `_assets`에서 제거
+- `PhotoManager.addChangeCallback(_onPhotosChanged)` + `startChangeNotify()` 추가 → iOS Photos 변경 시 `_quietReload()` 자동 트리거
+- "삭제 실패 또는 취소되었습니다" 오류 메시지 제거 → 항상 "X개를 삭제했습니다" 표시
+
+### 갤러리 사진 탭 → 잘못된 사진 표시 버그 수정
+
+**원인:** Flutter가 GridView 아이템 재사용 시 `_AssetThumbnailState._bytes`가 이전 항목 데이터를 유지
+
+**수정:**
+- `_AssetThumbnail`에 `ValueKey(asset.id)` 추가 → 재사용 방지
+- `_AssetThumbnail` 생성자에 `super.key` 추가
+- `didUpdateWidget` 오버라이드: `asset.id` 변경 시 `_bytes = null` 리셋 후 재로드
+
+### 에디터 → 카메라로 돌아가는 네비게이션 버그 수정
+
+**원인:** `_selectAsset`에서 `context.pop()` 후 `context.push('/editor')` → 갤러리 스택이 pop됨
+
+**수정:** `context.pop()` 제거 → 갤러리를 유지한 채 `/editor` push
+
+### 에디터 버튼 가시성 개선 (어두운 동그란 버튼 스타일)
+
+**원인:** `LiquidGlassPill` (흰색 8% opacity) → 밝은 사진 위에서 안 보임
+
+**수정:**
+- `_darkCircleBtn(IconData, VoidCallback)` 헬퍼 추가: 40×40px 반투명 검은 원 (`Colors.black.withValues(alpha:0.5)`) + 흰색 테두리 0.5px
+- `_darkPillBtn(String, VoidCallback)` 헬퍼 추가: 저장 버튼 pill 스타일
+- X 버튼, 저장 버튼: LiquidGlassPill → `_darkCircleBtn` / `_darkPillBtn` 교체
+- 탭 버튼 (필터/조정/이펙트): 48px 원 + 활성 시 `AppColors.accent.withValues(alpha:0.3)`, 비활성 시 검은 반투명
+
+### 버그 수정 요약
+
+| 버그 | 원인 | 수정 |
+|------|------|------|
+| 갤러리 삭제 후 그대로 보임 | iOS 캐시 미반영 시 낙관적 업데이트 미사용 | optimistic UI + changeCallback 자동 동기화 |
+| 잘못된 사진 표시 | GridView 아이템 재사용, 상태 미초기화 | ValueKey + didUpdateWidget 리셋 |
+| 에디터 종료 시 카메라로 이동 | context.pop()이 갤러리를 스택에서 제거 | context.pop() 제거 |
+| 에디터 버튼 안 보임 | LiquidGlassPill 투명도 부족 | 어두운 반투명 원/pill 스타일로 교체 |
+| 일괄 필터 적용 시 동영상에서 멈춤 | 동영상 자산에 이미지 처리 시도 | 동영상 건너뜀 처리 |
+
+---
+
 ## 다음 세션에서 할 일
 
 1. **필터 썸네일 20개** — 실기기에서 필터 적용 후 스크린샷으로 `assets/thumbnails/<id>.jpg` 생성

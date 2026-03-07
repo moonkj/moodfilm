@@ -165,13 +165,11 @@ class _FilterItem extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // 썸네일 이미지 (없으면 필터별 대표 컬러 fallback)
+                    // 썸네일 이미지 (없으면 필터별 그라디언트 fallback)
                     Image.asset(
                       filter.thumbnailAssetPath,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: _filterFallbackColor(filter),
-                      ),
+                      errorBuilder: (_, __, ___) => _filterFallbackGradient(filter),
                     ),
                     // NEW 배지
                     if (filter.isNew)
@@ -216,44 +214,72 @@ class _FilterItem extends StatelessWidget {
     );
   }
 
-  Color _filterFallbackColor(FilterModel filter) {
-    // 썸네일 없을 때 필터별 대표 컬러 (각 필터의 실제 색감 기준)
+  // 필터별 (base, highlight) 그라디언트 컬러
+  (Color, Color) _filterColors(FilterModel filter) {
     switch (filter.id) {
-      // Signature
-      case 'mood':        return const Color(0xFFD4A88C); // 따뜻한 드리미 베이지
-      case 'dream':       return const Color(0xFFB898D0); // 보랏빛 안개
-      // Warm
-      case 'milk':        return const Color(0xFFF8F2EC);
-      case 'cream':       return const Color(0xFFF5E0B8);
-      case 'butter':      return const Color(0xFFEED888);
-      case 'honey':       return const Color(0xFFD49040);
-      case 'peach':       return const Color(0xFFF0A880);
-      // Cool
-      case 'sky':         return const Color(0xFF88C0E8);
-      case 'ocean':       return const Color(0xFF3C7498);
-      case 'mint':        return const Color(0xFF80D4B0);
-      case 'cloud':       return const Color(0xFFD4ECF8);
-      case 'ice':         return const Color(0xFFB0DCF4);
-      // Film
-      case 'film98':      return const Color(0xFFC0A880);
-      case 'film03':      return const Color(0xFFD0BC88);
-      case 'disposable':  return const Color(0xFFD0B470);
-      case 'retro_ccd':   return const Color(0xFF8CA08C);
-      case 'kodak_soft':  return const Color(0xFFC8C0A0);
-      // Aesthetic
-      case 'soft_pink':   return const Color(0xFFF4A8C0);
-      case 'lavender':    return const Color(0xFFC0A0DC);
-      case 'dusty_blue':  return const Color(0xFF7890B8);
-      case 'cafe_mood':   return const Color(0xFFC09060);
-      case 'seoul_night': return const Color(0xFF3C3C7C);
+      case 'mood':        return (const Color(0xFFD4A88C), const Color(0xFFF2D4B8));
+      case 'dream':       return (const Color(0xFF9070C0), const Color(0xFFD0B8F0));
+      case 'milk':        return (const Color(0xFFE8DDD0), const Color(0xFFFBF7F2));
+      case 'cream':       return (const Color(0xFFD4A870), const Color(0xFFF5E0B8));
+      case 'butter':      return (const Color(0xFFD4B840), const Color(0xFFEED888));
+      case 'honey':       return (const Color(0xFFA86820), const Color(0xFFD49040));
+      case 'peach':       return (const Color(0xFFD07858), const Color(0xFFF0B898));
+      case 'sky':         return (const Color(0xFF5090C8), const Color(0xFFB0D8F0));
+      case 'ocean':       return (const Color(0xFF245878), const Color(0xFF5090B8));
+      case 'mint':        return (const Color(0xFF40A880), const Color(0xFF90D8B8));
+      case 'cloud':       return (const Color(0xFF90B8D8), const Color(0xFFD8EEF8));
+      case 'ice':         return (const Color(0xFF70B0D8), const Color(0xFFB8DDF0));
+      case 'film98':      return (const Color(0xFF907050), const Color(0xFFCAAA80));
+      case 'film03':      return (const Color(0xFFA09060), const Color(0xFFD0BC88));
+      case 'disposable':  return (const Color(0xFF988040), const Color(0xFFD0B470));
+      case 'retro_ccd':   return (const Color(0xFF607060), const Color(0xFF9AAC9A));
+      case 'kodak_soft':  return (const Color(0xFF908870), const Color(0xFFC8C0A0));
+      case 'soft_pink':   return (const Color(0xFFD07898), const Color(0xFFF4B8CC));
+      case 'lavender':    return (const Color(0xFF8870B8), const Color(0xFFCCB8E8));
+      case 'dusty_blue':  return (const Color(0xFF506090), const Color(0xFF8098C0));
+      case 'cafe_mood':   return (const Color(0xFF805030), const Color(0xFFC09060));
+      case 'seoul_night': return (const Color(0xFF202060), const Color(0xFF5858A8));
       default:
         switch (filter.category) {
-          case FilterCategory.warm:      return AppColors.warmTone;
-          case FilterCategory.cool:      return AppColors.coolTone;
-          case FilterCategory.film:      return AppColors.filmTone;
-          case FilterCategory.aesthetic: return AppColors.aestheticTone;
+          case FilterCategory.warm:      return (AppColors.warmTone, const Color(0xFFF5E0C0));
+          case FilterCategory.cool:      return (AppColors.coolTone, const Color(0xFFB0D8F0));
+          case FilterCategory.film:      return (AppColors.filmTone, const Color(0xFFD0B880));
+          case FilterCategory.aesthetic: return (AppColors.aestheticTone, const Color(0xFFD8B8E8));
         }
     }
+  }
+
+  Widget _filterFallbackGradient(FilterModel filter) {
+    final (base, highlight) = _filterColors(filter);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [highlight, base],
+          stops: const [0.0, 1.0],
+        ),
+      ),
+      child: Stack(
+        children: [
+          // 미세 질감 오버레이 (필름 감성)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.3, -0.3),
+                  radius: 1.2,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.18),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
@@ -8,6 +8,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
+import 'video_player_screen.dart';
 
 /// 갤러리에서 사진 선택
 /// - 단일 탭: EditorScreen으로 이동
@@ -36,6 +37,32 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
   void initState() {
     super.initState();
     _loadPhotos();
+    // iOS Photos 변경 감지 (삭제/추가 후 자동 동기화)
+    PhotoManager.addChangeCallback(_onPhotosChanged);
+    PhotoManager.startChangeNotify();
+  }
+
+  @override
+  void dispose() {
+    PhotoManager.removeChangeCallback(_onPhotosChanged);
+    PhotoManager.stopChangeNotify();
+    super.dispose();
+  }
+
+  void _onPhotosChanged(MethodCall call) {
+    if (mounted && !_isLoading && !_isBatchProcessing) {
+      _quietReload();
+    }
+  }
+
+  Future<void> _quietReload() async {
+    final albums = await PhotoManager.getAssetPathList(
+      type: RequestType.common,
+      onlyAll: true,
+    );
+    if (albums.isEmpty || !mounted) return;
+    final assets = await albums.first.getAssetListPaged(page: 0, size: 200);
+    if (mounted) setState(() => _assets = assets);
   }
 
   Future<void> _loadPhotos() async {
@@ -46,7 +73,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     }
 
     final albums = await PhotoManager.getAssetPathList(
-      type: RequestType.image,
+      type: RequestType.common, // 사진 + 동영상 (오디오 제외)
       onlyAll: true,
     );
 
@@ -79,7 +106,14 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     final file = await asset.file;
     if (file == null) return;
     if (!mounted) return;
-    context.pop();
+
+    if (asset.type == AssetType.video) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(videoPath: file.path),
+      ));
+      return;
+    }
+
     context.push('/editor', extra: file.path);
   }
 
@@ -98,9 +132,9 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.darkSurface,
-        title: Text('사진 $count장 삭제',
+        title: Text('$count개 삭제',
             style: const TextStyle(color: Colors.white, fontSize: 17)),
-        content: Text('선택한 사진을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
+        content: Text('선택한 항목을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
             style: const TextStyle(color: Colors.white60, fontSize: 14)),
         actions: [
           TextButton(
@@ -117,31 +151,22 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     if (confirmed != true || !mounted) return;
 
     final ids = _selectedIds.toList();
-    final deletedIds = await PhotoManager.editor.deleteWithIds(ids);
 
+    // iOS 16+에서 deleteWithIds는 시스템 확인 다이얼로그를 추가로 표시
+    // deletedIds 반환값이 iOS에서 불안정하므로 낙관적 UI 업데이트 사용
+    await PhotoManager.editor.deleteWithIds(ids);
     if (!mounted) return;
 
-    if (deletedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('삭제 실패: 권한이 없거나 취소되었습니다'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final deletedSet = deletedIds.toSet();
+    final idsToRemove = ids.toSet();
     setState(() {
-      _assets.removeWhere((a) => deletedSet.contains(a.id));
+      _assets.removeWhere((a) => idsToRemove.contains(a.id));
       _isMultiSelectMode = false;
       _selectedIds.clear();
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${deletedIds.length}장을 삭제했습니다'),
+        content: Text('${ids.length}개를 삭제했습니다'),
         backgroundColor: AppColors.darkSurface,
         behavior: SnackBarBehavior.floating,
       ),
@@ -187,6 +212,12 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
     int successCount = 0;
     for (final asset in selected) {
+      // 동영상은 이미지 필터 처리 불가 → 건너뜀
+      if (asset.type == AssetType.video) {
+        if (mounted) setState(() => _processedCount++);
+        continue;
+      }
+
       final file = await asset.file;
       if (file == null) continue;
 
@@ -318,6 +349,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
         final asset = _assets[index];
         final isSelected = _selectedIds.contains(asset.id);
         return _AssetThumbnail(
+          key: ValueKey(asset.id),
           asset: asset,
           isSelected: isSelected,
           isMultiSelectMode: _isMultiSelectMode,
@@ -389,6 +421,7 @@ class _FilterPickerSheet extends StatelessWidget {
 
 class _AssetThumbnail extends StatefulWidget {
   const _AssetThumbnail({
+    super.key,
     required this.asset,
     required this.isSelected,
     required this.isMultiSelectMode,
@@ -414,6 +447,15 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
     _loadThumbnail();
   }
 
+  @override
+  void didUpdateWidget(_AssetThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset.id != widget.asset.id) {
+      setState(() => _bytes = null);
+      _loadThumbnail();
+    }
+  }
+
   Future<void> _loadThumbnail() async {
     final bytes = await widget.asset.thumbnailDataWithSize(
       const ThumbnailSize(300, 300),
@@ -433,6 +475,14 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
           _bytes != null
               ? Image.memory(_bytes!, fit: BoxFit.cover)
               : const ColoredBox(color: AppColors.darkSurface),
+
+          // 동영상 플레이 아이콘
+          if (widget.asset.type == AssetType.video)
+            const Positioned(
+              bottom: 4,
+              left: 4,
+              child: Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 20),
+            ),
 
           // 다중 선택 체크박스
           if (widget.isMultiSelectMode)

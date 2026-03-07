@@ -110,6 +110,11 @@ class MFVideoRecorder: NSObject {
               writer.status == .writing,
               aInput.isReadyForMoreMediaData else { return }
 
+        // 세션 시작 시간(첫 비디오 프레임 PTS) 이전의 오디오 샘플 드롭
+        // → AVAssetWriter는 startSession 이전 타임스탬프를 거부하고 .failed 상태로 전환됨
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        guard CMTimeCompare(pts, startTime) >= 0 else { return }
+
         aInput.append(sampleBuffer)
     }
 

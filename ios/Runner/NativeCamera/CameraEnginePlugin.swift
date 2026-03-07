@@ -247,18 +247,23 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
         }
         session.stopRecording { [weak self] path in
             guard let path = path else {
+                print("[CameraEnginePlugin] 녹화 실패: AVAssetWriter status != completed")
                 result(FlutterError(code: "RECORD_FAILED", message: "녹화 저장 실패", details: nil))
                 return
             }
             // 갤러리 저장
             PHPhotoLibrary.requestAuthorization { status in
                 guard status == .authorized || status == .limited else {
+                    print("[CameraEnginePlugin] 사진 라이브러리 권한 없음: \(status.rawValue)")
                     DispatchQueue.main.async { result(path) }
                     return
                 }
                 PHPhotoLibrary.shared().performChanges({
                     PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: URL(fileURLWithPath: path))
-                }) { _, _ in
+                }) { success, error in
+                    if !success {
+                        print("[CameraEnginePlugin] 갤러리 저장 실패: \(error?.localizedDescription ?? "unknown")")
+                    }
                     DispatchQueue.main.async { result(path) }
                 }
             }
