@@ -171,31 +171,36 @@ flutter build ios --release --no-codesign
 - [ ] 기기별 테스트 (iPhone 12 / 14 / 15 Pro / 16)
 - [ ] Instruments 메모리/GPU 프로파일링
 
-### ⏳ W11 — BerryFilm 벤치마킹 기능 추가 (세션 11)
+### ✅ W11 — BerryFilm 벤치마킹 기능 추가 (세션 11)
 > BerryFilm(₩3,300, 4.8★, 40종) 분석 결과 반영
 
-- [ ] **iOS 최소버전 17 → 16** — Podfile / project.pbxproj / Info.plist 수정 (잠재 사용자 ~15% 확대)
-- [ ] **필터 30종으로 확장** (현재 22종 → +8종)
-  - blossom, latte, pale, vivid, mocha, winter, bronze, noir
-  - generate_luts.py 파라미터 추가 → filter_model.dart 등록 → 썸네일 생성
-- [ ] **Light Leak 이펙트** — MFLUTEngine에 CIFilter 기반 가장자리 빛번짐 추가
-  - EditorScreen 이펙트 탭에 Light Leak 슬라이더 추가
+- [x] **iOS 최소버전 17 → 16** — Podfile + project.pbxproj 3곳 수정 (잠재 사용자 ~15% 확대)
+- [x] **필터 30종으로 확장** (22종 → +8종: latte, mocha, pale, winter, bronze, noir, blossom, vivid)
+  - 33×33×33 `.cube` LUT 파일 8종 Python 스크립트로 생성
+  - 60×60 JPG 썸네일 8종 생성
+  - `filter_model.dart` 등록 + `defaultIntensities` 추가
+- [x] **Light Leak 이펙트** — `MFLUTEngine.applyLightLeak()` 구현
+  - `CIRadialGradient` 2개 (주황 좌상단 + 노랑 우하단) + Screen blend
+  - `CameraEnginePlugin` / `FilterEnginePlugin` 양쪽에 `lightLeak` 케이스 추가
+  - `EditorScreen` 이펙트 탭에 Light Leak 슬라이더 추가
 
-### ⏳ W12 — 라이브포토 지원 (세션 12)
+### ✅ W12 — 라이브포토 지원 (세션 11 연속)
 > BerryFilm 동등 기능, 핵심 차별점
 
-- [ ] **Swift (MFCameraSession.swift)**
-  - `photoOutput.isLivePhotoCaptureEnabled = true`
-  - `AVCapturePhotoSettings.livePhotoMovieFileURL` 지정 (임시 MOV 경로)
-  - `didFinishProcessingPhoto` + `didFinishRecordingLivePhotoMovieForEventualFileAt` 구현
-  - `PHAssetCreationRequest` → `.photo` + `.pairedVideo` 쌍으로 갤러리 저장
-- [ ] **Flutter**
-  - `UserPreferences`에 `@HiveField(10) bool isLivePhotoEnabled` 추가
+- [x] **Swift (MFCameraSession.swift)**
+  - `isLivePhotoEnabled` 프로퍼티 + `setLivePhotoEnabled()` 메서드
+  - `capturePhoto()`: 라이브포토 활성화 시 `livePhotoMovieFileURL` MOV 임시경로 주입
+  - delegate 메서드 `didCapturePhoto(path:livePhotoMovieURL:)` 로 통합
+  - `CameraEnginePlugin`: `PHAssetCreationRequest` `.photo` + `.pairedVideo` 쌍으로 갤러리 저장
+- [x] **Flutter**
+  - `UserPreferences`: `@HiveField(10) bool isLivePhotoEnabled` 추가
   - `CameraEngine.setLivePhotoEnabled(bool)` 메서드 추가
-  - 카메라 UI: 라이브포토 토글 버튼 (⊙ 아이콘, 활성 시 노랑)
-  - 설정화면에 라이브포토 토글 추가
-  - 무음셔터 ↔ 라이브포토 상호 배타 처리 (동시 불가)
-- [ ] `build_runner build` — Hive 어댑터 재생성
+  - `CameraScreen` 사이드 버튼에 라이브포토 토글 (`motion_photos_on` 아이콘)
+  - `SettingsScreen`: 라이브포토 토글 추가
+  - 무음셔터 ↔ 라이브포토 상호 배타 처리 (양쪽에서 자동 해제)
+  - 카메라 초기화 시 라이브포토 상태 복원
+- [x] `build_runner build` — `user_preferences.g.dart` HiveField(10) 재생성
+- [x] `flutter analyze`: 0 issues
 
 ### ⏳ W13 — App Store 준비 (세션 13)
 
@@ -276,7 +281,7 @@ flutter build ios --release --no-codesign
 |------|------|------|
 | 2026-03-06 | riverpod_generator 제외 | hive_generator와 analyzer 버전 충돌. Provider 수동 작성으로 대체 |
 | 2026-03-06 | build_runner 버전 | ^2.4.13 사용 (^2.4.14는 hive_generator와 충돌) |
-| 2026-03-06 | iOS 최소 버전 | 17.0 → W11에서 16.0으로 낮출 예정 |
+| 2026-03-08 | iOS 최소 버전 | 16.0 (W11에서 변경 완료) |
 | 2026-03-06 | Firebase 초기화 | main.dart에서 주석 처리. GoogleService-Info.plist 추가 후 활성화 필요 |
 | 2026-03-06 | 수익 모델 | 구독(월간/연간) 제거 → 1회 구매 ₩29,900 (`lifetime`)으로 단순화 |
 | 2026-03-07 | 수익 모델 재확정 | IAP 완전 제거 → App Store 유료 앱으로 전환. 모든 필터 무제한 제공 |
@@ -463,10 +468,56 @@ flutter build ios --release --no-codesign
 
 ---
 
-## 다음 세션에서 할 일
+## 세션 11 변경사항 (2026-03-08)
 
-1. **App Store Connect 유료 앱 설정** — 앱 가격 설정 (₩4,900 ~ ₩9,900 tier 결정), 앱 메타데이터 입력
-2. **W7 Liquid Glass + 모션** — 전체 화면 Liquid Glass 적용 확인, 모션 디자인 완성, Reduce Motion 대응
-3. **W10 성능 테스트** — 실기기 Instruments 프로파일링 (30fps, <150MB, <2s 시작)
-4. **W11 App Store 스크린샷** — 5.5인치 / 6.5인치 스크린샷 5장, 30초 프리뷰 영상
-5. **Pretendard 폰트 추가** — assets/fonts/에 .otf 4개 추가 후 pubspec.yaml 주석 해제
+### W11: BerryFilm 벤치마킹 기능 추가
+
+**iOS 최소버전 17 → 16:**
+- `ios/Podfile`: `platform :ios, '16.0'`
+- `ios/Runner.xcodeproj/project.pbxproj`: `IPHONEOS_DEPLOYMENT_TARGET = 16.0` (3곳)
+
+**필터 30종 확장 (+8종):**
+- 신규 필터: latte, mocha (Warm), pale, winter (Cool), bronze, noir (Film), blossom, vivid (Aesthetic)
+- 33×33×33 `.cube` LUT 파일 Python 스크립트로 생성 (`/tmp/gen_luts_w11.py`)
+- 60×60 JPG 썸네일 Python+PIL로 생성 (`/tmp/gen_thumbs_w11.py`, venv 환경)
+- `filter_model.dart`: 8종 `FilterModel` 등록 + `defaultIntensities` 추가 (모두 `isNew: true`, `isPro: true`)
+
+**Light Leak 이펙트:**
+- `MFLUTEngine`: `lightLeakIntensity: Float` 프로퍼티 + `applyLightLeak()` 메서드
+  - `CIRadialGradient` 2개: 좌상단 주황(α=intensity×0.65) + 우하단 노랑(α=intensity×0.45)
+  - `CIAdditionCompositing` → `CIScreenBlendMode` 으로 이미지에 합성
+  - 파이프라인 5번 위치 (Beauty 다음, Split 전)
+- `CameraEnginePlugin`: `setEffect` switch에 `"lightLeak"` 케이스 추가
+- `FilterEnginePlugin`: `processImage` + `processVideo` 양쪽에 `lightLeakIntensity` 연결
+- `EditorScreen`: `_lightLeak` 상태변수 + `_hasEffects()` / `_resetEffects()` 반영 + `wb_sunny_rounded` 슬라이더 행 추가
+
+### W12: 라이브포토 지원
+
+**Swift 구현:**
+- `MFCameraSession` delegate 메서드 `didCapturePhoto(path:livePhotoMovieURL:)` 로 통합 (기존 path-only 제거)
+- `isLivePhotoEnabled`, `livePhotoMovieURL` 프로퍼티 추가
+- `setLivePhotoEnabled(_:)`: `photoOutput.isLivePhotoCaptureEnabled` 설정
+- `capturePhoto()`: 라이브포토 ON 시 `livePhotoMovieFileURL` MOV 임시경로 주입
+- `configureSession`: photoOut 추가 시 `isLivePhotoCaptureEnabled` 동기화
+- `MFCameraSession.swift`: `import Photos` 추가
+- `CameraEnginePlugin`: `setLivePhotoEnabled` Method 핸들러 추가
+  - `didCapturePhoto` delegate: `livePhotoMovieURL != nil` 시 `PHAssetCreationRequest.forAsset()` + `.pairedVideo` 저장, 아닐 시 기존 `creationRequestForAssetFromImage`
+
+**Flutter 구현:**
+- `UserPreferences`: `@HiveField(10) bool isLivePhotoEnabled` 추가 (기본 false)
+- `user_preferences.g.dart`: build_runner 재생성
+- `CameraEngine`: `setLivePhotoEnabled(bool)` 메서드 추가
+- `camera_provider.dart`: 초기화 시 `prefs.isLivePhotoEnabled && !prefs.isSilentShutter` 조건으로 복원
+- `CameraScreen` 사이드 버튼: `motion_photos_on_rounded` 아이콘 토글 (무음셔터 자동 해제)
+- `SettingsScreen`: 라이브포토 `SwitchListTile` 추가 (무음셔터 ON 시 라이브포토 자동 해제, 반대도 동일)
+
+**결과:** `flutter analyze` 0 issues, git commit `9b25a02`
+
+## 다음 세션에서 할 일 (W13)
+
+1. **App Store Connect 앱 레코드 생성** — Bundle ID: com.moodfilm.moodfilm, 가격 Tier 2 (₩2,500)
+2. **개인정보처리방침 URL** — GitHub Pages 또는 Notion으로 생성
+3. **앱 아이콘 1024×1024** — JPG, 알파채널 없음
+4. **스크린샷 5장** — 6.5" + 5.5" Simulator로 생성
+5. **메타데이터 입력** — 앱 이름, 설명, 키워드
+6. **Xcode Archive → App Store Connect 업로드**
