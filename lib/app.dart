@@ -12,8 +12,7 @@ class MoodFilmApp extends ConsumerWidget {
       title: 'MoodFilm',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       routerConfig: appRouter,
     );
   }
