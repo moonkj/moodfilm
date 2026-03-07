@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_dimensions.dart';
+import '../../../../core/utils/haptic_utils.dart';
 
 /// 서터 버튼 — scale bounce 0.92→1.0 150ms spring(0.6)
 class ShutterButton extends StatefulWidget {
@@ -34,12 +35,21 @@ class _ShutterButtonState extends State<ShutterButton>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduce Motion 대응: 시스템 설정에 따라 애니메이션 비활성화
+    final disable = MediaQuery.of(context).disableAnimations;
+    _controller.duration = disable ? Duration.zero : const Duration(milliseconds: 150);
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
   void _onTapDown(_) {
+    HapticUtils.shutter();
     _controller.forward();
   }
 

@@ -10,6 +10,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/models/filter_model.dart';
+import '../../../core/utils/haptic_utils.dart';
 import '../../../native_plugins/camera_engine/camera_engine.dart';
 import '../providers/camera_provider.dart';
 import '../models/camera_state.dart';
@@ -68,6 +69,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduce Motion 대응
+    final disable = MediaQuery.of(context).disableAnimations;
+    _flipController.duration = disable ? Duration.zero : const Duration(milliseconds: 600);
+  }
+
   void _checkOnboardingHints() {
     final prefs = StorageService.prefs;
     if (!prefs.hasSeenSwipeHint) {
@@ -100,6 +109,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   Future<void> _handleCameraFlip() async {
     if (_flipController.isAnimating) return;
+    HapticUtils.cameraFlip();
     _flipController.forward(from: 0.0);
     await Future.delayed(const Duration(milliseconds: 120));
     if (mounted) await ref.read(cameraProvider.notifier).flipCamera();
@@ -182,6 +192,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
 
   void _triggerFilterFlash() {
+    HapticUtils.filterChange();
     setState(() => _filterFlash = true);
     Future.delayed(const Duration(milliseconds: 40), () {
       if (mounted) setState(() => _filterFlash = false);
@@ -396,20 +407,28 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     return Column(
       children: [
         const SizedBox(height: 16),
-        // 활성 필터 이름
-        Text(
-          cameraState.activeFilter?.name.toUpperCase() ?? '',
-          style: const TextStyle(
-            color: Color(0xFF3D3531),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1.8,
+        // 활성 필터 이름 (전환 시 fade)
+        AnimatedSwitcher(
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          child: Text(
+            cameraState.activeFilter?.name.toUpperCase() ?? '',
+            key: ValueKey(cameraState.activeFilter?.id ?? ''),
+            style: const TextStyle(
+              color: Color(0xFF3D3531),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.8,
+            ),
           ),
         ),
         const SizedBox(height: 10),
         // 강도 슬라이더 (토글)
         AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           height: _showIntensitySlider ? 40 : 0,
           child: _showIntensitySlider
@@ -446,7 +465,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         ),
         // 필터 스크롤 바 (토글)
         AnimatedSize(
-          duration: const Duration(milliseconds: 220),
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
           curve: Curves.easeInOut,
           child: _showFilterPanel
               ? FilterScrollBar(

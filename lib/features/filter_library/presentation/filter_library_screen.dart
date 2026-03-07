@@ -6,6 +6,7 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/utils/haptic_utils.dart';
 import '../../camera/providers/camera_provider.dart';
 
 
@@ -60,6 +61,7 @@ class _FilterLibraryScreenState
   }
 
   void _onFilterTap(FilterModel filter) {
+    HapticUtils.filterChange();
     ref.read(cameraProvider.notifier).selectFilter(filter);
     context.pop();
   }
@@ -97,6 +99,7 @@ class _FilterLibraryScreenState
             filters: _filtersForTab(index),
             onFilterTap: _onFilterTap,
             onFavoriteToggle: (filterId) {
+              HapticUtils.favoriteToggle();
               StorageService.prefs.toggleFavorite(filterId);
               ref.read(cameraProvider.notifier).refreshFavorites();
               setState(() {});
