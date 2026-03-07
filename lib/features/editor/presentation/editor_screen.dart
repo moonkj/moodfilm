@@ -210,25 +210,32 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 패널 콘텐츠 (슬라이드업 애니메이션)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              height: _activePanel != null ? panelH : 0,
-              child: _activePanel != null
-                  ? Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent,
-                              Colors.black.withValues(alpha: 0.85)],
-                          stops: const [0.0, 0.3],
+            // 패널 콘텐츠 (아래서 슬라이드업 애니메이션)
+            ClipRect(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOut,
+                height: _activePanel != null ? panelH : 0,
+                child: _activePanel != null
+                    ? OverflowBox(
+                        alignment: Alignment.bottomCenter,
+                        maxHeight: panelH,
+                        child: Container(
+                          height: panelH,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.85)],
+                              stops: const [0.0, 0.3],
+                            ),
+                          ),
+                          child: _buildPanelContent(panelH),
                         ),
-                      ),
-                      child: _buildPanelContent(panelH),
-                    )
-                  : const SizedBox.shrink(),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ),
             // 하단 탭 버튼 바
             _buildBottomTabBar(),
@@ -375,20 +382,30 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   Widget _buildSplitView() {
+    final camera = ref.read(cameraProvider);
+    final filterName = camera.activeFilter?.name ?? '효과';
+    // 배경: 원본 / 왼쪽 클립: 필터 적용본
     final filtered = _filteredPreviewPath ?? widget.imagePath!;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final lineX = screenWidth * _splitPosition;
+
     return Stack(
       children: [
-        SizedBox.expand(child: Image.file(File(filtered), fit: BoxFit.cover)),
+        // 배경 = 원본
+        SizedBox.expand(child: Image.file(File(widget.imagePath!), fit: BoxFit.cover)),
+        // 왼쪽 클립 = 필터 적용본
         ClipRect(
           child: Align(
             alignment: Alignment.centerLeft,
             widthFactor: _splitPosition,
-            child: Image.file(File(widget.imagePath!), fit: BoxFit.cover,
-                width: MediaQuery.of(context).size.width),
+            child: Image.file(File(filtered), fit: BoxFit.cover,
+                width: screenWidth),
           ),
         ),
+        // 분할선 + 핸들
         Positioned(
-          left: MediaQuery.of(context).size.width * _splitPosition - 1,
+          left: lineX - 1,
           top: 0, bottom: 0,
           child: Container(
             width: 2, color: Colors.white,
@@ -403,17 +420,30 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
           ),
         ),
+        // 왼쪽 라벨: 필터이름 (원 왼쪽)
         Positioned(
-          top: 12, left: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-                color: Colors.black45, borderRadius: BorderRadius.circular(100)),
-            child: const Text('원본',
-                style: TextStyle(color: Colors.white, fontSize: 11)),
-          ),
+          right: (screenWidth - lineX + 10).clamp(10.0, screenWidth - 20),
+          top: screenHeight * 0.5 + 20,
+          child: _splitLabel(filterName),
+        ),
+        // 오른쪽 라벨: 원본 (원 오른쪽)
+        Positioned(
+          left: (lineX + 10).clamp(10.0, screenWidth - 60),
+          top: screenHeight * 0.5 + 20,
+          child: _splitLabel('원본'),
         ),
       ],
+    );
+  }
+
+  Widget _splitLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+          color: Colors.black54, borderRadius: BorderRadius.circular(100)),
+      child: Text(text,
+          style: const TextStyle(color: Colors.white, fontSize: 11,
+              fontWeight: FontWeight.w500)),
     );
   }
 
