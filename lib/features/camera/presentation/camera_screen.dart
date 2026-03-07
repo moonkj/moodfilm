@@ -51,6 +51,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   // 필터 패널
   bool _showFilterPanel = false;
 
+  // 사이드 버튼 레이블 (클릭 시 2초 표시)
+  String? _sideBtnLabel;
+  Timer? _sideBtnLabelTimer;
+
   @override
   void initState() {
     super.initState();
@@ -89,9 +93,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     }
   }
 
+  void _showSideBtnLabel(String label) {
+    _sideBtnLabelTimer?.cancel();
+    setState(() => _sideBtnLabel = label);
+    _sideBtnLabelTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _sideBtnLabel = null);
+    });
+  }
+
   @override
   void dispose() {
     _splitAutoHideTimer?.cancel();
+    _sideBtnLabelTimer?.cancel();
     _flipController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     ref.read(cameraProvider.notifier).disposeCamera();
@@ -366,50 +379,88 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
   }
 
-  // MARK: - 프리뷰 우측 사이드 버튼 (비율 + 비교 + 강도 + 설정)
+  // MARK: - 프리뷰 우측 사이드 버튼 (라이브포토 + 비교 + 강도 + 설정)
 
   Widget _buildPreviewSideButtons(CameraState cameraState) {
     return Positioned(
       right: 10,
       bottom: 12,
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (cameraState.isRecording) ...[
-            _buildRecordingTimer(cameraState.recordingSeconds),
-            const SizedBox(height: 10),
-          ],
-          _glassBtn(
-            icon: Icons.motion_photos_on_rounded,
-            active: StorageService.prefs.isLivePhotoEnabled,
-            onTap: () {
-              final prefs = StorageService.prefs;
-              final next = !prefs.isLivePhotoEnabled;
-              setState(() {
-                prefs.isLivePhotoEnabled = next;
-                if (next) prefs.isSilentShutter = false; // 상호 배타
-                prefs.save();
-              });
-              CameraEngine.setLivePhotoEnabled(next);
-            },
-          ),
-          const SizedBox(height: 10),
-          _glassBtn(
-            icon: Icons.compare_rounded,
-            active: _isSplitMode,
-            onTap: () => _toggleSplitMode(cameraState.isFrontCamera),
-          ),
-          const SizedBox(height: 10),
-          _glassBtn(
-            icon: Icons.tune_rounded,
-            active: _showIntensitySlider,
-            onTap: () => setState(() => _showIntensitySlider = !_showIntensitySlider),
-          ),
-          const SizedBox(height: 10),
-          _glassBtn(
-            icon: Icons.settings_outlined,
-            active: false,
-            onTap: () => context.push('/settings'),
+          // 레이블 (버튼 왼쪽에 표시)
+          if (_sideBtnLabel != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 9),
+              child: AnimatedOpacity(
+                opacity: _sideBtnLabel != null ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    _sideBtnLabel!,
+                    style: const TextStyle(color: Colors.white, fontSize: 12,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+            ),
+          // 버튼 컬럼
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (cameraState.isRecording) ...[
+                _buildRecordingTimer(cameraState.recordingSeconds),
+                const SizedBox(height: 10),
+              ],
+              _glassBtn(
+                icon: Icons.motion_photos_on_rounded,
+                active: StorageService.prefs.isLivePhotoEnabled,
+                onTap: () {
+                  final prefs = StorageService.prefs;
+                  final next = !prefs.isLivePhotoEnabled;
+                  setState(() {
+                    prefs.isLivePhotoEnabled = next;
+                    if (next) prefs.isSilentShutter = false;
+                    prefs.save();
+                  });
+                  CameraEngine.setLivePhotoEnabled(next);
+                  _showSideBtnLabel('라이브포토');
+                },
+              ),
+              const SizedBox(height: 10),
+              _glassBtn(
+                icon: Icons.compare_rounded,
+                active: _isSplitMode,
+                onTap: () {
+                  _toggleSplitMode(cameraState.isFrontCamera);
+                  _showSideBtnLabel('비교');
+                },
+              ),
+              const SizedBox(height: 10),
+              _glassBtn(
+                icon: Icons.tune_rounded,
+                active: _showIntensitySlider,
+                onTap: () {
+                  setState(() => _showIntensitySlider = !_showIntensitySlider);
+                  _showSideBtnLabel('필터 강도');
+                },
+              ),
+              const SizedBox(height: 10),
+              _glassBtn(
+                icon: Icons.settings_outlined,
+                active: false,
+                onTap: () {
+                  _showSideBtnLabel('설정');
+                  context.push('/settings');
+                },
+              ),
+            ],
           ),
         ],
       ),
