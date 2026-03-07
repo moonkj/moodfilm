@@ -29,6 +29,7 @@ class MFLUTEngine {
     var glowIntensity: Float = 0.0
     var grainIntensity: Float = 0.0
     var beautyIntensity: Float = 0.0
+    var lightLeakIntensity: Float = 0.0
 
     // MARK: - Before/After 스플릿 (splitPosition < 0 = 비활성)
     var splitPosition: Float = -1.0
@@ -161,7 +162,12 @@ class MFLUTEngine {
             result = applyBeauty(to: result, intensity: beautyIntensity)
         }
 
-        // 5. Before/After 스플릿
+        // 5. Light Leak
+        if lightLeakIntensity > 0 {
+            result = applyLightLeak(to: result, intensity: lightLeakIntensity)
+        }
+
+        // 6. Before/After 스플릿
         if splitPosition >= 0 {
             result = applyBeforeAfterSplit(original: image, filtered: result,
                                            position: CGFloat(splitPosition))
@@ -281,6 +287,47 @@ class MFLUTEngine {
         }
 
         return result
+    }
+
+    // MARK: - Light Leak 이펙트
+    // 필름 카메라 빛번짐: 모서리에 따뜻한 주황/노랑 빛 오버레이 (Screen blend)
+
+    private func applyLightLeak(to image: CIImage, intensity: Float) -> CIImage {
+        let extent = image.extent
+        let w = extent.width
+        let h = extent.height
+
+        // 좌상단 큰 원형 그라디언트 (주황빛)
+        guard let grad1 = CIFilter(name: "CIRadialGradient") else { return image }
+        let radius1 = w * 0.55
+        grad1.setValue(CIVector(x: extent.minX + w * 0.1, y: extent.maxY - h * 0.1), forKey: "inputCenter")
+        grad1.setValue(radius1 * 0.3, forKey: "inputRadius0")
+        grad1.setValue(radius1, forKey: "inputRadius1")
+        grad1.setValue(CIColor(red: 1.0, green: 0.68, blue: 0.25, alpha: CGFloat(intensity) * 0.65), forKey: "inputColor0")
+        grad1.setValue(CIColor(red: 1.0, green: 0.68, blue: 0.25, alpha: 0.0), forKey: "inputColor1")
+        guard let leak1 = grad1.outputImage?.cropped(to: extent) else { return image }
+
+        // 우하단 작은 원형 그라디언트 (노랑빛)
+        guard let grad2 = CIFilter(name: "CIRadialGradient") else { return image }
+        let radius2 = w * 0.35
+        grad2.setValue(CIVector(x: extent.maxX - w * 0.08, y: extent.minY + h * 0.12), forKey: "inputCenter")
+        grad2.setValue(radius2 * 0.2, forKey: "inputRadius0")
+        grad2.setValue(radius2, forKey: "inputRadius1")
+        grad2.setValue(CIColor(red: 1.0, green: 0.85, blue: 0.35, alpha: CGFloat(intensity) * 0.45), forKey: "inputColor0")
+        grad2.setValue(CIColor(red: 1.0, green: 0.85, blue: 0.35, alpha: 0.0), forKey: "inputColor1")
+        guard let leak2 = grad2.outputImage?.cropped(to: extent) else { return image }
+
+        // 두 그라디언트 합성
+        guard let addComp = CIFilter(name: "CIAdditionCompositing") else { return image }
+        addComp.setValue(leak1, forKey: kCIInputImageKey)
+        addComp.setValue(leak2, forKey: kCIInputBackgroundImageKey)
+        guard let leakLayer = addComp.outputImage?.cropped(to: extent) else { return image }
+
+        // Screen blend로 이미지 위에 빛번짐 적용
+        guard let screen = CIFilter(name: "CIScreenBlendMode") else { return image }
+        screen.setValue(leakLayer, forKey: kCIInputImageKey)
+        screen.setValue(image, forKey: kCIInputBackgroundImageKey)
+        return screen.outputImage?.cropped(to: extent) ?? image
     }
 
     // MARK: - Before/After 스플릿 합성

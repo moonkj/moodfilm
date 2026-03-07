@@ -37,6 +37,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   double _dreamyGlow = 0;
   double _filmGrain = 0;
   double _beauty = 0;
+  double _lightLeak = 0;
 
   // 기본 "효과 없음" 상태 — 찍은 사진에 이미 필터가 베이크되어 있으므로
   bool _editorNoFilter = true;
@@ -60,7 +61,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       _saturation != 0 || _temperature != 0 || _tint != 0 ||
       _sharpness != 0 || _fade != 0 || _vignette != 0 || _skinTone != 0;
 
-  bool _hasEffects() => _dreamyGlow != 0 || _filmGrain != 0 || _beauty != 0;
+  bool _hasEffects() => _dreamyGlow != 0 || _filmGrain != 0 || _beauty != 0 || _lightLeak != 0;
 
   void _resetAdjustments() {
     setState(() {
@@ -72,7 +73,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   void _resetEffects() {
-    setState(() { _dreamyGlow = 0; _filmGrain = 0; _beauty = 0; });
+    setState(() { _dreamyGlow = 0; _filmGrain = 0; _beauty = 0; _lightLeak = 0; });
     _generatePreview();
   }
 
@@ -137,7 +138,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
       intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
       adjustments: _buildAdjustments(),
-      effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty},
+      effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty, 'lightLeak': _lightLeak},
     );
     if (mounted) {
       setState(() { _filteredPreviewPath = path; _isGeneratingPreview = false; });
@@ -379,6 +380,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 const SizedBox(height: 16),
                 _buildEffectRow('Beauty', Icons.face_retouching_natural_rounded,
                     _beauty, (v) => setState(() => _beauty = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                const SizedBox(height: 16),
+                _buildEffectRow('Light Leak', Icons.wb_sunny_rounded,
+                    _lightLeak, (v) => setState(() => _lightLeak = v),
                     onChangeEnd: (_) => _generatePreview()),
               ],
             ),
@@ -638,7 +643,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
         intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
         adjustments: _buildAdjustments(),
-        effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty},
+        effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty, 'lightLeak': _lightLeak},
         saveToGallery: true,
       );
       if (!mounted) return;

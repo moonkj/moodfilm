@@ -1,11 +1,13 @@
 import AVFoundation
 import CoreImage
 import ImageIO
+import Photos
 import UIKit
 
 protocol MFCameraSessionDelegate: AnyObject {
     func cameraSession(_ session: MFCameraSession, didOutput pixelBuffer: CVPixelBuffer)
-    func cameraSession(_ session: MFCameraSession, didCapturePhoto path: String)
+    /// 사진 캡처 완료 (라이브포토: livePhotoMovieURL != nil)
+    func cameraSession(_ session: MFCameraSession, didCapturePhoto path: String, livePhotoMovieURL: URL?)
     func cameraSession(_ session: MFCameraSession, didFailWithError error: Error)
 }
 
@@ -33,6 +35,7 @@ class MFCameraSession: NSObject {
     var currentZoom: CGFloat = 1.0
 
     var currentAspectRatio: String = "full" // 화면 비율 ('full', '9:16', '3:4', '1:1', '4:3', '16:9')
+    var isLivePhotoEnabled: Bool = false
 
     // MARK: - 비율별 크롭 Rect 계산 (landscape 버퍼 기준)
     // captureOutput(프리뷰)과 photoOutput(사진)에서 공유 사용
@@ -73,6 +76,9 @@ class MFCameraSession: NSObject {
 
     // MARK: - 무음 촬영용 최신 프레임 버퍼
     private var latestProcessedBuffer: CVPixelBuffer?
+
+    // MARK: - 라이브포토 MOV 임시 경로
+    private var livePhotoMovieURL: URL?
 
     // MARK: - 동영상 녹화
     private let recorder = MFVideoRecorder()
@@ -141,6 +147,9 @@ class MFCameraSession: NSObject {
         // 사진 출력
         let photoOut = AVCapturePhotoOutput()
         photoOut.isHighResolutionCaptureEnabled = true
+        if photoOut.isLivePhotoCaptureSupported {
+            photoOut.isLivePhotoCaptureEnabled = isLivePhotoEnabled
+        }
         if captureSession.canAddOutput(photoOut) {
             captureSession.addOutput(photoOut)
         }
@@ -222,9 +231,31 @@ class MFCameraSession: NSObject {
     // MARK: - 사진 촬영
 
     func capturePhoto() {
+        guard let photoOutput = photoOutput else { return }
         let settings = AVCapturePhotoSettings()
         settings.isHighResolutionPhotoEnabled = true
-        photoOutput?.capturePhoto(with: settings, delegate: self)
+
+        // 라이브포토 활성화 (지원 기기 + 활성화 상태일 때)
+        if isLivePhotoEnabled && photoOutput.isLivePhotoCaptureSupported {
+            let movURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("moodfilm_live_\(Int(Date().timeIntervalSince1970)).mov")
+            livePhotoMovieURL = movURL
+            settings.livePhotoMovieFileURL = movURL
+        } else {
+            livePhotoMovieURL = nil
+        }
+
+        photoOutput.capturePhoto(with: settings, delegate: self)
+    }
+
+    // MARK: - 라이브포토 활성화 설정
+
+    func setLivePhotoEnabled(_ enabled: Bool) {
+        guard let photoOutput = photoOutput else { return }
+        isLivePhotoEnabled = enabled && photoOutput.isLivePhotoCaptureSupported
+        sessionQueue.async {
+            photoOutput.isLivePhotoCaptureEnabled = self.isLivePhotoEnabled
+        }
     }
 
     // MARK: - 동영상 녹화
@@ -398,7 +429,9 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
 
         do {
             try imageData.write(to: filePath)
-            delegate?.cameraSession(self, didCapturePhoto: filePath.path)
+            delegate?.cameraSession(self, didCapturePhoto: filePath.path,
+                                    livePhotoMovieURL: livePhotoMovieURL)
+            livePhotoMovieURL = nil
         } catch {
             delegate?.cameraSession(self, didFailWithError: error)
         }

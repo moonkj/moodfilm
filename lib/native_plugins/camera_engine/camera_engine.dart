@@ -113,4 +113,9 @@ class CameraEngine {
   static Future<String?> stopRecording() async {
     return _channel.invokeMethod<String>('stopRecording');
   }
+
+  /// 라이브포토 활성화/비활성화
+  static Future<void> setLivePhotoEnabled(bool enabled) async {
+    await _channel.invokeMethod('setLivePhotoEnabled', {'enabled': enabled});
+  }
 }

@@ -89,6 +89,13 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             }
             result(nil)
 
+        case "setLivePhotoEnabled":
+            if let args = call.arguments as? [String: Any],
+               let enabled = args["enabled"] as? Bool {
+                cameraSession?.setLivePhotoEnabled(enabled)
+            }
+            result(nil)
+
         case "startRecording":
             handleStartRecording(result: result)
 
@@ -189,6 +196,8 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             cameraSession?.lutEngine.grainIntensity = Float(intensity)
         case "beauty":
             cameraSession?.lutEngine.beautyIntensity = Float(intensity)
+        case "lightLeak":
+            cameraSession?.lutEngine.lightLeakIntensity = Float(intensity)
         default:
             break
         }
@@ -279,19 +288,28 @@ extension CameraEnginePlugin: MFCameraSessionDelegate {
         cameraPreview?.update(pixelBuffer: pixelBuffer)
     }
 
-    func cameraSession(_ session: MFCameraSession, didCapturePhoto path: String) {
-        // 갤러리 저장
+    func cameraSession(_ session: MFCameraSession, didCapturePhoto path: String, livePhotoMovieURL: URL?) {
         PHPhotoLibrary.requestAuthorization { status in
             guard status == .authorized || status == .limited else {
                 DispatchQueue.main.async {
-                    self.pendingCapturResult?(path) // 저장 실패해도 경로 반환
+                    self.pendingCapturResult?(path)
                     self.pendingCapturResult = nil
                 }
                 return
             }
 
             PHPhotoLibrary.shared().performChanges({
-                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: URL(fileURLWithPath: path))
+                if let movURL = livePhotoMovieURL {
+                    // 라이브포토: JPEG + MOV 쌍으로 저장
+                    let req = PHAssetCreationRequest.forAsset()
+                    req.addResource(with: .photo, fileURL: URL(fileURLWithPath: path), options: nil)
+                    let movOptions = PHAssetResourceCreationOptions()
+                    movOptions.shouldMoveFile = true
+                    req.addResource(with: .pairedVideo, fileURL: movURL, options: movOptions)
+                } else {
+                    PHAssetChangeRequest.creationRequestForAssetFromImage(
+                        atFileURL: URL(fileURLWithPath: path))
+                }
             }) { _, _ in
                 DispatchQueue.main.async {
                     self.pendingCapturResult?(path)

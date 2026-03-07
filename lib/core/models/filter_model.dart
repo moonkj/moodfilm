@@ -257,6 +257,87 @@ class FilterData {
       description: '서울 야경 네온빛',
       isPro: true,
     ),
+
+    // ── W11 추가 8종 ─────────────────────────────────────────
+    // Warm +2
+    FilterModel(
+      id: 'latte',
+      name: 'Latte',
+      category: FilterCategory.warm,
+      lutFileName: 'latte.cube',
+      description: '카페라떼 브라운 따뜻함',
+      isPro: true,
+      isNew: true,
+    ),
+    FilterModel(
+      id: 'mocha',
+      name: 'Mocha',
+      category: FilterCategory.warm,
+      lutFileName: 'mocha.cube',
+      description: '모카 브라운 감성',
+      isPro: true,
+      isNew: true,
+    ),
+
+    // Cool +2
+    FilterModel(
+      id: 'pale',
+      name: 'Pale',
+      category: FilterCategory.cool,
+      lutFileName: 'pale.cube',
+      description: '창백한 쿨톤 무드',
+      isPro: true,
+      isNew: true,
+    ),
+    FilterModel(
+      id: 'winter',
+      name: 'Winter',
+      category: FilterCategory.cool,
+      lutFileName: 'winter.cube',
+      description: '겨울 아침 청량함',
+      isPro: true,
+      isNew: true,
+    ),
+
+    // Film +2
+    FilterModel(
+      id: 'bronze',
+      name: 'Bronze',
+      category: FilterCategory.film,
+      lutFileName: 'bronze.cube',
+      description: '구리빛 복고 필름',
+      isPro: true,
+      isNew: true,
+    ),
+    FilterModel(
+      id: 'noir',
+      name: 'Noir',
+      category: FilterCategory.film,
+      lutFileName: 'noir.cube',
+      description: '흑백 감성 필름',
+      isPro: true,
+      isNew: true,
+    ),
+
+    // Aesthetic +2
+    FilterModel(
+      id: 'blossom',
+      name: 'Blossom',
+      category: FilterCategory.aesthetic,
+      lutFileName: 'blossom.cube',
+      description: '벚꽃 핑크 봄 감성',
+      isPro: true,
+      isNew: true,
+    ),
+    FilterModel(
+      id: 'vivid',
+      name: 'Vivid',
+      category: FilterCategory.aesthetic,
+      lutFileName: 'vivid.cube',
+      description: '선명하고 진한 채도',
+      isPro: true,
+      isNew: true,
+    ),
   ];
 
   /// 필터별 기본 강도 (최신 트렌드 기준 — 자연스럽고 은은하게)
@@ -289,6 +370,15 @@ class FilterData {
     'dusty_blue':  0.60,
     'cafe_mood':   0.55,
     'seoul_night': 0.65,
+    // W11 추가
+    'latte':       0.55,
+    'mocha':       0.55,
+    'pale':        0.55,
+    'winter':      0.60,
+    'bronze':      0.65,
+    'noir':        0.70,
+    'blossom':     0.55,
+    'vivid':       0.60,
   };
 
   static List<FilterModel> byCategory(FilterCategory category) =>

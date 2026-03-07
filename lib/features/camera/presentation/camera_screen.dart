@@ -380,6 +380,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             const SizedBox(height: 10),
           ],
           _glassBtn(
+            icon: Icons.motion_photos_on_rounded,
+            active: StorageService.prefs.isLivePhotoEnabled,
+            onTap: () {
+              final prefs = StorageService.prefs;
+              final next = !prefs.isLivePhotoEnabled;
+              setState(() {
+                prefs.isLivePhotoEnabled = next;
+                if (next) prefs.isSilentShutter = false; // 상호 배타
+                prefs.save();
+              });
+              CameraEngine.setLivePhotoEnabled(next);
+            },
+          ),
+          const SizedBox(height: 10),
+          _glassBtn(
             icon: Icons.compare_rounded,
             active: _isSplitMode,
             onTap: () => _toggleSplitMode(cameraState.isFrontCamera),

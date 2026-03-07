@@ -110,11 +110,13 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         lutEngine.glowIntensity = Float(effects["dreamyGlow"] ?? 0)
         lutEngine.grainIntensity = Float(effects["filmGrain"] ?? 0)
         lutEngine.beautyIntensity = Float(effects["beauty"] ?? 0)
+        lutEngine.lightLeakIntensity = Float(effects["lightLeak"] ?? 0)
 
         let hasEffect = (intensity > 0 && !lutFile.isEmpty)
             || lutEngine.glowIntensity > 0
             || lutEngine.grainIntensity > 0
             || lutEngine.beautyIntensity > 0
+            || lutEngine.lightLeakIntensity > 0
         if hasEffect {
             ciImage = lutEngine.apply(to: ciImage)
         }
@@ -169,6 +171,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         engine.glowIntensity = Float(effects["dreamyGlow"] ?? 0)
         engine.grainIntensity = Float(effects["filmGrain"] ?? 0)
         engine.beautyIntensity = Float(effects["beauty"] ?? 0)
+        engine.lightLeakIntensity = Float(effects["lightLeak"] ?? 0)
 
         // AVVideoComposition으로 각 프레임에 CIFilter 적용
         let composition = AVVideoComposition(asset: asset) { request in

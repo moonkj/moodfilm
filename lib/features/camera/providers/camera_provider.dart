@@ -40,6 +40,11 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
       // 뽀샤시 기본 적용 (0.45 — 피부 보정 + 은은한 발광)
       await CameraEngine.setEffect(effectType: 'beauty', intensity: 0.45);
+
+      // 라이브포토 상태 복원 (무음셔터와 상호 배타: 동시에 켜질 수 없음)
+      if (prefs.isLivePhotoEnabled && !prefs.isSilentShutter) {
+        await CameraEngine.setLivePhotoEnabled(true);
+      }
     } catch (e) {
       state = state.copyWith(
         status: CameraStatus.error,
