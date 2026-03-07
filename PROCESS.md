@@ -102,10 +102,10 @@ flutter build ios --release --no-codesign
 
 ## Phase 2: Core Features (W4-6) — 예정
 
-### ⏳ W4 — 필터 20종 완성
-- [x] 나머지 12종 LUT .cube 파일 제작 (tools/generate_luts.py로 전체 20종 생성)
+### ✅ W4 — 필터 22종 완성
+- [x] 나머지 12종 LUT .cube 파일 제작 (tools/generate_luts.py로 전체 22종 생성)
 - [x] 셀카 피부톤 최적화 → tools/generate_luts.py 파라미터로 반영
-- [ ] 썸네일 20개 추가 (실기기 필요)
+- [x] 썸네일 22종 생성 (assets/thumbnails/, 60x60 JPG, 필터 색감 반영)
 
 ### ⏳ W5 — 편집 화면 완성
 - [x] `FilterEnginePlugin.swift` Native 구현 (Full-res 처리 + 갤러리 저장)
@@ -398,7 +398,8 @@ flutter build ios --release --no-codesign
 
 ## 다음 세션에서 할 일
 
-1. **필터 썸네일 20개** — 실기기에서 필터 적용 후 스크린샷으로 `assets/thumbnails/<id>.jpg` 생성
-2. **App Store Connect 유료 앱 설정** — 앱 가격 설정 (₩4,900 ~ ₩9,900 tier 결정)
-3. **W7 Liquid Glass + 모션** — 전체 화면 Liquid Glass 적용 확인, 모션 디자인 완성
-4. **W10 성능 테스트** — 실기기 Instruments 프로파일링
+1. **App Store Connect 유료 앱 설정** — 앱 가격 설정 (₩4,900 ~ ₩9,900 tier 결정), 앱 메타데이터 입력
+2. **W7 Liquid Glass + 모션** — 전체 화면 Liquid Glass 적용 확인, 모션 디자인 완성, Reduce Motion 대응
+3. **W10 성능 테스트** — 실기기 Instruments 프로파일링 (30fps, <150MB, <2s 시작)
+4. **W11 App Store 스크린샷** — 5.5인치 / 6.5인치 스크린샷 5장, 30초 프리뷰 영상
+5. **Pretendard 폰트 추가** — assets/fonts/에 .otf 4개 추가 후 pubspec.yaml 주석 해제
