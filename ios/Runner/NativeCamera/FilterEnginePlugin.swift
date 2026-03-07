@@ -42,6 +42,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
 
         let adjustments = args["adjustments"] as? [String: Double] ?? [:]
         let effects = args["effects"] as? [String: Double] ?? [:]
+        let saveToGallery = args["saveToGallery"] as? Bool ?? false
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -56,6 +57,11 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
                 DispatchQueue.main.async {
                     result(FlutterError(code: "PROCESS_FAILED", message: "이미지 처리 실패", details: nil))
                 }
+                return
+            }
+
+            guard saveToGallery else {
+                DispatchQueue.main.async { result(outputPath) }
                 return
             }
 
@@ -84,18 +90,29 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         effects: [String: Double]
     ) -> String? {
         guard let uiImage = UIImage(contentsOfFile: sourcePath) else { return nil }
-        guard var ciImage = CIImage(image: uiImage) else { return nil }
+        // Device RGB로 고정 — 카메라 CVPixelBuffer 파이프라인과 컬러 스페이스 통일
+        let ciOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpaceCreateDeviceRGB()]
+        guard var ciImage = CIImage(image: uiImage, options: ciOptions) else { return nil }
 
         // 1. 조정값 적용 (CIFilters)
         ciImage = applyAdjustments(to: ciImage, adjustments: adjustments)
 
-        // 2. LUT 필터 적용
-        lutEngine.loadLUT(named: lutFile)
-        lutEngine.intensity = intensity
+        // 2. LUT 필터 + 이펙트 적용 (빈 lutFile = 필터 없음)
+        if !lutFile.isEmpty {
+            lutEngine.loadLUT(named: lutFile)
+            lutEngine.intensity = intensity
+        } else {
+            lutEngine.intensity = 0.0
+        }
         lutEngine.glowIntensity = Float(effects["dreamyGlow"] ?? 0)
         lutEngine.grainIntensity = Float(effects["filmGrain"] ?? 0)
+        lutEngine.beautyIntensity = Float(effects["beauty"] ?? 0)
 
-        if intensity > 0 {
+        let hasEffect = (intensity > 0 && !lutFile.isEmpty)
+            || lutEngine.glowIntensity > 0
+            || lutEngine.grainIntensity > 0
+            || lutEngine.beautyIntensity > 0
+        if hasEffect {
             ciImage = lutEngine.apply(to: ciImage)
         }
 
@@ -165,7 +182,8 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         let thumbImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
 
-        guard let thumb = thumbImage, var ciImage = CIImage(image: thumb) else { return nil }
+        let thumbOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpaceCreateDeviceRGB()]
+        guard let thumb = thumbImage, var ciImage = CIImage(image: thumb, options: thumbOptions) else { return nil }
 
         // LUT 적용
         lutEngine.loadLUT(named: lutFile)

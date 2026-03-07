@@ -78,6 +78,18 @@ class CameraEngine {
     return await _channel.invokeMethod<bool>('isFrontCamera') ?? true;
   }
 
+  /// Before/After 스플릿 모드 설정
+  /// [position] 0.0~1.0 (0=왼쪽끝 / 1=오른쪽끝), -1.0 = 비활성
+  static Future<void> setSplitMode({
+    required double position,
+    required bool isFrontCamera,
+  }) async {
+    await _channel.invokeMethod('setSplitMode', {
+      'position': position,
+      'isFrontCamera': isFrontCamera,
+    });
+  }
+
   /// 동영상 녹화 시작
   /// Returns: 임시 출력 파일 경로
   static Future<String> startRecording() async {

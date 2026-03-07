@@ -10,6 +10,7 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/theme/liquid_glass_decoration.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/models/filter_model.dart';
+import '../../../native_plugins/camera_engine/camera_engine.dart';
 import '../providers/camera_provider.dart';
 import '../models/camera_state.dart';
 import 'widgets/shutter_button.dart';
@@ -51,6 +52,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   // 온보딩 힌트
   bool _showSwipeHint = false;
+
+  // Before/After 스플릿 모드
+  bool _isSplitMode = false;
+  double _splitPosition = 0.5;
+
+  // 필터 패널 표시
+  bool _showFilterPanel = false;
 
   @override
   void initState() {
@@ -170,8 +178,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   void _onScaleEnd(ScaleEndDetails details) {
-    // 수평 스와이프 → 필터 변경
-    if (_isHorizontalSwipe) {
+    // 수평 스와이프 → 스플릿 모드면 무시 (드래그로 처리), 아니면 필터 변경
+    if (_isHorizontalSwipe && !_isSplitMode) {
       final vx = details.velocity.pixelsPerSecond.dx;
       if (vx.abs() > 200) {
         final camera = ref.read(cameraProvider);
@@ -208,6 +216,22 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     });
   }
 
+  void _toggleSplitMode(bool isFront) {
+    final newMode = !_isSplitMode;
+    setState(() => _isSplitMode = newMode);
+    if (newMode) {
+      CameraEngine.setSplitMode(position: _splitPosition, isFrontCamera: isFront);
+    } else {
+      CameraEngine.setSplitMode(position: -1.0, isFrontCamera: isFront);
+    }
+  }
+
+  void _updateSplitPosition(double dx, double screenWidth, bool isFront) {
+    final newPos = (_splitPosition + dx / screenWidth).clamp(0.05, 0.95);
+    setState(() => _splitPosition = newPos);
+    CameraEngine.setSplitMode(position: newPos, isFrontCamera: isFront);
+  }
+
   // MARK: - Build
 
   @override
@@ -237,6 +261,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
           // 3. 상단 컨트롤 (설정, 플래시)
           _buildTopControls(cameraState),
+
+          // 3-b. 스플릿 모드 오버레이 (분할선 + Before/After 레이블)
+          if (_isSplitMode) _buildSplitOverlay(cameraState),
+
+          // 3-c. 스플릿 드래그 레이어
+          if (_isSplitMode) _buildSplitDragLayer(cameraState),
 
           // 4. 노출 인디케이터
           Positioned(
@@ -407,31 +437,37 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
             ),
 
-            // 중앙: 앱 로고 또는 녹화 타이머
+            // 중앙: 녹화 타이머
             if (cameraState.isRecording)
               _buildRecordingTimer(cameraState.recordingSeconds)
             else
-              const Text(
-                'MoodFilm',
-                style: TextStyle(
-                  color: AppColors.shutter,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1.5,
-                ),
-              ),
+              const SizedBox.shrink(),
 
-            // 필터 강도 토글
-            LiquidGlassPill(
-              onTap: () => setState(() => _showIntensitySlider = !_showIntensitySlider),
-              padding: const EdgeInsets.all(10),
-              child: Icon(
-                Icons.tune_rounded,
-                color: _showIntensitySlider
-                    ? AppColors.accent
-                    : AppColors.shutter,
-                size: 20,
-              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Before/After 비교 버튼 (위)
+                LiquidGlassPill(
+                  onTap: () => _toggleSplitMode(cameraState.isFrontCamera),
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(
+                    Icons.compare_rounded,
+                    color: _isSplitMode ? AppColors.accent : AppColors.shutter,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 필터 강도 토글 (아래)
+                LiquidGlassPill(
+                  onTap: () => setState(() => _showIntensitySlider = !_showIntensitySlider),
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    color: _showIntensitySlider ? AppColors.accent : AppColors.shutter,
+                    size: 20,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -497,14 +533,24 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   : const SizedBox.shrink(),
             ),
 
-            // 필터 스크롤 바
-            RepaintBoundary(
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                  child: const FilterScrollBar(),
-                ),
-              ),
+            // 필터 패널 (토글)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              child: _showFilterPanel
+                  ? RepaintBoundary(
+                      child: ClipRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                          child: FilterScrollBar(
+                            isNoFilterSelected: cameraState.activeFilter == null,
+                            onNoFilterSelected: () =>
+                                ref.read(cameraProvider.notifier).clearFilter(),
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
 
             // 사진/동영상 모드 전환 탭
@@ -534,19 +580,30 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                       onTap: () => ref.read(cameraProvider.notifier).capturePhoto(),
                     ),
 
-                  // 전면/후면 전환 (우측)
-                  Semantics(
-                    label: '카메라 전환',
-                    button: true,
-                    child: LiquidGlassPill(
-                      onTap: _handleCameraFlip,
-                      padding: const EdgeInsets.all(12),
-                      child: const Icon(
-                        Icons.flip_camera_ios_rounded,
-                        color: AppColors.shutter,
-                        size: 24,
+                  // 우측: 카메라 전환 + 필터 버튼
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      LiquidGlassPill(
+                        onTap: _handleCameraFlip,
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.flip_camera_ios_rounded,
+                          color: AppColors.shutter,
+                          size: 24,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      LiquidGlassPill(
+                        onTap: () => setState(() => _showFilterPanel = !_showFilterPanel),
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          color: _showFilterPanel ? AppColors.accent : AppColors.shutter,
+                          size: 24,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -717,6 +774,84 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           ),
         ),
       ),
+    );
+  }
+
+  // MARK: - Before/After 스플릿 오버레이 (분할선 + 레이블)
+
+  Widget _buildSplitOverlay(CameraState cameraState) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final lineX = constraints.maxWidth * _splitPosition;
+        final filterName = cameraState.activeFilter?.name ?? 'Filter';
+        return IgnorePointer(
+          child: Stack(
+            children: [
+              // 분할선
+              Positioned(
+                left: lineX - 1,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 2,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+              // 핸들 아이콘
+              Positioned(
+                left: lineX - 18,
+                top: constraints.maxHeight * 0.45,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.compare_arrows_rounded,
+                      color: Colors.black54, size: 18),
+                ),
+              ),
+              // Before 레이블
+              Positioned(
+                left: 12,
+                top: 60,
+                child: _splitLabel('원본'),
+              ),
+              // After 레이블
+              Positioned(
+                right: 12,
+                top: 60,
+                child: _splitLabel(filterName),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _splitLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(text,
+          style: const TextStyle(color: Colors.white, fontSize: 12,
+              fontWeight: FontWeight.w500)),
+    );
+  }
+
+  Widget _buildSplitDragLayer(CameraState cameraState) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: (details) {
+        final width = MediaQuery.of(context).size.width;
+        _updateSplitPosition(details.delta.dx, width, cameraState.isFrontCamera);
+      },
+      child: const SizedBox.expand(),
     );
   }
 

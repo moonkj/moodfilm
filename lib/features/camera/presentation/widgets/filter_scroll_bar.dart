@@ -11,7 +11,15 @@ import '../../providers/camera_provider.dart';
 /// 하단 필터 스크롤 바 (카메라 프리뷰 위에 반투명 오버레이)
 /// 좌우 스와이프로 필터 전환, 선택 시 < 100ms 전환
 class FilterScrollBar extends ConsumerStatefulWidget {
-  const FilterScrollBar({super.key});
+  const FilterScrollBar({
+    super.key,
+    this.onNoFilterSelected,
+    this.isNoFilterSelected = false,
+  });
+
+  /// null이 아니면 "효과 없음" 항목을 맨 앞에 표시
+  final VoidCallback? onNoFilterSelected;
+  final bool isNoFilterSelected;
 
   @override
   ConsumerState<FilterScrollBar> createState() => _FilterScrollBarState();
@@ -53,6 +61,10 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
       ...FilterData.all.where((f) => !prefs.favoriteFilterIds.contains(f.id)),
     ];
 
+    final hasNoFilter = widget.onNoFilterSelected != null;
+    // hasNoFilter이면 index 0 = "효과 없음", 나머지 +1 offset
+    final itemCount = filters.length + 1 + (hasNoFilter ? 1 : 0);
+
     return SizedBox(
       height: AppDimensions.filterBarHeight,
       child: ListView.builder(
@@ -62,22 +74,33 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
           horizontal: AppDimensions.paddingM,
           vertical: AppDimensions.filterBarPaddingV,
         ),
-        itemCount: filters.length + 1, // +1 for "전체" button
+        itemCount: itemCount,
         itemBuilder: (context, index) {
+          // "효과 없음" 버튼 (첫 번째)
+          if (hasNoFilter && index == 0) {
+            return _NoFilterItem(
+              isSelected: widget.isNoFilterSelected,
+              onTap: widget.onNoFilterSelected!,
+            );
+          }
+
+          final filterIndex = hasNoFilter ? index - 1 : index;
+
           // 마지막 아이템: "전체" 버튼
-          if (index == filters.length) {
+          if (filterIndex == filters.length) {
             return _AllFiltersButton(onTap: () => context.push('/library'));
           }
 
-          final filter = filters[index];
-          final isSelected = cameraState.activeFilter?.id == filter.id;
+          final filter = filters[filterIndex];
+          final isSelected = !widget.isNoFilterSelected &&
+              cameraState.activeFilter?.id == filter.id;
 
           return _FilterItem(
             filter: filter,
             isSelected: isSelected,
             onTap: () {
               ref.read(cameraProvider.notifier).selectFilter(filter);
-              _scrollToFilter(index);
+              _scrollToFilter(filterIndex);
             },
           );
         },
@@ -204,6 +227,69 @@ class _FilterItem extends StatelessWidget {
       case FilterCategory.aesthetic:
         return AppColors.aestheticTone;
     }
+  }
+}
+
+/// 필터 없음 버튼
+class _NoFilterItem extends StatelessWidget {
+  const _NoFilterItem({required this.isSelected, required this.onTap});
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        width: isSelected
+            ? AppDimensions.filterThumbnailSizeSelected
+            : AppDimensions.filterThumbnailSize,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 100),
+              width: isSelected
+                  ? AppDimensions.filterThumbnailSizeSelected
+                  : AppDimensions.filterThumbnailSize,
+              height: isSelected
+                  ? AppDimensions.filterThumbnailSizeSelected
+                  : AppDimensions.filterThumbnailSize,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(isSelected ? 14 : 12),
+                border: isSelected
+                    ? Border.all(color: AppColors.shutter, width: 2)
+                    : Border.all(
+                        color: AppColors.shutter.withValues(alpha: 0.4),
+                        width: 1.5),
+                color: Colors.black.withValues(alpha: 0.4),
+                boxShadow: isSelected
+                    ? [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 6)]
+                    : null,
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.block_rounded,
+                  color: isSelected ? AppColors.shutter : AppColors.shutter.withValues(alpha: 0.7),
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '없음',
+              style: AppTypography.filterLabel.copyWith(
+                color: isSelected ? AppColors.shutter : AppColors.shutter.withValues(alpha: 0.7),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

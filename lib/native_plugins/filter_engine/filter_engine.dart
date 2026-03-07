@@ -21,6 +21,7 @@ class FilterEngine {
     required double intensity,
     Map<String, double>? adjustments,
     Map<String, double>? effects,
+    bool saveToGallery = false,
   }) async {
     return _channel.invokeMethod<String>('processImage', {
       'sourcePath': sourcePath,
@@ -28,6 +29,7 @@ class FilterEngine {
       'intensity': intensity,
       'adjustments': adjustments ?? {},
       'effects': effects ?? {},
+      'saveToGallery': saveToGallery,
     });
   }
 

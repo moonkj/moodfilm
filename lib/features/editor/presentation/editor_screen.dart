@@ -31,6 +31,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
   double _fade = 0;
   double _dreamyGlow = 0;
   double _filmGrain = 0;
+  double _beauty = 0;
+
+  // 기본 "효과 없음" 상태 — 찍은 사진에 이미 필터가 베이크되어 있으므로
+  bool _editorNoFilter = true;
 
   String? _filteredPreviewPath;
   bool _isGeneratingPreview = false;
@@ -41,7 +45,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _generatePreview());
+    // 자동 preview 생성 없음: 찍은 사진에 이미 필터가 적용되어 있음
   }
 
   @override
@@ -50,11 +54,38 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
     super.dispose();
   }
 
+  bool _hasAdjustments() =>
+      _exposure != 0 || _contrast != 0 || _warmth != 0 ||
+      _saturation != 0 || _grain != 0 || _fade != 0;
+
+  bool _hasEffects() => _dreamyGlow != 0 || _filmGrain != 0 || _beauty != 0;
+
+  void _resetAdjustments() {
+    setState(() {
+      _exposure = 0; _contrast = 0; _warmth = 0;
+      _saturation = 0; _grain = 0; _fade = 0;
+    });
+    _generatePreview();
+  }
+
+  void _resetEffects() {
+    setState(() { _dreamyGlow = 0; _filmGrain = 0; _beauty = 0; });
+    _generatePreview();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(cameraProvider, (prev, next) {
-      if (prev?.activeFilter?.id != next.activeFilter?.id) {
-        _generatePreview();
+      final prevId = prev?.activeFilter?.id;
+      final nextId = next.activeFilter?.id;
+      if (prevId != nextId) {
+        if (nextId == null) {
+          // "효과 없음" 선택
+          setState(() { _editorNoFilter = true; _filteredPreviewPath = null; });
+        } else {
+          setState(() => _editorNoFilter = false);
+          _generatePreview();
+        }
       }
     });
 
@@ -74,17 +105,24 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
 
   Future<void> _generatePreview() async {
     if (widget.imagePath == null || _isGeneratingPreview) return;
+
+    // 효과 없음 + 조정값/이펙트도 없으면 원본 그대로 표시
+    if (_editorNoFilter && !_hasAdjustments() && !_hasEffects()) {
+      setState(() { _filteredPreviewPath = null; });
+      return;
+    }
+
     setState(() => _isGeneratingPreview = true);
     final camera = ref.read(cameraProvider);
     final path = await FilterEngine.processImage(
       sourcePath: widget.imagePath!,
-      lutFileName: camera.activeFilter?.lutFileName ?? 'milk.cube',
-      intensity: camera.filterIntensity,
+      lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
+      intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
       adjustments: {
         'exposure': _exposure, 'contrast': _contrast,
         'warmth': _warmth, 'saturation': _saturation, 'fade': _fade,
       },
-      effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow},
+      effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty},
     );
     if (mounted) {
       setState(() { _filteredPreviewPath = path; _isGeneratingPreview = false; });
@@ -153,6 +191,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
       fit: StackFit.expand,
       children: [
         Image.file(
+          key: ValueKey(_filteredPreviewPath ?? widget.imagePath!),
           File(_filteredPreviewPath ?? widget.imagePath!),
           fit: BoxFit.cover, width: double.infinity,
         ),
@@ -220,7 +259,39 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
         children: [
           TabBar(
             controller: _tabController,
-            tabs: const [Tab(text: '필터'), Tab(text: '조정'), Tab(text: '이펙트')],
+            tabs: [
+              const Tab(text: '필터'),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('조정'),
+                    if (_hasAdjustments()) ...[
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: _resetAdjustments,
+                        child: const Icon(Icons.refresh_rounded, size: 14, color: AppColors.accent),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('이펙트'),
+                    if (_hasEffects()) ...[
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: _resetEffects,
+                        child: const Icon(Icons.refresh_rounded, size: 14, color: AppColors.accent),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             labelStyle: AppTypography.filterName,
             indicatorColor: AppColors.accent,
             indicatorSize: TabBarIndicatorSize.label,
@@ -232,7 +303,16 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                const FilterScrollBar(),
+                FilterScrollBar(
+                  isNoFilterSelected: _editorNoFilter,
+                  onNoFilterSelected: () {
+                    ref.read(cameraProvider.notifier).clearFilter();
+                    setState(() {
+                      _editorNoFilter = true;
+                      _filteredPreviewPath = null;
+                    });
+                  },
+                ),
                 _buildAdjustmentSliders(),
                 _buildEffectPanel(),
               ],
@@ -323,6 +403,12 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
           value: _filmGrain, onChanged: (v) => setState(() => _filmGrain = v),
           onChangeEnd: (_) => _generatePreview(),
         ),
+        const SizedBox(height: 8),
+        _buildEffectTile(
+          icon: Icons.face_retouching_natural_rounded, label: 'Beauty', description: '뽀샤시 피부 보정',
+          value: _beauty, onChanged: (v) => setState(() => _beauty = v),
+          onChangeEnd: (_) => _generatePreview(),
+        ),
       ],
     );
   }
@@ -383,13 +469,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
       final camera = ref.read(cameraProvider);
       final outputPath = await FilterEngine.processImage(
         sourcePath: widget.imagePath!,
-        lutFileName: camera.activeFilter?.lutFileName ?? 'milk.cube',
-        intensity: camera.filterIntensity,
+        lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
+        intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
         adjustments: {
           'exposure': _exposure, 'contrast': _contrast,
           'warmth': _warmth, 'saturation': _saturation, 'fade': _fade,
         },
-        effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow},
+        effects: {'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow, 'beauty': _beauty},
+        saveToGallery: true,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();

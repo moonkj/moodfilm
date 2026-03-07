@@ -70,6 +70,15 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
         case "isFrontCamera":
             result(cameraSession != nil)
 
+        case "setSplitMode":
+            if let args = call.arguments as? [String: Any] {
+                let position = args["position"] as? Double ?? -1.0
+                let isFront = args["isFrontCamera"] as? Bool ?? true
+                cameraSession?.lutEngine.splitPosition = Float(position)
+                cameraSession?.lutEngine.isFrontCamera = isFront
+            }
+            result(nil)
+
         case "startRecording":
             handleStartRecording(result: result)
 
@@ -143,8 +152,13 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        cameraSession?.lutEngine.loadLUT(named: lutFile)
-        cameraSession?.lutEngine.intensity = Float(intensity)
+        // 빈 파일명 = 필터 없음
+        if lutFile.isEmpty {
+            cameraSession?.lutEngine.intensity = 0.0
+        } else {
+            cameraSession?.lutEngine.loadLUT(named: lutFile)
+            cameraSession?.lutEngine.intensity = Float(intensity)
+        }
         result(nil)
     }
 
@@ -163,6 +177,8 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             cameraSession?.lutEngine.glowIntensity = Float(intensity)
         case "filmGrain":
             cameraSession?.lutEngine.grainIntensity = Float(intensity)
+        case "beauty":
+            cameraSession?.lutEngine.beautyIntensity = Float(intensity)
         default:
             break
         }

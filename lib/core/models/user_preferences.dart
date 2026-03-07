@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'filter_model.dart';
 
 part 'user_preferences.g.dart';
 
@@ -45,7 +46,9 @@ class UserPreferences extends HiveObject {
         favoriteFilterIds = favoriteFilterIds ?? [];
 
   double intensityFor(String filterId) =>
-      filterIntensities[filterId] ?? 1.0;
+      filterIntensities[filterId] ??
+      FilterData.defaultIntensities[filterId] ??
+      0.6;
 
   void setIntensity(String filterId, double intensity) {
     filterIntensities[filterId] = intensity;

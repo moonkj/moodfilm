@@ -239,6 +239,35 @@ class FilterData {
     ),
   ];
 
+  /// 필터별 기본 강도 (최신 트렌드 기준 — 자연스럽고 은은하게)
+  /// 사용자가 슬라이더로 조정 시 이 값이 덮어씌워짐
+  static const Map<String, double> defaultIntensities = {
+    // Warm — 피부톤 살리되 과하지 않게
+    'milk':        0.55,
+    'cream':       0.55,
+    'butter':      0.50,
+    'honey':       0.50,
+    'peach':       0.55,
+    // Cool — 청량하되 파랗지 않게
+    'sky':         0.60,
+    'ocean':       0.55,
+    'mint':        0.50,
+    'cloud':       0.60,
+    'ice':         0.55,
+    // Film — 필름 감성은 조금 더 강하게
+    'film98':      0.70,
+    'film03':      0.65,
+    'disposable':  0.75,
+    'retro_ccd':   0.65,
+    'kodak_soft':  0.65,
+    // Aesthetic — 색감 개성, 은은하게
+    'soft_pink':   0.55,
+    'lavender':    0.55,
+    'dusty_blue':  0.60,
+    'cafe_mood':   0.55,
+    'seoul_night': 0.65,
+  };
+
   static List<FilterModel> byCategory(FilterCategory category) =>
       all.where((f) => f.category == category).toList();
 

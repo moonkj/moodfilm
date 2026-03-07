@@ -28,6 +28,11 @@ class MFLUTEngine {
     // MARK: - 현재 이펙트 강도
     var glowIntensity: Float = 0.0
     var grainIntensity: Float = 0.0
+    var beautyIntensity: Float = 0.0
+
+    // MARK: - Before/After 스플릿 (splitPosition < 0 = 비활성)
+    var splitPosition: Float = -1.0
+    var isFrontCamera: Bool = false
 
     /// LUT 필터가 실제로 로드되어 있는지 여부
     var hasLUT: Bool { return currentLUTFilter != nil }
@@ -151,6 +156,17 @@ class MFLUTEngine {
             result = applyFilmGrain(to: result, intensity: grainIntensity)
         }
 
+        // 4. Beauty (뽀샤시)
+        if beautyIntensity > 0 {
+            result = applyBeauty(to: result, intensity: beautyIntensity)
+        }
+
+        // 5. Before/After 스플릿
+        if splitPosition >= 0 {
+            result = applyBeforeAfterSplit(original: image, filtered: result,
+                                           position: CGFloat(splitPosition))
+        }
+
         return result
     }
 
@@ -208,6 +224,107 @@ class MFLUTEngine {
         blendFilter.setValue(image, forKey: kCIInputBackgroundImageKey)
 
         return blendFilter.outputImage?.cropped(to: image.extent) ?? image
+    }
+
+    // MARK: - Beauty (뽀샤시) 이펙트
+    // 피부 보정: 부드럽게 + 밝게 + 따뜻하게 + 은은한 빛번짐
+
+    private func applyBeauty(to image: CIImage, intensity: Float) -> CIImage {
+        var result = image
+
+        // 1. 피부 소프트닝: Gaussian Blur를 원본과 부드럽게 블렌딩
+        if let blurFilter = CIFilter(name: "CIGaussianBlur"),
+           let blendFilter = CIFilter(name: "CISoftLightBlendMode") {
+            blurFilter.setValue(result, forKey: kCIInputImageKey)
+            blurFilter.setValue(intensity * 4.0, forKey: kCIInputRadiusKey)
+            if let blurred = blurFilter.outputImage?.cropped(to: image.extent) {
+                // 소프트 라이트로 원본과 블렌딩 (intensity * 0.5 opacity)
+                if let alphaFilter = CIFilter(name: "CIColorMatrix"),
+                   let composite = CIFilter(name: "CISourceOverCompositing") {
+                    alphaFilter.setValue(blurred, forKey: kCIInputImageKey)
+                    alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+                    alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+                    alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+                    alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity * 0.45)), forKey: "inputAVector")
+                    if let semiBlur = alphaFilter.outputImage {
+                        composite.setValue(semiBlur, forKey: kCIInputImageKey)
+                        composite.setValue(result, forKey: kCIInputBackgroundImageKey)
+                        result = composite.outputImage?.cropped(to: image.extent) ?? result
+                    }
+                }
+            }
+        }
+
+        // 2. 밝기 + 채도 미세 보정 (CIColorControls)
+        if let colorFilter = CIFilter(name: "CIColorControls") {
+            colorFilter.setValue(result, forKey: kCIInputImageKey)
+            colorFilter.setValue(CGFloat(intensity) * 0.08, forKey: kCIInputBrightnessKey)
+            colorFilter.setValue(1.0 + CGFloat(intensity) * 0.06, forKey: kCIInputSaturationKey)
+            result = colorFilter.outputImage?.cropped(to: image.extent) ?? result
+        }
+
+        // 3. 따뜻한 피부톤 (CITemperatureAndTint)
+        if let tempFilter = CIFilter(name: "CITemperatureAndTint") {
+            tempFilter.setValue(result, forKey: kCIInputImageKey)
+            let temp = 6500.0 + CGFloat(intensity) * 500.0
+            tempFilter.setValue(CIVector(x: temp, y: 0), forKey: "inputNeutral")
+            tempFilter.setValue(CIVector(x: 6500, y: 0), forKey: "inputTargetNeutral")
+            result = tempFilter.outputImage?.cropped(to: image.extent) ?? result
+        }
+
+        // 4. 은은한 Bloom (뽀샤시 발광)
+        if let bloomFilter = CIFilter(name: "CIBloom") {
+            bloomFilter.setValue(result, forKey: kCIInputImageKey)
+            bloomFilter.setValue(intensity * 6.0, forKey: kCIInputRadiusKey)
+            bloomFilter.setValue(intensity * 0.4, forKey: kCIInputIntensityKey)
+            result = bloomFilter.outputImage?.cropped(to: image.extent) ?? result
+        }
+
+        return result
+    }
+
+    // MARK: - Before/After 스플릿 합성
+    // 버퍼는 landscape (1920×1080), Flutter에서 RotatedBox(quarterTurns:1)로 90°CW 회전 표시
+    // 세로 분할선(display X축) → 버퍼 Y축에 해당
+    // back: display_left = buffer_bottom → splitY = H*(1-position)
+    // front(미러): display_left = buffer_top → splitY = H*position
+
+    private func applyBeforeAfterSplit(original: CIImage, filtered: CIImage,
+                                       position: CGFloat) -> CIImage {
+        let extent = original.extent
+
+        // 실제 매핑(실기기 검증):
+        // back  카메라: buffer top(low Y) → display 왼쪽
+        // front 카메라: buffer bottom(high Y) → display 왼쪽 (scale(-1,1) flip 이후)
+        let splitY: CGFloat = isFrontCamera
+            ? extent.minY + extent.height * (1.0 - position)
+            : extent.minY + extent.height * position
+
+        // 원본(before) = display 왼쪽 / 필터(after) = display 오른쪽
+        let beforeRect: CGRect
+        let afterRect: CGRect
+
+        if isFrontCamera {
+            // front: buffer bottom(high Y) → display left
+            beforeRect = CGRect(x: extent.minX, y: splitY,
+                                width: extent.width, height: extent.maxY - splitY)
+            afterRect  = CGRect(x: extent.minX, y: extent.minY,
+                                width: extent.width, height: splitY - extent.minY)
+        } else {
+            // back: buffer top(low Y) → display left
+            beforeRect = CGRect(x: extent.minX, y: extent.minY,
+                                width: extent.width, height: splitY - extent.minY)
+            afterRect  = CGRect(x: extent.minX, y: splitY,
+                                width: extent.width, height: extent.maxY - splitY)
+        }
+
+        let beforePart = original.cropped(to: beforeRect)
+        let afterPart  = filtered.cropped(to: afterRect)
+
+        guard let composite = CIFilter(name: "CISourceOverCompositing") else { return filtered }
+        composite.setValue(beforePart, forKey: kCIInputImageKey)
+        composite.setValue(afterPart, forKey: kCIInputBackgroundImageKey)
+        return composite.outputImage?.cropped(to: extent) ?? filtered
     }
 
     // MARK: - 캐시 관리

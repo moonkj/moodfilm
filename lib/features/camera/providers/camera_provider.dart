@@ -37,6 +37,9 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
       // 필터 바로 적용
       await _applyCurrentFilter();
+
+      // 뽀샤시 기본 적용 (0.25 — 자연스러운 피부 보정)
+      await CameraEngine.setEffect(effectType: 'beauty', intensity: 0.25);
     } catch (e) {
       state = state.copyWith(
         status: CameraStatus.error,
@@ -93,6 +96,11 @@ class CameraNotifier extends StateNotifier<CameraState> {
     if (state.activeFilter != null) {
       StorageService.prefs.setIntensity(state.activeFilter!.id, intensity);
     }
+  }
+
+  Future<void> clearFilter() async {
+    state = state.copyWith(clearFilter: true, filterIntensity: 0.0);
+    await CameraEngine.setFilter(lutFileName: '', intensity: 0.0);
   }
 
   Future<void> _applyCurrentFilter() async {

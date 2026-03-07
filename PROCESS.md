@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-07 (세션 4)
+> 마지막 업데이트: 2026-03-07 (세션 5)
 
 ---
 
@@ -190,6 +190,19 @@ flutter build ios --release --no-codesign
 | v1.2 | 런칭+2개월 | 오늘의 필터 위젯 (WidgetKit), ColorGrid 피드 미리보기 |
 | v1.3 | 런칭+3개월 | Mood Match AI 필터 추천 (on-device CoreML), Android 출시 |
 | v2.0 | 런칭+6개월 | 커스텀 필터 생성, 커뮤니티 공유, Mood Journal |
+
+---
+
+## 세션 5 변경사항 (2026-03-07)
+
+- **더블필터링 버그 수정**: 카메라에서 LUT가 이미 적용된 JPEG을 저장하므로, EditorScreen은 기본적으로 필터 미적용(`_editorNoFilter = true`) 상태로 시작
+- **"없음" 버튼 추가**: FilterScrollBar에 `_NoFilterItem` 위젯 추가 — 카메라/에디터 모두 적용
+- **카메라 가운데 "MoodFilm" 텍스트 제거**
+- **버튼 레이아웃 변경**: 비교(compare) 버튼을 tune 버튼 위로 이동; 카메라 전/후면 전환 버튼을 필터 버튼 옆에 추가
+- **Split View 방향 수정**: 왼쪽=원본(before), 오른쪽=필터(after) — `MFLUTEngine.applyBeforeAfterSplit` beforeRect/afterRect 재계산
+- **필터 기본 강도 최적화**: 100% → 50-75% 트렌드 기반 개별 최적화 (`FilterData.defaultIntensities`)
+- **`CameraState.clearFilter`**: `copyWith`에 `clearFilter: bool` 파라미터 추가해 `activeFilter = null` 설정 가능
+- **빌드 오류 수정**: `user_preferences.dart`에 `filter_model.dart` import 누락 추가
 
 ---
 
