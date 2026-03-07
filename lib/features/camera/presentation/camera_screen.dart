@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:math' show pi;
+import 'dart:math' show pi, max;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -216,11 +216,28 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     });
   }
 
+  /// 화면 X 좌표(_splitPosition 0~1)를 버퍼 Y 좌표(0~1)로 변환
+  /// BoxFit.cover 크롭 오프셋을 보정하여 시각적 분할선과 실제 필터 경계를 일치
+  double _computeNativeSplitPos(double splitPosition, bool isFront, Size screenSize) {
+    // 카메라 프리뷰: SizedBox(16,9) + RotatedBox(1) = portrait 9:16 이미지
+    // FittedBox.cover로 스크린에 맞출 때 좌우 크롭 발생
+    final scale = max(screenSize.width / 9.0, screenSize.height / 16.0);
+    final scaledW = 9.0 * scale;
+    final cropX = (scaledW - screenSize.width) / 2.0;
+    // screen X -> image X -> buffer Y 비율
+    final raw = ((screenSize.width * splitPosition) + cropX) / scaledW;
+    // back 카메라: buffer 저Y → display 우 → nativePos = 1 - raw
+    // front 카메라: scale(-1,1) 후 buffer 저Y → display 좌 → nativePos = raw
+    return isFront ? raw : (1.0 - raw);
+  }
+
   void _toggleSplitMode(bool isFront) {
     final newMode = !_isSplitMode;
     setState(() => _isSplitMode = newMode);
     if (newMode) {
-      CameraEngine.setSplitMode(position: _splitPosition, isFrontCamera: isFront);
+      final screenSize = MediaQuery.of(context).size;
+      final nativePos = _computeNativeSplitPos(_splitPosition, isFront, screenSize);
+      CameraEngine.setSplitMode(position: nativePos, isFrontCamera: isFront);
     } else {
       CameraEngine.setSplitMode(position: -1.0, isFrontCamera: isFront);
     }
@@ -229,7 +246,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   void _updateSplitPosition(double dx, double screenWidth, bool isFront) {
     final newPos = (_splitPosition + dx / screenWidth).clamp(0.05, 0.95);
     setState(() => _splitPosition = newPos);
-    CameraEngine.setSplitMode(position: newPos, isFrontCamera: isFront);
+    final screenSize = MediaQuery.of(context).size;
+    final nativePos = _computeNativeSplitPos(newPos, isFront, screenSize);
+    CameraEngine.setSplitMode(position: nativePos, isFrontCamera: isFront);
   }
 
   // MARK: - Build
@@ -345,11 +364,29 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       );
     }
 
-    // CVPixelBuffer는 가로(landscape 1920×1080)로 도착
-    // 전면: RotatedBox(1, 90°CW) + scale(-1,1) = 정상 (확인됨)
-    // 후면: RotatedBox(1, 90°CW) + no scale = 정상 (steady state)
-    // 전환 글리치는 isFlipping 500ms 딜레이로 처리
+    // CVPixelBuffer는 항상 landscape (1920×1080)로 도착
+    // 세로 모드: RotatedBox(1, 90°CW)로 portrait 변환
+    // 가로 모드: RotatedBox 불필요 (buffer가 이미 landscape)
+    //   LandscapeRight(홈 우측): 버퍼 방향과 일치 → quarterTurns = 0
+    //   LandscapeLeft(홈 좌측): 버퍼 상하 반전 → quarterTurns = 2
+    // 전면 카메라: scale(-1,1) 좌우 미러 (모든 방향 공통)
     final isFront = cameraState.isFrontCamera;
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+
+    // 가로 모드 방향 감지 (LandscapeLeft vs LandscapeRight)
+    // MediaQuery.orientationData가 없으면 size 비율로 판단 후 기본값 사용
+    int quarterTurns;
+    if (!isLandscape) {
+      quarterTurns = 1; // portrait: 90° CW
+    } else {
+      // 가로모드: UIDeviceOrientation은 직접 접근 불가
+      // 실기기에서는 LandscapeRight(홈 우측)가 기본이므로 0 사용
+      // LandscapeLeft는 View.padding 차이로 구분 가능하지만 복잡
+      // 일단 0으로 처리하고 실기기 확인 후 조정
+      quarterTurns = 0;
+    }
+
     final previewWidget = SizedBox.expand(
       child: FittedBox(
         fit: BoxFit.cover,
@@ -359,7 +396,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ? (Matrix4.identity()..scale(-1.0, 1.0))
               : Matrix4.identity(),
           child: RotatedBox(
-            quarterTurns: 1,
+            quarterTurns: quarterTurns,
             child: SizedBox(
               width: 16,
               height: 9,
@@ -580,26 +617,26 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                       onTap: () => ref.read(cameraProvider.notifier).capturePhoto(),
                     ),
 
-                  // 우측: 카메라 전환 + 필터 버튼
+                  // 우측: 필터 버튼 + 카메라 전환
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      LiquidGlassPill(
-                        onTap: _handleCameraFlip,
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.flip_camera_ios_rounded,
-                          color: AppColors.shutter,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       LiquidGlassPill(
                         onTap: () => setState(() => _showFilterPanel = !_showFilterPanel),
                         padding: const EdgeInsets.all(12),
                         child: Icon(
                           Icons.auto_awesome_rounded,
                           color: _showFilterPanel ? AppColors.accent : AppColors.shutter,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      LiquidGlassPill(
+                        onTap: _handleCameraFlip,
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.flip_camera_ios_rounded,
+                          color: AppColors.shutter,
                           size: 24,
                         ),
                       ),

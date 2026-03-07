@@ -19,9 +19,7 @@ class EditorScreen extends ConsumerStatefulWidget {
   ConsumerState<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorScreenState extends ConsumerState<EditorScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   double _exposure = 0;
   double _contrast = 0;
@@ -41,17 +39,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
   bool _showSplitView = false;
   double _splitPosition = 0.5;
 
+  // 활성 패널: null | 'filter' | 'adjust' | 'effect'
+  String? _activePanel;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     // 자동 preview 생성 없음: 찍은 사진에 이미 필터가 적용되어 있음
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   bool _hasAdjustments() =>
@@ -90,15 +84,30 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
     });
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(flex: 5, child: _buildImagePreview()),
-            Expanded(flex: 4, child: _buildEditPanel()),
-          ],
-        ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. 풀스크린 사진
+          _buildFullScreenImage(),
+
+          // 2. 상단 오버레이 (닫기 / 비교 / 저장)
+          _buildTopOverlay(),
+
+          // 3. 하단 컨트롤 패널
+          _buildBottomPanel(),
+
+          // 4. 프리뷰 생성 중 로딩
+          if (_isGeneratingPreview)
+            const IgnorePointer(
+              child: ColoredBox(
+                color: Colors.black26,
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -129,37 +138,48 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
     }
   }
 
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.paddingM, vertical: AppDimensions.paddingS),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: const Icon(Icons.close_rounded, color: Colors.white70, size: 24),
-          ),
-          const Spacer(),
-          Text('Edit', style: AppTypography.h2.copyWith(color: Colors.white)),
-          const Spacer(),
-          GestureDetector(
-            onTap: _saveImage,
-            child: LiquidGlassPill(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: const Text('Save',
+  Widget _buildTopOverlay() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.paddingM, vertical: AppDimensions.paddingS),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            LiquidGlassPill(
+              onTap: () => Navigator.of(context).pop(),
+              padding: const EdgeInsets.all(10),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+            ),
+            LiquidGlassPill(
+              onTap: () => setState(() => _showSplitView = !_showSplitView),
+              padding: const EdgeInsets.all(10),
+              child: Icon(
+                Icons.compare_rounded,
+                color: _showSplitView ? AppColors.accent : Colors.white,
+                size: 20,
+              ),
+            ),
+            LiquidGlassPill(
+              onTap: _saveImage,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              child: const Text('저장',
                   style: TextStyle(color: Colors.white, fontSize: 14,
                       fontWeight: FontWeight.w600)),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildImagePreview() {
+  Widget _buildFullScreenImage() {
+    if (widget.imagePath == null) {
+      return const Center(
+          child: Icon(Icons.add_photo_alternate_outlined,
+              color: Colors.white38, size: 64));
+    }
     return GestureDetector(
-      onLongPressStart: (_) => setState(() => _showSplitView = true),
-      onLongPressEnd: (_) => setState(() => _showSplitView = false),
       onHorizontalDragUpdate: (details) {
         if (_showSplitView) {
           final width = MediaQuery.of(context).size.width;
@@ -168,41 +188,189 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
           });
         }
       },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-          child: widget.imagePath != null
-              ? _showSplitView ? _buildSplitView() : _buildMainPreview()
-              : const Center(
-                  child: Icon(Icons.add_photo_alternate_outlined,
-                      color: Colors.white38, size: 48)),
+      child: _showSplitView ? _buildSplitView() : _buildMainPreview(),
+    );
+  }
+
+  Widget _buildMainPreview() {
+    return Image.file(
+      key: ValueKey(_filteredPreviewPath ?? widget.imagePath!),
+      File(_filteredPreviewPath ?? widget.imagePath!),
+      fit: BoxFit.contain,
+      width: double.infinity,
+      height: double.infinity,
+    );
+  }
+
+  Widget _buildBottomPanel() {
+    const panelH = 260.0;
+    return Positioned(
+      bottom: 0, left: 0, right: 0,
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 패널 콘텐츠 (슬라이드업 애니메이션)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              height: _activePanel != null ? panelH : 0,
+              child: _activePanel != null
+                  ? Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent,
+                              Colors.black.withValues(alpha: 0.85)],
+                          stops: const [0.0, 0.3],
+                        ),
+                      ),
+                      child: _buildPanelContent(panelH),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            // 하단 탭 버튼 바
+            _buildBottomTabBar(),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildMainPreview() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.file(
-          key: ValueKey(_filteredPreviewPath ?? widget.imagePath!),
-          File(_filteredPreviewPath ?? widget.imagePath!),
-          fit: BoxFit.cover, width: double.infinity,
-        ),
-        if (_isGeneratingPreview)
-          const ColoredBox(
-            color: Colors.black26,
-            child: Center(
-              child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+  Widget _buildPanelContent(double height) {
+    switch (_activePanel) {
+      case 'filter':
+        return SizedBox(
+          height: height,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FilterScrollBar(
+                isNoFilterSelected: _editorNoFilter,
+                onNoFilterSelected: () {
+                  ref.read(cameraProvider.notifier).clearFilter();
+                  setState(() {
+                    _editorNoFilter = true;
+                    _filteredPreviewPath = null;
+                  });
+                },
+              ),
+            ],
+          ),
+        );
+      case 'adjust':
+        return SizedBox(
+          height: height,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+                AppDimensions.paddingM, 24, AppDimensions.paddingM, 8),
+            child: Column(
+              children: [
+                _buildSlider('Exposure', _exposure, -1.0, 1.0,
+                    (v) => setState(() => _exposure = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('Contrast', _contrast, -1.0, 1.0,
+                    (v) => setState(() => _contrast = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('Warmth', _warmth, -1.0, 1.0,
+                    (v) => setState(() => _warmth = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('Saturation', _saturation, -1.0, 1.0,
+                    (v) => setState(() => _saturation = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('Grain', _grain, 0.0, 1.0,
+                    (v) => setState(() => _grain = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                _buildSlider('Fade', _fade, 0.0, 1.0,
+                    (v) => setState(() => _fade = v),
+                    onChangeEnd: (_) => _generatePreview()),
+              ],
             ),
           ),
-      ],
+        );
+      case 'effect':
+        return SizedBox(
+          height: height,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+                AppDimensions.paddingM, 24, AppDimensions.paddingM, 8),
+            child: Column(
+              children: [
+                _buildEffectRow('Dreamy Glow', Icons.flare_rounded,
+                    _dreamyGlow, (v) => setState(() => _dreamyGlow = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                const SizedBox(height: 16),
+                _buildEffectRow('Film Grain', Icons.grain_rounded,
+                    _filmGrain, (v) => setState(() => _filmGrain = v),
+                    onChangeEnd: (_) => _generatePreview()),
+                const SizedBox(height: 16),
+                _buildEffectRow('Beauty', Icons.face_retouching_natural_rounded,
+                    _beauty, (v) => setState(() => _beauty = v),
+                    onChangeEnd: (_) => _generatePreview()),
+              ],
+            ),
+          ),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildBottomTabBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildTabButton('필터', Icons.auto_awesome_rounded, 'filter'),
+          _buildTabButton('조정', Icons.tune_rounded, 'adjust',
+              hasChanges: _hasAdjustments()),
+          _buildTabButton('이펙트', Icons.flare_rounded, 'effect',
+              hasChanges: _hasEffects()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String label, IconData icon, String panelId,
+      {bool hasChanges = false}) {
+    final isActive = _activePanel == panelId;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _activePanel = isActive ? null : panelId;
+      }),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            children: [
+              LiquidGlassPill(
+                padding: const EdgeInsets.all(12),
+                child: Icon(icon,
+                    color: isActive ? AppColors.accent : Colors.white,
+                    size: 22),
+              ),
+              if (hasChanges)
+                Positioned(
+                  top: 2, right: 2,
+                  child: Container(
+                    width: 8, height: 8,
+                    decoration: const BoxDecoration(
+                        color: AppColors.accent, shape: BoxShape.circle),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(label,
+              style: TextStyle(
+                color: isActive ? AppColors.accent : Colors.white60,
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              )),
+        ],
+      ),
     );
   }
 
@@ -249,106 +417,41 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
     );
   }
 
-  Widget _buildEditPanel() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.darkSurface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          TabBar(
-            controller: _tabController,
-            tabs: [
-              const Tab(text: '필터'),
-              Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('조정'),
-                    if (_hasAdjustments()) ...[
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: _resetAdjustments,
-                        child: const Icon(Icons.refresh_rounded, size: 14, color: AppColors.accent),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('이펙트'),
-                    if (_hasEffects()) ...[
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: _resetEffects,
-                        child: const Icon(Icons.refresh_rounded, size: 14, color: AppColors.accent),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-            labelStyle: AppTypography.filterName,
-            indicatorColor: AppColors.accent,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white38,
-            dividerColor: Colors.transparent,
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                FilterScrollBar(
-                  isNoFilterSelected: _editorNoFilter,
-                  onNoFilterSelected: () {
-                    ref.read(cameraProvider.notifier).clearFilter();
-                    setState(() {
-                      _editorNoFilter = true;
-                      _filteredPreviewPath = null;
-                    });
-                  },
-                ),
-                _buildAdjustmentSliders(),
-                _buildEffectPanel(),
-              ],
+  Widget _buildEffectRow(String label, IconData icon, double value,
+      ValueChanged<double> onChanged, {ValueChanged<double>? onChangeEnd}) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.accent, size: 18),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 80,
+          child: Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
+            ),
+            child: Slider(
+              value: value, min: 0.0, max: 1.0,
+              onChanged: onChanged, onChangeEnd: onChangeEnd,
+              activeColor: AppColors.accent, inactiveColor: Colors.white24,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdjustmentSliders() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppDimensions.paddingM, vertical: AppDimensions.paddingS),
-      children: [
-        _buildSlider('Exposure', _exposure, -1.0, 1.0,
-            (v) => setState(() => _exposure = v),
-            onChangeEnd: (_) => _generatePreview()),
-        _buildSlider('Contrast', _contrast, -1.0, 1.0,
-            (v) => setState(() => _contrast = v),
-            onChangeEnd: (_) => _generatePreview()),
-        _buildSlider('Warmth', _warmth, -1.0, 1.0,
-            (v) => setState(() => _warmth = v),
-            onChangeEnd: (_) => _generatePreview()),
-        _buildSlider('Saturation', _saturation, -1.0, 1.0,
-            (v) => setState(() => _saturation = v),
-            onChangeEnd: (_) => _generatePreview()),
-        _buildSlider('Grain', _grain, 0.0, 1.0,
-            (v) => setState(() => _grain = v),
-            onChangeEnd: (_) => _generatePreview()),
-        _buildSlider('Fade', _fade, 0.0, 1.0,
-            (v) => setState(() => _fade = v),
-            onChangeEnd: (_) => _generatePreview()),
+        ),
+        SizedBox(
+          width: 36,
+          child: Text('${(value * 100).toInt()}%',
+              style: const TextStyle(color: Colors.white60, fontSize: 11),
+              textAlign: TextAlign.right),
+        ),
       ],
     );
   }
+
+  Widget _buildEditPanel() => const SizedBox.shrink(); // 미사용 (호환성용)
 
   Widget _buildSlider(String label, double value, double min, double max,
       ValueChanged<double> onChanged, {ValueChanged<double>? onChangeEnd}) {
@@ -387,77 +490,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
     );
   }
 
-  Widget _buildEffectPanel() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppDimensions.paddingM, vertical: AppDimensions.paddingS),
-      children: [
-        _buildEffectTile(
-          icon: Icons.flare_rounded, label: 'Dreamy Glow', description: '몽환적인 빛번짐',
-          value: _dreamyGlow, onChanged: (v) => setState(() => _dreamyGlow = v),
-          onChangeEnd: (_) => _generatePreview(),
-        ),
-        const SizedBox(height: 8),
-        _buildEffectTile(
-          icon: Icons.grain_rounded, label: 'Film Grain', description: '필름 노이즈 텍스처',
-          value: _filmGrain, onChanged: (v) => setState(() => _filmGrain = v),
-          onChangeEnd: (_) => _generatePreview(),
-        ),
-        const SizedBox(height: 8),
-        _buildEffectTile(
-          icon: Icons.face_retouching_natural_rounded, label: 'Beauty', description: '뽀샤시 피부 보정',
-          value: _beauty, onChanged: (v) => setState(() => _beauty = v),
-          onChangeEnd: (_) => _generatePreview(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEffectTile({
-    required IconData icon, required String label, required String description,
-    required double value, required ValueChanged<double> onChanged,
-    ValueChanged<double>? onChangeEnd,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: AppColors.darkBg, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: AppColors.accent, size: 18),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: AppTypography.filterName.copyWith(color: Colors.white)),
-                  Text(description, style: AppTypography.caption),
-                ],
-              ),
-              const Spacer(),
-              Text('${(value * 100).toInt()}%',
-                  style: AppTypography.caption.copyWith(color: Colors.white60)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-            ),
-            child: Slider(
-              value: value, min: 0.0, max: 1.0,
-              onChanged: onChanged, onChangeEnd: onChangeEnd,
-              activeColor: AppColors.accent, inactiveColor: Colors.white24,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _saveImage() async {
     if (widget.imagePath == null) return;

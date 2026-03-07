@@ -165,12 +165,12 @@ class _FilterItem extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // 썸네일 이미지 (없으면 컬러 fallback)
+                    // 썸네일 이미지 (없으면 필터별 대표 컬러 fallback)
                     Image.asset(
                       filter.thumbnailAssetPath,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: _categoryColor(filter.category),
+                        color: _filterFallbackColor(filter),
                       ),
                     ),
                     // NEW 배지
@@ -216,16 +216,43 @@ class _FilterItem extends StatelessWidget {
     );
   }
 
-  Color _categoryColor(FilterCategory category) {
-    switch (category) {
-      case FilterCategory.warm:
-        return AppColors.warmTone;
-      case FilterCategory.cool:
-        return AppColors.coolTone;
-      case FilterCategory.film:
-        return AppColors.filmTone;
-      case FilterCategory.aesthetic:
-        return AppColors.aestheticTone;
+  Color _filterFallbackColor(FilterModel filter) {
+    // 썸네일 없을 때 필터별 대표 컬러 (각 필터의 실제 색감 기준)
+    switch (filter.id) {
+      // Signature
+      case 'mood':        return const Color(0xFFD4A88C); // 따뜻한 드리미 베이지
+      case 'dream':       return const Color(0xFFB898D0); // 보랏빛 안개
+      // Warm
+      case 'milk':        return const Color(0xFFF8F2EC);
+      case 'cream':       return const Color(0xFFF5E0B8);
+      case 'butter':      return const Color(0xFFEED888);
+      case 'honey':       return const Color(0xFFD49040);
+      case 'peach':       return const Color(0xFFF0A880);
+      // Cool
+      case 'sky':         return const Color(0xFF88C0E8);
+      case 'ocean':       return const Color(0xFF3C7498);
+      case 'mint':        return const Color(0xFF80D4B0);
+      case 'cloud':       return const Color(0xFFD4ECF8);
+      case 'ice':         return const Color(0xFFB0DCF4);
+      // Film
+      case 'film98':      return const Color(0xFFC0A880);
+      case 'film03':      return const Color(0xFFD0BC88);
+      case 'disposable':  return const Color(0xFFD0B470);
+      case 'retro_ccd':   return const Color(0xFF8CA08C);
+      case 'kodak_soft':  return const Color(0xFFC8C0A0);
+      // Aesthetic
+      case 'soft_pink':   return const Color(0xFFF4A8C0);
+      case 'lavender':    return const Color(0xFFC0A0DC);
+      case 'dusty_blue':  return const Color(0xFF7890B8);
+      case 'cafe_mood':   return const Color(0xFFC09060);
+      case 'seoul_night': return const Color(0xFF3C3C7C);
+      default:
+        switch (filter.category) {
+          case FilterCategory.warm:      return AppColors.warmTone;
+          case FilterCategory.cool:      return AppColors.coolTone;
+          case FilterCategory.film:      return AppColors.filmTone;
+          case FilterCategory.aesthetic: return AppColors.aestheticTone;
+        }
     }
   }
 }

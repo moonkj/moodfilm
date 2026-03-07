@@ -70,6 +70,26 @@ class FilterData {
   FilterData._();
 
   static final List<FilterModel> all = [
+    // ── MoodFilm 시그니처 (2종) ──────────────────────────────
+    FilterModel(
+      id: 'mood',
+      name: 'Mood',
+      category: FilterCategory.warm,
+      lutFileName: 'mood.cube',
+      description: 'MoodFilm 시그니처 — 따뜻한 드리미 필름',
+      isPro: false,
+      isNew: true,
+    ),
+    FilterModel(
+      id: 'dream',
+      name: 'Dream',
+      category: FilterCategory.aesthetic,
+      lutFileName: 'dream.cube',
+      description: '몽환적 보랏빛 안개 감성',
+      isPro: false,
+      isNew: true,
+    ),
+
     // Warm Tone (5종)
     FilterModel(
       id: 'milk',
@@ -242,6 +262,9 @@ class FilterData {
   /// 필터별 기본 강도 (최신 트렌드 기준 — 자연스럽고 은은하게)
   /// 사용자가 슬라이더로 조정 시 이 값이 덮어씌워짐
   static const Map<String, double> defaultIntensities = {
+    // Signature
+    'mood':        0.65,
+    'dream':       0.60,
     // Warm — 피부톤 살리되 과하지 않게
     'milk':        0.55,
     'cream':       0.55,

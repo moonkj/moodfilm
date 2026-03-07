@@ -222,6 +222,26 @@ FILTERS = {
         'highlight_r': 0.01,
     },
 
+    # ── MoodFilm 시그니처 ──────────────────────────────────────────────────
+    # "Mood" — 앱 대표 필터: 따뜻한 페이드 + 쿨 하이라이트 크로스 프로세스
+    # 피부톤 살리면서 드리미한 필름 감성. 셀카/인물 최적.
+    'mood': {
+        'temp': 0.06, 'tint': 0.03,
+        'sat': 0.80, 'fade': 0.13, 'contrast': 0.88, 'gamma': 0.94,
+        'lift': 0.07, 'gain': 0.97,
+        'shadow_r': 0.04, 'shadow_g': 0.01, 'shadow_b': -0.01,
+        'highlight_b': 0.02, 'highlight_r': 0.01,
+    },
+    # "Dream" — 에디토리얼 시그니처: 보랏빛 안개 + 리프트된 그림자
+    # 몽환적이고 부드러운 감성. 배경/풍경/OOTD 최적.
+    'dream': {
+        'temp': -0.02, 'tint': 0.06,
+        'sat': 0.75, 'fade': 0.14, 'contrast': 0.86, 'gamma': 1.02,
+        'lift': 0.08, 'gain': 0.96,
+        'shadow_r': 0.02, 'shadow_b': 0.03, 'shadow_g': 0.01,
+        'highlight_b': 0.03, 'highlight_r': 0.02,
+    },
+
     # Aesthetic
     'soft_pink': {
         'temp': 0.04, 'tint': 0.11,

@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
@@ -88,6 +90,64 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     });
   }
 
+  Future<void> _confirmAndDelete() async {
+    if (_selectedIds.isEmpty) return;
+    final count = _selectedIds.length;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.darkSurface,
+        title: Text('사진 $count장 삭제',
+            style: const TextStyle(color: Colors.white, fontSize: 17)),
+        content: Text('선택한 사진을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
+            style: const TextStyle(color: Colors.white60, fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('취소', style: TextStyle(color: Colors.white60)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final ids = _selectedIds.toList();
+    await PhotoManager.editor.deleteWithIds(ids);
+
+    if (!mounted) return;
+    setState(() {
+      _assets.removeWhere((a) => ids.contains(a.id));
+      _isMultiSelectMode = false;
+      _selectedIds.clear();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$count장을 삭제했습니다'),
+        backgroundColor: AppColors.darkSurface,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _shareSelected() async {
+    if (_selectedIds.isEmpty) return;
+    final selected = _assets.where((a) => _selectedIds.contains(a.id)).toList();
+
+    final files = <XFile>[];
+    for (final asset in selected) {
+      final file = await asset.file;
+      if (file != null) files.add(XFile(file.path));
+    }
+    if (files.isEmpty) return;
+    await Share.shareXFiles(files);
+  }
+
   Future<void> _showBatchFilterPicker() async {
     if (_selectedIds.isEmpty) return;
 
@@ -168,11 +228,22 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
               onPressed: _toggleMultiSelectMode,
               child: const Text('선택', style: TextStyle(color: AppColors.accent)),
             ),
-          if (_isMultiSelectMode && _selectedIds.isNotEmpty)
+          if (_isMultiSelectMode && _selectedIds.isNotEmpty) ...[
+            IconButton(
+              onPressed: _shareSelected,
+              icon: const Icon(Icons.ios_share_rounded, color: AppColors.accent),
+              tooltip: '공유',
+            ),
+            IconButton(
+              onPressed: _confirmAndDelete,
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              tooltip: '삭제',
+            ),
             TextButton(
               onPressed: _showBatchFilterPicker,
               child: const Text('필터 적용', style: TextStyle(color: AppColors.accent)),
             ),
+          ],
         ],
       ),
       body: _buildBody(),
@@ -238,6 +309,12 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
           isSelected: isSelected,
           isMultiSelectMode: _isMultiSelectMode,
           onTap: () => _selectAsset(asset),
+          onLongPress: () async {
+            // 롱프레스: 단일 사진 바로 공유
+            final file = await asset.file;
+            if (file == null || !mounted) return;
+            await Share.shareXFiles([XFile(file.path)]);
+          },
         );
       },
     );
@@ -303,11 +380,13 @@ class _AssetThumbnail extends StatefulWidget {
     required this.isSelected,
     required this.isMultiSelectMode,
     required this.onTap,
+    this.onLongPress,
   });
   final AssetEntity asset;
   final bool isSelected;
   final bool isMultiSelectMode;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   State<_AssetThumbnail> createState() => _AssetThumbnailState();
@@ -334,6 +413,7 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: Stack(
         fit: StackFit.expand,
         children: [

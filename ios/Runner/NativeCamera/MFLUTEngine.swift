@@ -284,46 +284,45 @@ class MFLUTEngine {
     }
 
     // MARK: - Before/After 스플릿 합성
-    // 버퍼는 landscape (1920×1080), Flutter에서 RotatedBox(quarterTurns:1)로 90°CW 회전 표시
-    // 세로 분할선(display X축) → 버퍼 Y축에 해당
-    // back: display_left = buffer_bottom → splitY = H*(1-position)
-    // front(미러): display_left = buffer_top → splitY = H*position
+    // Flutter에서 BoxFit.cover 크롭 보정된 nativePos(0~1)를 받음
+    // back  카메라: RotatedBox(CW90°) → 버퍼 저Y=display 우, 고Y=display 좌
+    //               nativePos = 1 - display_x → splitY = H * nativePos
+    //               display 왼쪽(원본) = 고Y 영역 [splitY, maxY)
+    //               display 오른쪽(필터) = 저Y 영역 [minY, splitY)
+    // front 카메라: RotatedBox + scale(-1,1) → 버퍼 저Y=display 좌, 고Y=display 우
+    //               nativePos = display_x → splitY = H * nativePos
+    //               display 왼쪽(원본) = 저Y 영역 [minY, splitY)
+    //               display 오른쪽(필터) = 고Y 영역 [splitY, maxY)
 
     private func applyBeforeAfterSplit(original: CIImage, filtered: CIImage,
                                        position: CGFloat) -> CIImage {
         let extent = original.extent
+        let splitY = extent.minY + extent.height * position
 
-        // 실제 매핑(실기기 검증):
-        // back  카메라: buffer top(low Y) → display 왼쪽
-        // front 카메라: buffer bottom(high Y) → display 왼쪽 (scale(-1,1) flip 이후)
-        let splitY: CGFloat = isFrontCamera
-            ? extent.minY + extent.height * (1.0 - position)
-            : extent.minY + extent.height * position
-
-        // 원본(before) = display 왼쪽 / 필터(after) = display 오른쪽
-        let beforeRect: CGRect
-        let afterRect: CGRect
+        let originalPart: CIImage
+        let filteredPart: CIImage
 
         if isFrontCamera {
-            // front: buffer bottom(high Y) → display left
-            beforeRect = CGRect(x: extent.minX, y: splitY,
-                                width: extent.width, height: extent.maxY - splitY)
-            afterRect  = CGRect(x: extent.minX, y: extent.minY,
-                                width: extent.width, height: splitY - extent.minY)
+            // front: 저Y → display 왼쪽(원본), 고Y → display 오른쪽(필터)
+            originalPart = original.cropped(to: CGRect(
+                x: extent.minX, y: extent.minY,
+                width: extent.width, height: splitY - extent.minY))
+            filteredPart = filtered.cropped(to: CGRect(
+                x: extent.minX, y: splitY,
+                width: extent.width, height: extent.maxY - splitY))
         } else {
-            // back: buffer top(low Y) → display left
-            beforeRect = CGRect(x: extent.minX, y: extent.minY,
-                                width: extent.width, height: splitY - extent.minY)
-            afterRect  = CGRect(x: extent.minX, y: splitY,
-                                width: extent.width, height: extent.maxY - splitY)
+            // back: 고Y → display 왼쪽(원본), 저Y → display 오른쪽(필터)
+            originalPart = original.cropped(to: CGRect(
+                x: extent.minX, y: splitY,
+                width: extent.width, height: extent.maxY - splitY))
+            filteredPart = filtered.cropped(to: CGRect(
+                x: extent.minX, y: extent.minY,
+                width: extent.width, height: splitY - extent.minY))
         }
 
-        let beforePart = original.cropped(to: beforeRect)
-        let afterPart  = filtered.cropped(to: afterRect)
-
         guard let composite = CIFilter(name: "CISourceOverCompositing") else { return filtered }
-        composite.setValue(beforePart, forKey: kCIInputImageKey)
-        composite.setValue(afterPart, forKey: kCIInputBackgroundImageKey)
+        composite.setValue(originalPart, forKey: kCIInputImageKey)
+        composite.setValue(filteredPart, forKey: kCIInputBackgroundImageKey)
         return composite.outputImage?.cropped(to: extent) ?? filtered
     }
 

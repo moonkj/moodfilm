@@ -226,7 +226,8 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         let needsProcessing = lutEngine.intensity > 0 && (
-            lutEngine.hasLUT || lutEngine.glowIntensity > 0 || lutEngine.grainIntensity > 0
+            lutEngine.hasLUT || lutEngine.glowIntensity > 0 ||
+            lutEngine.grainIntensity > 0 || lutEngine.beautyIntensity > 0
         )
 
         let outputBuffer: CVPixelBuffer
