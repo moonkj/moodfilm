@@ -184,7 +184,7 @@ class _FilterGridItem extends StatelessWidget {
                       filter.thumbnailAssetPath,
                       fit: BoxFit.cover,
                       width: double.infinity,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (context, error, stackTrace) => Container(
                         color: AppColors.warmTone,
                       ),
                     ),

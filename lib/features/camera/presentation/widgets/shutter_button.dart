@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 
 /// 서터 버튼 — scale bounce 0.92→1.0 150ms spring(0.6)

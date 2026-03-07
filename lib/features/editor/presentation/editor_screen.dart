@@ -153,6 +153,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _darkCircleBtn(Icons.close_rounded, () => Navigator.of(context).pop()),
+            _darkCircleBtn(
+              _showSplitView ? Icons.compare_arrows_rounded : Icons.compare_rounded,
+              () => setState(() => _showSplitView = !_showSplitView),
+            ),
             _darkPillBtn('저장', _saveImage),
           ],
         ),
@@ -294,7 +298,18 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _sectionLabel('기본'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _sectionLabel('기본'),
+                    if (_hasAdjustments())
+                      GestureDetector(
+                        onTap: _resetAdjustments,
+                        child: const Text('초기화',
+                            style: TextStyle(color: Colors.white60, fontSize: 12)),
+                      ),
+                  ],
+                ),
                 _buildSlider('노출', _exposure, -1.0, 1.0,
                     (v) => setState(() => _exposure = v),
                     onChangeEnd: (_) => _generatePreview()),
@@ -341,9 +356,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           height: height,
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-                AppDimensions.paddingM, 24, AppDimensions.paddingM, 8),
+                AppDimensions.paddingM, 12, AppDimensions.paddingM, 8),
             child: Column(
               children: [
+                if (_hasEffects())
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: _resetEffects,
+                      child: const Text('초기화',
+                          style: TextStyle(color: Colors.white60, fontSize: 12)),
+                    ),
+                  ),
+                const SizedBox(height: 8),
                 _buildEffectRow('Dreamy Glow', Icons.flare_rounded,
                     _dreamyGlow, (v) => setState(() => _dreamyGlow = v),
                     onChangeEnd: (_) => _generatePreview()),
@@ -546,8 +571,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     'vignette': _vignette,
     'skinTone': _skinTone,
   };
-
-  Widget _buildEditPanel() => const SizedBox.shrink(); // 미사용 (호환성용)
 
   Widget _sectionLabel(String label) {
     return Padding(

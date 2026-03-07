@@ -185,7 +185,7 @@ class _VideoFilterPickerSheet extends StatelessWidget {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemCount: filters.length,
             itemBuilder: (ctx, i) {
               final f = filters[i];

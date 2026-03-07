@@ -10,7 +10,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/models/filter_model.dart';
-import '../../../core/utils/haptic_utils.dart';
 import '../../../native_plugins/camera_engine/camera_engine.dart';
 import '../providers/camera_provider.dart';
 import '../models/camera_state.dart';
@@ -181,13 +180,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     ];
   }
 
-  void _cycleAspectRatio() {
-    final current = ref.read(cameraProvider).aspectRatio;
-    final values = CameraAspectRatio.values;
-    final nextIndex = (values.indexOf(current) + 1) % values.length;
-    ref.read(cameraProvider.notifier).setAspectRatio(values[nextIndex]);
-    HapticUtils.filterChange();
-  }
 
   void _triggerFilterFlash() {
     setState(() => _filterFlash = true);
@@ -306,13 +298,17 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         // 카메라 전환 blur
         AnimatedBuilder(
           animation: _flipController,
-          builder: (_, __) {
+          builder: (context, child) {
             final v = _flipController.value;
             if (v == 0) return const SizedBox.shrink();
             final double p;
-            if (v < 0.2) p = v / 0.2;
-            else if (v < 0.8) p = 1.0;
-            else p = 1.0 - (v - 0.8) / 0.2;
+            if (v < 0.2) {
+              p = v / 0.2;
+            } else if (v < 0.8) {
+              p = 1.0;
+            } else {
+              p = 1.0 - (v - 0.8) / 0.2;
+            }
             return IgnorePointer(
               child: BackdropFilter(
                 filter: ui.ImageFilter.blur(sigmaX: p * 30, sigmaY: p * 30),
@@ -337,7 +333,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     final isFront = cameraState.isFrontCamera;
     final textureWidget = Transform(
       alignment: Alignment.center,
-      transform: isFront ? (Matrix4.identity()..scale(-1.0, 1.0)) : Matrix4.identity(),
+      transform: isFront ? Matrix4.diagonal3Values(-1.0, 1.0, 1.0) : Matrix4.identity(),
       child: RotatedBox(
         quarterTurns: 1,
         child: SizedBox(width: 16, height: 9, child: Texture(textureId: cameraState.textureId!)),
@@ -570,7 +566,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     : Image.file(
                         File(cameraState.lastCapturedPath!),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorBuilder: (context, error, stackTrace) =>
                             const Icon(Icons.photo_library_outlined, color: Color(0xFF8A8480), size: 20),
                       ),
               )

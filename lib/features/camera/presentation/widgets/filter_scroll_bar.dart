@@ -169,7 +169,7 @@ class _FilterItem extends StatelessWidget {
                     Image.asset(
                       filter.thumbnailAssetPath,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _filterFallbackGradient(filter),
+                      errorBuilder: (context, error, stackTrace) => _filterFallbackGradient(filter),
                     ),
                     // NEW 배지
                     if (filter.isNew)

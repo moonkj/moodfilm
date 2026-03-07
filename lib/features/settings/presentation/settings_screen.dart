@@ -34,7 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     prefs.save();
                   });
                 },
-                activeColor: AppColors.accent,
+                activeThumbColor: AppColors.accent,
               ),
             ],
           ),
