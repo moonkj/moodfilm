@@ -97,10 +97,10 @@ class CameraEngine {
     return path!;
   }
 
-  /// 프리뷰 비율 크롭 설정
-  /// [ratio] portrait W/H 비율 (null = Full, 크롭 없음)
-  static Future<void> setAspectRatio(double? ratio) async {
-    await _channel.invokeMethod('setAspectRatio', {'ratio': ratio ?? 0.0});
+  /// 화면 비율 설정 ('full', '9:16', '3:4', '1:1', '4:3', '16:9')
+  /// 촬영 시 해당 비율로 크롭됨
+  static Future<void> setAspectRatio(String ratio) async {
+    await _channel.invokeMethod('setAspectRatio', {'ratio': ratio});
   }
 
   /// 동영상 녹화 종료 + 갤러리 저장

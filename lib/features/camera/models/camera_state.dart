@@ -36,6 +36,18 @@ extension CameraAspectRatioX on CameraAspectRatio {
       case CameraAspectRatio.ratio16_9: return 16 / 9;
     }
   }
+
+  // 네이티브 크롭 전달용 문자열 키
+  String get nativeKey {
+    switch (this) {
+      case CameraAspectRatio.full: return 'full';
+      case CameraAspectRatio.ratio9_16: return '9:16';
+      case CameraAspectRatio.ratio3_4: return '3:4';
+      case CameraAspectRatio.ratio1_1: return '1:1';
+      case CameraAspectRatio.ratio4_3: return '4:3';
+      case CameraAspectRatio.ratio16_9: return '16:9';
+    }
+  }
 }
 
 class CameraState {
@@ -54,6 +66,7 @@ class CameraState {
   final bool isRecording; // 동영상 녹화 중
   final int recordingSeconds; // 녹화 경과 시간(초)
   final int favoritesVersion; // 즐겨찾기 변경 감지 (FilterScrollBar 리빌드 트리거)
+  final CameraAspectRatio aspectRatio; // 카메라 비율
 
   const CameraState({
     this.status = CameraStatus.uninitialized,
@@ -71,6 +84,7 @@ class CameraState {
     this.isRecording = false,
     this.recordingSeconds = 0,
     this.favoritesVersion = 0,
+    this.aspectRatio = CameraAspectRatio.full,
   });
 
   CameraState copyWith({
@@ -90,6 +104,7 @@ class CameraState {
     bool? isRecording,
     int? recordingSeconds,
     int? favoritesVersion,
+    CameraAspectRatio? aspectRatio,
   }) {
     return CameraState(
       status: status ?? this.status,
@@ -107,6 +122,7 @@ class CameraState {
       isRecording: isRecording ?? this.isRecording,
       recordingSeconds: recordingSeconds ?? this.recordingSeconds,
       favoritesVersion: favoritesVersion ?? this.favoritesVersion,
+      aspectRatio: aspectRatio ?? this.aspectRatio,
     );
   }
 

@@ -81,10 +81,8 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
 
         case "setAspectRatio":
             if let args = call.arguments as? [String: Any],
-               let ratio = args["ratio"] as? Double, ratio > 0 {
-                cameraSession?.cropRatio = CGFloat(ratio)
-            } else {
-                cameraSession?.cropRatio = nil
+               let ratio = args["ratio"] as? String {
+                cameraSession?.currentAspectRatio = ratio
             }
             result(nil)
 

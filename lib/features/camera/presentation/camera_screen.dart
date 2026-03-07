@@ -11,36 +11,13 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/theme/liquid_glass_decoration.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/models/filter_model.dart';
+import '../../../core/utils/haptic_utils.dart';
 import '../../../native_plugins/camera_engine/camera_engine.dart';
 import '../providers/camera_provider.dart';
 import '../models/camera_state.dart';
 import 'widgets/shutter_button.dart';
 import 'widgets/filter_scroll_bar.dart';
 import 'widgets/exposure_indicator.dart';
-
-/// 카메라 화면 비율 선택
-enum CameraAspectRatio { full, r9x16, r3x4, r1x1, r4x3, r16x9 }
-
-extension CameraAspectRatioExt on CameraAspectRatio {
-  /// 비율값 (width/height). null이면 크롭 없음(Full)
-  double? get ratio => switch (this) {
-    CameraAspectRatio.full   => null,
-    CameraAspectRatio.r9x16  => 9 / 16,
-    CameraAspectRatio.r3x4   => 3 / 4,
-    CameraAspectRatio.r1x1   => 1 / 1,
-    CameraAspectRatio.r4x3   => 4 / 3,
-    CameraAspectRatio.r16x9  => 16 / 9,
-  };
-
-  String get label => switch (this) {
-    CameraAspectRatio.full   => 'Full',
-    CameraAspectRatio.r9x16  => '9:16',
-    CameraAspectRatio.r3x4   => '3:4',
-    CameraAspectRatio.r1x1   => '1:1',
-    CameraAspectRatio.r4x3   => '4:3',
-    CameraAspectRatio.r16x9  => '16:9',
-  };
-}
 
 /// 메인 카메라 화면
 /// 풀스크린 카메라 프리뷰 + 반투명 오버레이 컨트롤
@@ -83,9 +60,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   double _splitPosition = 0.5;
   bool _splitUIHidden = false;
   Timer? _splitAutoHideTimer;
-
-  // 화면 비율 선택
-  CameraAspectRatio _aspectRatio = CameraAspectRatio.full;
 
   // 필터 패널 표시
   bool _showFilterPanel = false;
@@ -248,6 +222,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       ...FilterData.all.where((f) => prefs.favoriteFilterIds.contains(f.id)),
       ...FilterData.all.where((f) => !prefs.favoriteFilterIds.contains(f.id)),
     ];
+  }
+
+  void _cycleAspectRatio() {
+    final current = ref.read(cameraProvider).aspectRatio;
+    final values = CameraAspectRatio.values;
+    final nextIndex = (values.indexOf(current) + 1) % values.length;
+    ref.read(cameraProvider.notifier).setAspectRatio(values[nextIndex]);
+    HapticUtils.filterChange();
   }
 
   void _triggerFilterFlash() {
@@ -453,66 +435,59 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       quarterTurns = 0;
     }
 
-    final ratio = _aspectRatio.ratio;
-    final screenSize = MediaQuery.of(context).size;
-
-    // Full은 풀스크린, 나머지는 네이티브가 비율에 맞게 크롭한 버퍼를 표시
-    Widget previewWidget;
-    if (ratio == null) {
-      // Full: 9:16 풀스크린
-      previewWidget = SizedBox.expand(
-        child: FittedBox(
-          fit: BoxFit.cover,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: isFront
-                ? (Matrix4.identity()..scale(-1.0, 1.0))
-                : Matrix4.identity(),
-            child: RotatedBox(
-              quarterTurns: quarterTurns,
-              child: SizedBox(
-                width: 16,
-                height: 9,
-                child: Texture(textureId: cameraState.textureId!),
-              ),
-            ),
-          ),
+    // 텍스처 위젯 (항상 16:9 landscape 버퍼)
+    final textureWidget = Transform(
+      alignment: Alignment.center,
+      transform: isFront
+          ? (Matrix4.identity()..scale(-1.0, 1.0))
+          : Matrix4.identity(),
+      child: RotatedBox(
+        quarterTurns: quarterTurns,
+        child: SizedBox(
+          width: 16,
+          height: 9,
+          child: Texture(textureId: cameraState.textureId!),
         ),
+      ),
+    );
+
+    final aspectRatio = cameraState.aspectRatio;
+
+    Widget previewWidget;
+    if (aspectRatio == CameraAspectRatio.full) {
+      // 풀스크린 — 기존 동작 유지
+      previewWidget = SizedBox.expand(
+        child: FittedBox(fit: BoxFit.cover, child: textureWidget),
       );
     } else {
-      // 비율 모드: 네이티브가 cropW×1080 버퍼를 전달
-      // cropW = 1080/ratio → buffer aspect = 1/ratio
-      // SizedBox(1, ratio) → RotatedBox(1) → (ratio, 1) portrait aspect = ratio
-      // FittedBox.fill은 같은 비율이므로 왜곡 없이 pw×ph에 채움
-      final sw = screenSize.width;
-      final sh = screenSize.height;
-      double pw = sw;
-      double ph = sw / ratio;
-      if (ph > sh) { ph = sh; pw = sh * ratio; }
+      // 특정 비율 — Flutter가 ClipRect로 잘라냄 (네이티브 버퍼는 항상 16:9)
+      previewWidget = LayoutBuilder(
+        builder: (context, constraints) {
+          final screenW = constraints.maxWidth;
+          final screenH = constraints.maxHeight;
+          final targetRatio = aspectRatio.ratio!; // width / height
 
-      previewWidget = Align(
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: pw,
-          height: ph,
-          child: FittedBox(
-            fit: BoxFit.fill,
-            child: Transform(
-              alignment: Alignment.center,
-              transform: isFront
-                  ? (Matrix4.identity()..scale(-1.0, 1.0))
-                  : Matrix4.identity(),
-              child: RotatedBox(
-                quarterTurns: quarterTurns,
-                child: SizedBox(
-                  width: 1.0,
-                  height: ratio,
-                  child: Texture(textureId: cameraState.textureId!),
+          double containerW = screenW;
+          double containerH = screenW / targetRatio;
+
+          if (containerH > screenH) {
+            containerH = screenH;
+            containerW = screenH * targetRatio;
+          }
+
+          return Center(
+            child: ClipRect(
+              child: SizedBox(
+                width: containerW,
+                height: containerH,
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: textureWidget,
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       );
     }
 
@@ -575,6 +550,20 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               child: _cameraButton(
                 onTap: () => context.push('/settings'),
                 child: const Icon(Icons.settings_outlined, color: Colors.white, size: 20),
+              ),
+            ),
+
+            // 비율 전환 버튼
+            LiquidGlassPill(
+              onTap: _cycleAspectRatio,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                cameraState.aspectRatio.label,
+                style: const TextStyle(
+                  color: AppColors.shutter,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
 
@@ -720,9 +709,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                             )
                           : const SizedBox.shrink(),
                     ),
-
-                    // 화면 비율 선택 탭
-                    _buildAspectRatioSelector(),
 
                     // 사진/동영상 모드 전환 탭
                     _buildModeSelector(cameraState),
@@ -1057,84 +1043,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
 
-  Widget _buildAspectRatioSelector() {
-    // 앱이 세로 고정이므로 orientation 감지 불가 → 6개 전체를 가로 스크롤로 표시
-    const ratios = [
-      CameraAspectRatio.full,
-      CameraAspectRatio.r9x16,
-      CameraAspectRatio.r3x4,
-      CameraAspectRatio.r1x1,
-      CameraAspectRatio.r4x3,
-      CameraAspectRatio.r16x9,
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: ratios.map((r) {
-            final isSelected = _aspectRatio == r;
-            return GestureDetector(
-              onTap: () => _setAspectRatio(r),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.9)
-                      : Colors.black.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  r.label,
-                  style: TextStyle(
-                    color: isSelected ? Colors.black87 : Colors.white,
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  void _setAspectRatio(CameraAspectRatio ratio) {
-    setState(() => _aspectRatio = ratio);
-    // 네이티브에 비율 전달 → 사진 촬영 시 JPEG 크롭에 사용
-    CameraEngine.setAspectRatio(ratio.ratio);
-  }
-
-  // MARK: - 비율 크롭 오버레이
-
-  /// 선택된 비율의 크롭 영역 — 화면 중앙 기준
-  Rect _getCropRect(Size screen) {
-    final ratio = _aspectRatio.ratio;
-    if (ratio == null) return Rect.fromLTWH(0, 0, screen.width, screen.height);
-    final sw = screen.width;
-    final sh = screen.height;
-    // 너비 기준으로 높이 계산 (초과하면 높이 기준으로 너비 계산)
-    double w = sw;
-    double h = sw / ratio;
-    if (h > sh) {
-      h = sh;
-      w = sh * ratio;
-    }
-    final left = (sw - w) / 2;
-    final top = (sh - h) / 2;
-    return Rect.fromLTWH(left, top, w, h);
-  }
-
   // MARK: - 원형 카메라 아이콘 버튼 헬퍼
 
   Widget _cameraButton({
@@ -1188,51 +1096,4 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       ),
     );
   }
-}
-
-// MARK: - 비율 크롭 오버레이 페인터
-
-/// 선택된 비율 밖을 어둡게 처리하고 모서리 가이드를 그림
-class _CropOverlayPainter extends CustomPainter {
-  final Rect cropRect;
-  _CropOverlayPainter(this.cropRect);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final dimPaint = Paint()..color = const Color(0xB3000000); // 70% 불투명
-
-    // 크롭 영역 밖 4방향 어둡게
-    final rects = [
-      Rect.fromLTWH(0, 0, size.width, cropRect.top),                          // 위
-      Rect.fromLTWH(0, cropRect.bottom, size.width, size.height - cropRect.bottom), // 아래
-      Rect.fromLTWH(0, cropRect.top, cropRect.left, cropRect.height),          // 왼
-      Rect.fromLTWH(cropRect.right, cropRect.top, size.width - cropRect.right, cropRect.height), // 오른
-    ];
-    for (final r in rects) {
-      if (r.width > 0 && r.height > 0) canvas.drawRect(r, dimPaint);
-    }
-
-    // 모서리 가이드
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-    const len = 22.0;
-
-    // 좌상단
-    canvas.drawLine(Offset(cropRect.left, cropRect.top + len), Offset(cropRect.left, cropRect.top), paint);
-    canvas.drawLine(Offset(cropRect.left, cropRect.top), Offset(cropRect.left + len, cropRect.top), paint);
-    // 우상단
-    canvas.drawLine(Offset(cropRect.right - len, cropRect.top), Offset(cropRect.right, cropRect.top), paint);
-    canvas.drawLine(Offset(cropRect.right, cropRect.top), Offset(cropRect.right, cropRect.top + len), paint);
-    // 좌하단
-    canvas.drawLine(Offset(cropRect.left, cropRect.bottom - len), Offset(cropRect.left, cropRect.bottom), paint);
-    canvas.drawLine(Offset(cropRect.left, cropRect.bottom), Offset(cropRect.left + len, cropRect.bottom), paint);
-    // 우하단
-    canvas.drawLine(Offset(cropRect.right - len, cropRect.bottom), Offset(cropRect.right, cropRect.bottom), paint);
-    canvas.drawLine(Offset(cropRect.right, cropRect.bottom), Offset(cropRect.right, cropRect.bottom - len), paint);
-  }
-
-  @override
-  bool shouldRepaint(_CropOverlayPainter old) => old.cropRect != cropRect;
 }

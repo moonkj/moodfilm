@@ -182,6 +182,13 @@ class CameraNotifier extends StateNotifier<CameraState> {
     state = state.copyWith(errorMessage: null);
   }
 
+  // MARK: - 비율 전환
+
+  Future<void> setAspectRatio(CameraAspectRatio ratio) async {
+    state = state.copyWith(aspectRatio: ratio);
+    await CameraEngine.setAspectRatio(ratio.nativeKey);
+  }
+
   // MARK: - 카메라 모드 전환
 
   void toggleCameraMode() {
