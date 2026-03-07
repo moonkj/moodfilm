@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-07 (세션 6)
+> 마지막 업데이트: 2026-03-07 (세션 7)
 
 ---
 
@@ -254,10 +254,75 @@ flutter build ios --release --no-codesign
 
 ---
 
+## 세션 7 변경사항 (2026-03-07)
+
+### 카메라 UI 전면 개편 (BerryFilm 스타일)
+
+**레이아웃 구조 변경:**
+- 풀스크린 오버레이 → BerryFilm 스타일: 상단 카메라 프리뷰(3:4) + 하단 흰색 컨트롤 영역으로 분리
+- 프리뷰 영역: `SizedBox(width: screenW, height: screenW * 4/3)` 고정 비율
+- 하단 컨트롤 영역: 배경 흰색, 필터명/강도 슬라이더, 모드탭, 셔터행
+- 화면 비율 선택 버튼 제거 (기본값: 3:4)
+
+**셔터 버튼:**
+- 셔터 행: `Row(Expanded[갤러리], 셔터(center), Expanded[Row(필터버튼, 전환버튼)])`
+- 셔터 색상 수정 (흰 배경에서 보이도록): 외곽 `Color(0xFFB0AAA5)`, 내부 `Color(0xFFF5F2EF)` + 그림자
+- 흰 배경에서 ShutterButton 사라지는 버그 수정
+
+**필터 바 토글:**
+- 필터 바 기본 숨김, 셔터 옆 필터 버튼으로 토글
+- `_showFilterPanel` 상태로 AnimatedContainer 슬라이드업/다운
+
+**사이드 버튼 이동:**
+- 설정/비교(compare)/밝기(tune) 버튼: 상단 → 카메라 프리뷰 우하단 `Positioned(right:10, bottom:12)`
+- 스플릿 모드 자동 UI 숨김 제거 — 항상 전체 UI 표시
+
+### 카메라 기본 비율 변경
+
+- `CameraState` 기본 `aspectRatio`: `CameraAspectRatio.full` → `CameraAspectRatio.ratio3_4`
+
+### Split View 버그 수정
+
+**전면/후면 카메라 전환 후 분할선 틀어짐 수정:**
+- `_computeNativeSplitPos`: `isFront ? (1.0 - pos) : pos` (후면은 직접 매핑)
+- `_handleCameraFlip()` 후 새 `isFront` 값으로 split 위치 재전송
+
+### 무음 셔터 기능 추가
+
+**설정 화면:**
+- `SettingsScreen` → `StatefulWidget`으로 변경
+- "카메라" 섹션 + 무음 셔터 `SwitchListTile` 추가
+
+**데이터 모델:**
+- `UserPreferences`에 `@HiveField(9) bool isSilentShutter` 추가 (기본값: `false`)
+- `user_preferences.g.dart`: `fields[9] as bool? ?? false` null 안전 처리 (기존 Hive 데이터 호환)
+
+**Flutter:**
+- `CameraEngine.capturePhotoSilent()` 메서드 추가 (`capturePhotoSilent` Method Channel)
+- `CameraProvider.capturePhoto()`: `isSilentShutter` 여부에 따라 무음/일반 촬영 분기
+
+**iOS Native:**
+- `MFCameraSession.latestProcessedBuffer`: 최신 처리된 CVPixelBuffer 저장 (매 프레임 업데이트)
+- `MFCameraSession.captureSilentPhoto()`: 최신 버퍼 → 비율 크롭 → UIImage JPEG 저장
+  - 전면: `.leftMirrored` (EXIF 5 = 90°CW + 좌우반전) — 위아래 반전 버그 수정
+  - 후면: `.right` (EXIF 6 = 90°CW)
+- `CameraEnginePlugin`: `capturePhotoSilent` 케이스 추가, `PHPhotoLibrary` 갤러리 저장 연결
+
+### 버그 수정
+
+| 버그 | 원인 | 수정 |
+|------|------|------|
+| 앱 흰화면/크래시 | `fields[9] as bool` — null as bool TypeError | `fields[9] as bool? ?? false` |
+| 전면 무음 촬영 위아래 반전 | `.rightMirrored` = 90°CCW + flip | `.leftMirrored` = 90°CW + flip |
+| 후면 카메라 스플릿 반전 | `_computeNativeSplitPos`에서 front/back 동일 공식 | `isFront ? 1-pos : pos` 분기 |
+| 카메라 전환 후 스플릿 틀어짐 | 전환 후 새 isFront로 native pos 재전송 안함 | `_handleCameraFlip` 후 재전송 |
+| 셔터 버튼 안보임 | `AppColors.shutter = white` on white bg | 회색 테두리 + 연한 내부 + 그림자 |
+
+---
+
 ## 다음 세션에서 할 일
 
-1. **카메라 화면 비율 선택** — 세로: Full/9:16/3:4, 가로: 1:1/4:3/16:9 모드 추가 + 회전 버튼 제거
-2. **필터 썸네일 20개** — 실기기에서 필터 적용 후 스크린샷으로 `assets/thumbnails/<id>.jpg` 생성
-3. **App Store Connect 유료 앱 설정** — 앱 가격 설정 (₩4,900 ~ ₩9,900 tier 결정)
-4. **W7 Liquid Glass + 모션** — 전체 화면 Liquid Glass 적용 확인, 모션 디자인 완성
-5. **W10 성능 테스트** — 실기기 Instruments 프로파일링
+1. **필터 썸네일 20개** — 실기기에서 필터 적용 후 스크린샷으로 `assets/thumbnails/<id>.jpg` 생성
+2. **App Store Connect 유료 앱 설정** — 앱 가격 설정 (₩4,900 ~ ₩9,900 tier 결정)
+3. **W7 Liquid Glass + 모션** — 전체 화면 Liquid Glass 적용 확인, 모션 디자인 완성
+4. **W10 성능 테스트** — 실기기 Instruments 프로파일링
