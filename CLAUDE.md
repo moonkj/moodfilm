@@ -110,12 +110,11 @@ AppColors.proBadge     // #D4A574 골드
 | 플랜 | 가격 | RevenueCat ID |
 |------|------|---------------|
 | Free | 무료 | - |
-| Pro Monthly | ₩2,900/월 | `pro_monthly` |
-| Pro Annual | ₩14,900/년 | `pro_annual` |
-| Lifetime | ₩29,900 | `lifetime` |
+| Pro (1회 구매) | ₩29,900 | `lifetime` |
 
-- 연간 구독 7일 무료 체험 제공
+- 구독 없음, 1회 구매로 모든 필터 영구 사용
 - RevenueCat entitlement ID: `pro`
+- `UserPreferences.isProUser` boolean으로 잠금 해제 관리
 
 ---
 

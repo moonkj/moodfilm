@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/services/storage_service.dart';
+import '../../camera/providers/camera_provider.dart';
 
 
 /// 필터 라이브러리 화면
-/// 카테고리 탭 + 2열 그리드 + 즐겨찾기 + Pro 잠금
+/// 카테고리 탭 + 2열 그리드 + 즐겨찾기
 class FilterLibraryScreen extends ConsumerStatefulWidget {
   const FilterLibraryScreen({super.key});
 
@@ -57,6 +59,11 @@ class _FilterLibraryScreenState
     }
   }
 
+  void _onFilterTap(FilterModel filter) {
+    ref.read(cameraProvider.notifier).selectFilter(filter);
+    context.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,8 +95,10 @@ class _FilterLibraryScreenState
           _tabs.length,
           (index) => _FilterGrid(
             filters: _filtersForTab(index),
+            onFilterTap: _onFilterTap,
             onFavoriteToggle: (filterId) {
               StorageService.prefs.toggleFavorite(filterId);
+              ref.read(cameraProvider.notifier).refreshFavorites();
               setState(() {});
             },
           ),
@@ -102,10 +111,12 @@ class _FilterLibraryScreenState
 class _FilterGrid extends StatelessWidget {
   const _FilterGrid({
     required this.filters,
+    required this.onFilterTap,
     required this.onFavoriteToggle,
   });
 
   final List<FilterModel> filters;
+  final void Function(FilterModel filter) onFilterTap;
   final void Function(String filterId) onFavoriteToggle;
 
   @override
@@ -128,6 +139,7 @@ class _FilterGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         return _FilterGridItem(
           filter: filters[index],
+          onTap: () => onFilterTap(filters[index]),
           onFavoriteToggle: () => onFavoriteToggle(filters[index].id),
         );
       },
@@ -138,25 +150,21 @@ class _FilterGrid extends StatelessWidget {
 class _FilterGridItem extends StatelessWidget {
   const _FilterGridItem({
     required this.filter,
+    required this.onTap,
     required this.onFavoriteToggle,
   });
 
   final FilterModel filter;
+  final VoidCallback onTap;
   final VoidCallback onFavoriteToggle;
 
   @override
   Widget build(BuildContext context) {
     final prefs = StorageService.prefs;
     final isFavorite = prefs.favoriteFilterIds.contains(filter.id);
-    final isProUser = prefs.isProUser;
 
     return GestureDetector(
-      onTap: () {
-        if (filter.isPro && !isProUser) {
-          // Paywall로 이동
-          // context.push('/paywall', extra: 'filter_library');
-        }
-      },
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.secondary,
@@ -172,26 +180,13 @@ class _FilterGridItem extends StatelessWidget {
                   // 이미지 영역 (70%)
                   Expanded(
                     flex: 7,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.asset(
-                          filter.thumbnailAssetPath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: AppColors.warmTone,
-                          ),
-                        ),
-                        // Pro 잠금 오버레이
-                        if (filter.isPro && !isProUser)
-                          Container(
-                            color: Colors.black.withOpacity(0.35),
-                            child: const Center(
-                              child: Icon(Icons.lock_rounded,
-                                  color: Colors.white70, size: 28),
-                            ),
-                          ),
-                      ],
+                    child: Image.asset(
+                      filter.thumbnailAssetPath,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.warmTone,
+                      ),
                     ),
                   ),
                   // 필터명 영역 (30%)
@@ -246,20 +241,6 @@ class _FilterGridItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: const Text('NEW', style: AppTypography.proBadge),
-                ),
-              ),
-            // Pro 배지
-            if (filter.isPro)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.proBadge,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: const Text('PRO', style: AppTypography.proBadge),
                 ),
               ),
           ],

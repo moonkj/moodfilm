@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -61,8 +62,13 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
           horizontal: AppDimensions.paddingM,
           vertical: AppDimensions.filterBarPaddingV,
         ),
-        itemCount: filters.length,
+        itemCount: filters.length + 1, // +1 for "전체" button
         itemBuilder: (context, index) {
+          // 마지막 아이템: "전체" 버튼
+          if (index == filters.length) {
+            return _AllFiltersButton(onTap: () => context.push('/library'));
+          }
+
           final filter = filters[index];
           final isSelected = cameraState.activeFilter?.id == filter.id;
 
@@ -93,7 +99,11 @@ class _FilterItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      label: '${filter.name} 필터',
+      button: true,
+      selected: isSelected,
+      child: GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
@@ -121,7 +131,7 @@ class _FilterItem extends StatelessWidget {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha:0.3),
                           blurRadius: 6,
                         )
                       ]
@@ -140,16 +150,6 @@ class _FilterItem extends StatelessWidget {
                         color: _categoryColor(filter.category),
                       ),
                     ),
-                    // Pro 잠금 오버레이
-                    if (filter.isPro && !_isProUser())
-                      Container(
-                        color: Colors.black.withOpacity(0.4),
-                        child: const Icon(
-                          Icons.lock_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
                     // NEW 배지
                     if (filter.isNew)
                       Positioned(
@@ -179,7 +179,7 @@ class _FilterItem extends StatelessWidget {
             Text(
               filter.name,
               style: AppTypography.filterLabel.copyWith(
-                color: isSelected ? AppColors.shutter : AppColors.shutter.withOpacity(0.7),
+                color: isSelected ? AppColors.shutter : AppColors.shutter.withValues(alpha:0.7),
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
               overflow: TextOverflow.ellipsis,
@@ -189,10 +189,9 @@ class _FilterItem extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
-
-  bool _isProUser() => StorageService.prefs.isProUser;
 
   Color _categoryColor(FilterCategory category) {
     switch (category) {
@@ -205,5 +204,52 @@ class _FilterItem extends StatelessWidget {
       case FilterCategory.aesthetic:
         return AppColors.aestheticTone;
     }
+  }
+}
+
+/// 필터 스크롤바 끝 "전체" 버튼 → 필터 라이브러리 이동
+class _AllFiltersButton extends StatelessWidget {
+  const _AllFiltersButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: AppDimensions.filterThumbnailSize,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: AppDimensions.filterThumbnailSize,
+              height: AppDimensions.filterThumbnailSize,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.shutter.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+              child: const Icon(
+                Icons.apps_rounded,
+                color: AppColors.shutter,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '전체',
+              style: AppTypography.filterLabel.copyWith(
+                color: AppColors.shutter.withValues(alpha: 0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

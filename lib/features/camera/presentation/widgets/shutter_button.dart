@@ -54,7 +54,10 @@ class _ShutterButtonState extends State<ShutterButton>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      label: widget.isCapturing ? '촬영 중' : '촬영',
+      button: true,
+      child: GestureDetector(
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
       onTapCancel: _onTapCancel,
@@ -77,7 +80,7 @@ class _ShutterButtonState extends State<ShutterButton>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.shutter.withOpacity(0.6),
+                    color: AppColors.shutter.withValues(alpha:0.6),
                     width: 3,
                   ),
                 ),
@@ -96,7 +99,7 @@ class _ShutterButtonState extends State<ShutterButton>
                   color: AppColors.shutter,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha:0.3),
                       blurRadius: 8,
                       spreadRadius: 2,
                     ),
@@ -106,6 +109,7 @@ class _ShutterButtonState extends State<ShutterButton>
             ],
           ),
         ),
+      ),
       ),
     );
   }

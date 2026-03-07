@@ -57,6 +57,12 @@ class CameraNotifier extends StateNotifier<CameraState> {
     state = const CameraState();
   }
 
+  // MARK: - 즐겨찾기 갱신 (FilterScrollBar 리빌드 트리거)
+
+  void refreshFavorites() {
+    state = state.copyWith(favoritesVersion: state.favoritesVersion + 1);
+  }
+
   // MARK: - 필터 변경
 
   Future<void> selectFilter(FilterModel filter) async {

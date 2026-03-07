@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-06 (세션 2)
+> 마지막 업데이트: 2026-03-07 (세션 4)
 
 ---
 
@@ -103,16 +103,16 @@ flutter build ios --release --no-codesign
 ## Phase 2: Core Features (W4-6) — 예정
 
 ### ⏳ W4 — 필터 20종 완성
-- [ ] 나머지 12종 LUT .cube 파일 제작
-- [ ] 셀카 피부톤 최적화 (red -5~-10%, highlight +10~20%)
-- [ ] 썸네일 12개 추가
+- [x] 나머지 12종 LUT .cube 파일 제작 (tools/generate_luts.py로 전체 20종 생성)
+- [x] 셀카 피부톤 최적화 → tools/generate_luts.py 파라미터로 반영
+- [ ] 썸네일 20개 추가 (실기기 필요)
 
 ### ⏳ W5 — 편집 화면 완성
 - [x] `FilterEnginePlugin.swift` Native 구현 (Full-res 처리 + 갤러리 저장)
 - [x] EditorScreen 저장 버튼 실제 연결 (`FilterEngine.processImage()`)
 - [x] 6종 슬라이더 CIFilter 연결 (Exposure, Contrast, Warmth, Saturation, Grain, Fade)
 - [x] 갤러리 Import (photo_manager 연동) — GalleryPickerScreen, /gallery 라우트, 카메라 갤러리 버튼 연결
-- [ ] Split-View Before/After 개선 (filtered image 실제 반영)
+- [x] Split-View Before/After 개선 (filtered image 실제 반영)
 - [x] **갤러리 일괄 필터 적용** — 다중 선택 모드, 필터 바텀시트 선택, 일괄 FilterEngine.processImage 처리 → 갤러리 저장
 
 ### ✅ W5b — 실시간 필터 프리뷰
@@ -144,21 +144,24 @@ flutter build ios --release --no-codesign
 
 ## Phase 3: Polish & Business (W7-9) — 예정
 
-### ⏳ W7 — UI/UX 완성
+### ✅ W7 — UI/UX 완성 (부분 완료)
+- [x] `withOpacity()` → `withValues(alpha:)` 전체 교체 (Flutter 3.x 코딩 규칙)
+- [x] VoiceOver Semantics 레이블 (셔터, 설정, 카메라 전환, 필터 아이템)
 - [ ] Liquid Glass 전체 적용 확인
 - [ ] 모션 디자인 스펙 전체 구현 (계획서 6-7 기준)
 - [ ] Reduce Motion 대응
-- [ ] VoiceOver 레이블 전체
 
-### ⏳ W8 — 필터 라이브러리 완성
-- [ ] 필터 적용 → 카메라 화면 연동 완성
-- [ ] 즐겨찾기 실시간 반영
+### ✅ W8 — 필터 라이브러리 완성
+- [x] 필터 스크롤바 끝 "전체" 버튼 → /library 이동
+- [x] 필터 라이브러리 → 필터 선택 시 카메라에 적용 + pop
+- [x] Pro 필터 탭 → Paywall 이동
+- [x] 즐겨찾기 실시간 반영 (favoritesVersion 트리거)
 
-### ⏳ W9 — IAP + 온보딩
-- [ ] RevenueCat 설정 (App Store Connect 상품 등록)
-- [ ] Paywall 실제 결제 연동 (Sandbox 테스트)
-- [ ] 구독 복원
-- [ ] 온보딩 힌트 시퀀스 완성
+### ✅ W9 — 수익 모델 확정
+- [x] **수익 모델: App Store 유료 앱 (IAP 없음)** — 앱 자체를 유료로 판매
+- [x] 앱 내 구매 기능 전체 제거 (PaywallScreen, IapService, Pro 잠금 제거)
+- [x] 모든 필터 20종 무제한 사용 (Pro 게이트 해제)
+- [x] Settings 구매 섹션 제거 → 앱 정보만 표시
 
 ---
 
@@ -198,13 +201,21 @@ flutter build ios --release --no-codesign
 | 2026-03-06 | build_runner 버전 | ^2.4.13 사용 (^2.4.14는 hive_generator와 충돌) |
 | 2026-03-06 | iOS 최소 버전 | 17.0 (Liquid Glass는 iOS 26 조건부 적용) |
 | 2026-03-06 | Firebase 초기화 | main.dart에서 주석 처리. GoogleService-Info.plist 추가 후 활성화 필요 |
+| 2026-03-06 | 수익 모델 | 구독(월간/연간) 제거 → 1회 구매 ₩29,900 (`lifetime`)으로 단순화 |
+| 2026-03-07 | 수익 모델 재확정 | IAP 완전 제거 → App Store 유료 앱으로 전환. 모든 필터 무제한 제공 |
+| 2026-03-07 | EditorScreen | 열릴 때/슬라이더 변경 시 자동 필터 프리뷰 생성 (이전: Long press만 가능) |
 
 ---
 
+
+
+
+
+
+
 ## 다음 세션에서 할 일
 
-1. **W5b: 카메라 프리뷰 실시간 LUT 적용** — Metal 렌더링 파이프라인 구축
-2. **W6b: 동영상 필터 녹화** — AVAssetWriter + LUT 실시간 적용 + 갤러리 저장
-3. **W5: 갤러리 일괄 필터 적용** — 다중 선택 → 일괄 처리
-4. LUT 썸네일 이미지 20개 `assets/thumbnails/`에 추가
-5. W4: 나머지 12종 LUT .cube 파일 썸네일 확인
+1. **필터 썸네일 20개** — 실기기에서 필터 적용 후 스크린샷으로 `assets/thumbnails/<id>.jpg` 생성
+2. **App Store Connect 유료 앱 설정** — 앱 가격 설정 (₩4,900 ~ ₩9,900 tier 결정)
+3. **W7 Liquid Glass + 모션** — 전체 화면 Liquid Glass 적용 확인, 모션 디자인 완성
+4. **W10 성능 테스트** — 실기기 Instruments 프로파일링 (EditorScreen 프리뷰 생성 속도 포함)

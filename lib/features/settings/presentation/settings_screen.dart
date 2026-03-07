@@ -1,47 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
-import '../../../core/services/storage_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final prefs = StorageService.prefs;
-
     return Scaffold(
       backgroundColor: AppColors.primary,
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          // 구독 상태
-          _SettingsSection(
-            title: '구독',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.workspace_premium_rounded,
-                    color: AppColors.proBadge),
-                title: const Text('MoodFilm Pro'),
-                subtitle: Text(
-                  prefs.isProUser ? '구독 중' : '무료 플랜',
-                  style: AppTypography.caption,
-                ),
-                trailing: prefs.isProUser
-                    ? null
-                    : ElevatedButton(
-                        onPressed: () {},
-                        child: const Text('업그레이드'),
-                      ),
-              ),
-              if (prefs.isProUser)
-                ListTile(
-                  leading: const Icon(Icons.restore_rounded),
-                  title: const Text('구독 복원'),
-                  onTap: () {},
-                ),
-            ],
-          ),
           // 앱 정보
           _SettingsSection(
             title: '앱 정보',

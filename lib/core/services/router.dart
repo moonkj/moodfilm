@@ -5,9 +5,7 @@ import '../../features/editor/presentation/editor_screen.dart';
 import '../../features/filter_library/presentation/filter_library_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
-import '../../features/onboarding/presentation/paywall_screen.dart';
 import '../../features/gallery/presentation/gallery_picker_screen.dart';
-import '../services/storage_service.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -48,14 +46,6 @@ final GoRouter appRouter = GoRouter(
       path: '/gallery',
       name: 'gallery',
       builder: (context, state) => const GalleryPickerScreen(),
-    ),
-    GoRoute(
-      path: '/paywall',
-      name: 'paywall',
-      builder: (context, state) {
-        final source = state.extra as String? ?? 'unknown';
-        return PaywallScreen(source: source);
-      },
     ),
   ],
   errorBuilder: (context, state) => Scaffold(

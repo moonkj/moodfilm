@@ -285,7 +285,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
                   child: ColoredBox(
-                    color: Colors.black.withOpacity(dimOpacity),
+                    color: Colors.black.withValues(alpha:dimOpacity),
                   ),
                 ),
               );
@@ -393,13 +393,17 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // 설정 버튼
-            LiquidGlassPill(
-              onTap: () => context.push('/settings'),
-              padding: const EdgeInsets.all(10),
-              child: const Icon(
-                Icons.settings_outlined,
-                color: AppColors.shutter,
-                size: 20,
+            Semantics(
+              label: '설정',
+              button: true,
+              child: LiquidGlassPill(
+                onTap: () => context.push('/settings'),
+                padding: const EdgeInsets.all(10),
+                child: const Icon(
+                  Icons.settings_outlined,
+                  color: AppColors.shutter,
+                  size: 20,
+                ),
               ),
             ),
 
@@ -531,13 +535,17 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     ),
 
                   // 전면/후면 전환 (우측)
-                  LiquidGlassPill(
-                    onTap: _handleCameraFlip,
-                    padding: const EdgeInsets.all(12),
-                    child: const Icon(
-                      Icons.flip_camera_ios_rounded,
-                      color: AppColors.shutter,
-                      size: 24,
+                  Semantics(
+                    label: '카메라 전환',
+                    button: true,
+                    child: LiquidGlassPill(
+                      onTap: _handleCameraFlip,
+                      padding: const EdgeInsets.all(12),
+                      child: const Icon(
+                        Icons.flip_camera_ios_rounded,
+                        color: AppColors.shutter,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ],
@@ -660,7 +668,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         height: AppDimensions.galleryThumbnailSize,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.shutter.withOpacity(0.5), width: 1.5),
+          border: Border.all(color: AppColors.shutter.withValues(alpha:0.5), width: 1.5),
           color: Colors.black26,
         ),
         child: cameraState.lastCapturedPath != null

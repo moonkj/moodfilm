@@ -19,6 +19,7 @@ class CameraState {
   final CameraMode cameraMode; // 사진 / 동영상 모드
   final bool isRecording; // 동영상 녹화 중
   final int recordingSeconds; // 녹화 경과 시간(초)
+  final int favoritesVersion; // 즐겨찾기 변경 감지 (FilterScrollBar 리빌드 트리거)
 
   const CameraState({
     this.status = CameraStatus.uninitialized,
@@ -35,6 +36,7 @@ class CameraState {
     this.cameraMode = CameraMode.photo,
     this.isRecording = false,
     this.recordingSeconds = 0,
+    this.favoritesVersion = 0,
   });
 
   CameraState copyWith({
@@ -52,6 +54,7 @@ class CameraState {
     CameraMode? cameraMode,
     bool? isRecording,
     int? recordingSeconds,
+    int? favoritesVersion,
   }) {
     return CameraState(
       status: status ?? this.status,
@@ -68,6 +71,7 @@ class CameraState {
       cameraMode: cameraMode ?? this.cameraMode,
       isRecording: isRecording ?? this.isRecording,
       recordingSeconds: recordingSeconds ?? this.recordingSeconds,
+      favoritesVersion: favoritesVersion ?? this.favoritesVersion,
     );
   }
 

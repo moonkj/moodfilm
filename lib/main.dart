@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/services/storage_service.dart';
 import 'app.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,6 +21,7 @@ void main() async {
 
   // Hive 초기화
   await StorageService.init();
+
 
   // Firebase 초기화 — google-services.json 추가 후 활성화
   // await Firebase.initializeApp();

@@ -36,9 +36,9 @@ class AppTheme {
         sliderTheme: SliderThemeData(
           trackHeight: AppDimensions.sliderTrackHeight,
           activeTrackColor: AppColors.accent,
-          inactiveTrackColor: AppColors.accent.withOpacity(0.2),
+          inactiveTrackColor: AppColors.accent.withValues(alpha:0.2),
           thumbColor: AppColors.secondary,
-          overlayColor: AppColors.accent.withOpacity(0.1),
+          overlayColor: AppColors.accent.withValues(alpha:0.1),
           thumbShape: const RoundSliderThumbShape(
             enabledThumbRadius: AppDimensions.sliderThumbSize / 2,
           ),
@@ -82,9 +82,9 @@ class AppTheme {
         sliderTheme: SliderThemeData(
           trackHeight: AppDimensions.sliderTrackHeight,
           activeTrackColor: AppColors.accent,
-          inactiveTrackColor: AppColors.accent.withOpacity(0.2),
+          inactiveTrackColor: AppColors.accent.withValues(alpha:0.2),
           thumbColor: AppColors.darkSurface,
-          overlayColor: AppColors.accent.withOpacity(0.1),
+          overlayColor: AppColors.accent.withValues(alpha:0.1),
           thumbShape: const RoundSliderThumbShape(
             enabledThumbRadius: AppDimensions.sliderThumbSize / 2,
           ),

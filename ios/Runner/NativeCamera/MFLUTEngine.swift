@@ -122,12 +122,20 @@ class MFLUTEngine {
                 if intensity >= 1.0 {
                     result = filtered
                 } else {
-                    // intensity 블렌딩: original * (1 - intensity) + filtered * intensity
-                    let blend = CIFilter(name: "CIBlend")
-                    blend?.setValue(filtered, forKey: kCIInputImageKey)
-                    blend?.setValue(result, forKey: kCIInputBackgroundImageKey)
-                    if let blended = blend?.outputImage {
-                        result = blended
+                    // intensity 블렌딩: filtered * intensity + original * (1 - intensity)
+                    // filtered 이미지의 alpha를 intensity로 설정한 뒤 source-over 합성
+                    if let alphaFilter = CIFilter(name: "CIColorMatrix"),
+                       let composite = CIFilter(name: "CISourceOverCompositing") {
+                        alphaFilter.setValue(filtered, forKey: kCIInputImageKey)
+                        alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+                        alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+                        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+                        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity)), forKey: "inputAVector")
+                        if let semiTransparent = alphaFilter.outputImage {
+                            composite.setValue(semiTransparent, forKey: kCIInputImageKey)
+                            composite.setValue(result, forKey: kCIInputBackgroundImageKey)
+                            result = composite.outputImage ?? result
+                        }
                     }
                 }
             }
