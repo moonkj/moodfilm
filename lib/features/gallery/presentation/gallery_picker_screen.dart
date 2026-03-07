@@ -117,18 +117,31 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     if (confirmed != true || !mounted) return;
 
     final ids = _selectedIds.toList();
-    await PhotoManager.editor.deleteWithIds(ids);
+    final deletedIds = await PhotoManager.editor.deleteWithIds(ids);
 
     if (!mounted) return;
+
+    if (deletedIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('삭제 실패: 권한이 없거나 취소되었습니다'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final deletedSet = deletedIds.toSet();
     setState(() {
-      _assets.removeWhere((a) => ids.contains(a.id));
+      _assets.removeWhere((a) => deletedSet.contains(a.id));
       _isMultiSelectMode = false;
       _selectedIds.clear();
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$count장을 삭제했습니다'),
+        content: Text('${deletedIds.length}장을 삭제했습니다'),
         backgroundColor: AppColors.darkSurface,
         behavior: SnackBarBehavior.floating,
       ),

@@ -32,6 +32,10 @@ class MFCameraSession: NSObject {
     var currentExposure: Float = 0.0 // -2EV ~ +2EV
     var currentZoom: CGFloat = 1.0
 
+    /// 프리뷰 크롭 비율 (portrait W/H, nil = Full/9:16 = 크롭 없음)
+    /// 예: 3:4 portrait → 0.75, 1:1 → 1.0, 4:3 landscape photo → 1.333
+    var cropRatio: CGFloat? = nil
+
     // MARK: - 동영상 녹화
     private let recorder = MFVideoRecorder()
     var isRecording: Bool { recorder.isRecording }
@@ -256,14 +260,61 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
             outputBuffer = pixelBuffer
         }
 
-        // 프리뷰 업데이트
-        delegate?.cameraSession(self, didOutput: outputBuffer)
+        // 프리뷰 비율 크롭 (선택된 비율로 landscape 버퍼 크롭)
+        let previewBuffer: CVPixelBuffer
+        if let ratio = cropRatio, let cropped = cropPreviewBuffer(outputBuffer, ratio: ratio) {
+            previewBuffer = cropped
+        } else {
+            previewBuffer = outputBuffer
+        }
 
-        // 녹화 중이면 recorder에 전달
+        // 프리뷰 업데이트
+        delegate?.cameraSession(self, didOutput: previewBuffer)
+
+        // 녹화 중이면 recorder에 전달 (크롭 전 원본 사용)
         if recorder.isRecording {
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
             recorder.appendVideoBuffer(outputBuffer, timestamp: timestamp)
         }
+    }
+
+    /// 프리뷰용 landscape 버퍼를 portrait 비율에 맞게 가로 크롭
+    /// - buffer: 1920×1080 landscape 버퍼
+    /// - ratio: portrait W/H (예: 3/4, 1/1, 16/9)
+    /// - returns: 크롭된 버퍼 (width = 1080/ratio, height = 1080)
+    private func cropPreviewBuffer(_ buffer: CVPixelBuffer, ratio: CGFloat) -> CVPixelBuffer? {
+        let bw = CVPixelBufferGetWidth(buffer)   // 1920
+        let bh = CVPixelBufferGetHeight(buffer)  // 1080
+
+        // 크롭 너비: portrait 비율에서 portrait_W/portrait_H = ratio
+        // Flutter RotatedBox(1) 후: portrait_W = bh = 1080, portrait_H = cropW
+        // → cropW = bh / ratio
+        let cropW = Int(round(CGFloat(bh) / ratio))
+        guard cropW < bw else { return nil } // 9:16이면 크롭 불필요
+
+        let cropX = (bw - cropW) / 2
+        let ciImage = CIImage(cvPixelBuffer: buffer)
+        let cropRect = CGRect(
+            x: ciImage.extent.minX + CGFloat(cropX),
+            y: ciImage.extent.minY,
+            width: CGFloat(cropW),
+            height: CGFloat(bh)
+        )
+        let cropped = ciImage.cropped(to: cropRect)
+            .transformed(by: CGAffineTransform(translationX: -CGFloat(cropX), y: 0))
+
+        let attrs: [String: Any] = [
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+        ]
+        var result: CVPixelBuffer?
+        CVPixelBufferCreate(kCFAllocatorDefault, cropW, bh,
+                            kCVPixelFormatType_32BGRA, attrs as CFDictionary, &result)
+        guard let out = result else { return nil }
+        MFLUTEngine.ciContext.render(cropped, to: out,
+                                     bounds: CGRect(x: 0, y: 0, width: CGFloat(cropW), height: CGFloat(bh)),
+                                     colorSpace: CGColorSpaceCreateDeviceRGB())
+        return out
     }
 }
 
@@ -284,9 +335,32 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
         // Full-res LUT 필터 적용
         let filteredImage = lutEngine.apply(to: ciImage)
 
+        // 비율 크롭 적용 (CIImage 단계에서 → JPEG 품질 유지, 갤러리 저장 전 처리)
+        var outputImage = filteredImage
+        if let ratio = cropRatio {
+            let imgW = filteredImage.extent.width
+            let imgH = filteredImage.extent.height
+            let imgRatio = imgW / imgH
+            let cropRect: CGRect
+            if imgRatio > ratio + 0.001 {
+                // 이미지가 더 넓음 → 좌우 크롭
+                let newW = imgH * ratio
+                let cropX = filteredImage.extent.minX + (imgW - newW) / 2
+                cropRect = CGRect(x: cropX, y: filteredImage.extent.minY, width: newW, height: imgH)
+            } else if imgRatio < ratio - 0.001 {
+                // 이미지가 더 높음 → 상하 크롭
+                let newH = imgW / ratio
+                let cropY = filteredImage.extent.minY + (imgH - newH) / 2
+                cropRect = CGRect(x: filteredImage.extent.minX, y: cropY, width: imgW, height: newH)
+            } else {
+                cropRect = filteredImage.extent
+            }
+            outputImage = filteredImage.cropped(to: cropRect)
+        }
+
         // JPEG 변환
         if let jpegData = MFLUTEngine.ciContext.jpegRepresentation(
-            of: filteredImage,
+            of: outputImage,
             colorSpace: CGColorSpaceCreateDeviceRGB(),
             options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.95]
         ) {

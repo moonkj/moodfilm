@@ -4,6 +4,40 @@ import '../../../core/models/effect_model.dart';
 enum CameraStatus { uninitialized, initializing, ready, capturing, error }
 enum CameraMode { photo, video }
 
+enum CameraAspectRatio {
+  full,       // 화면 가득 (크롭 없음)
+  ratio9_16,  // 9:16 세로
+  ratio3_4,   // 3:4 세로
+  ratio1_1,   // 1:1 정사각
+  ratio4_3,   // 4:3 가로
+  ratio16_9,  // 16:9 가로
+}
+
+extension CameraAspectRatioX on CameraAspectRatio {
+  String get label {
+    switch (this) {
+      case CameraAspectRatio.full: return 'Full';
+      case CameraAspectRatio.ratio9_16: return '9:16';
+      case CameraAspectRatio.ratio3_4: return '3:4';
+      case CameraAspectRatio.ratio1_1: return '1:1';
+      case CameraAspectRatio.ratio4_3: return '4:3';
+      case CameraAspectRatio.ratio16_9: return '16:9';
+    }
+  }
+
+  // width / height 비율 (null = full screen)
+  double? get ratio {
+    switch (this) {
+      case CameraAspectRatio.full: return null;
+      case CameraAspectRatio.ratio9_16: return 9 / 16;
+      case CameraAspectRatio.ratio3_4: return 3 / 4;
+      case CameraAspectRatio.ratio1_1: return 1.0;
+      case CameraAspectRatio.ratio4_3: return 4 / 3;
+      case CameraAspectRatio.ratio16_9: return 16 / 9;
+    }
+  }
+}
+
 class CameraState {
   final CameraStatus status;
   final int? textureId;

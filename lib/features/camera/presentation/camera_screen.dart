@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' show pi, max;
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +17,30 @@ import '../models/camera_state.dart';
 import 'widgets/shutter_button.dart';
 import 'widgets/filter_scroll_bar.dart';
 import 'widgets/exposure_indicator.dart';
+
+/// 카메라 화면 비율 선택
+enum CameraAspectRatio { full, r9x16, r3x4, r1x1, r4x3, r16x9 }
+
+extension CameraAspectRatioExt on CameraAspectRatio {
+  /// 비율값 (width/height). null이면 크롭 없음(Full)
+  double? get ratio => switch (this) {
+    CameraAspectRatio.full   => null,
+    CameraAspectRatio.r9x16  => 9 / 16,
+    CameraAspectRatio.r3x4   => 3 / 4,
+    CameraAspectRatio.r1x1   => 1 / 1,
+    CameraAspectRatio.r4x3   => 4 / 3,
+    CameraAspectRatio.r16x9  => 16 / 9,
+  };
+
+  String get label => switch (this) {
+    CameraAspectRatio.full   => 'Full',
+    CameraAspectRatio.r9x16  => '9:16',
+    CameraAspectRatio.r3x4   => '3:4',
+    CameraAspectRatio.r1x1   => '1:1',
+    CameraAspectRatio.r4x3   => '4:3',
+    CameraAspectRatio.r16x9  => '16:9',
+  };
+}
 
 /// 메인 카메라 화면
 /// 풀스크린 카메라 프리뷰 + 반투명 오버레이 컨트롤
@@ -59,6 +83,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   double _splitPosition = 0.5;
   bool _splitUIHidden = false;
   Timer? _splitAutoHideTimer;
+
+  // 화면 비율 선택
+  CameraAspectRatio _aspectRatio = CameraAspectRatio.full;
 
   // 필터 패널 표시
   bool _showFilterPanel = false;
@@ -293,7 +320,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. 카메라 프리뷰 (풀스크린)
+          // 1. 카메라 프리뷰 (항상 풀스크린)
           _buildCameraPreview(cameraState),
 
           // 2. 제스처 감지 레이어
@@ -371,7 +398,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               final dimOpacity = progress * 0.82;
               return IgnorePointer(
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                  filter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
                   child: ColoredBox(
                     color: Colors.black.withValues(alpha:dimOpacity),
                   ),
@@ -426,25 +453,68 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       quarterTurns = 0;
     }
 
-    final previewWidget = SizedBox.expand(
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: Transform(
-          alignment: Alignment.center,
-          transform: isFront
-              ? (Matrix4.identity()..scale(-1.0, 1.0))
-              : Matrix4.identity(),
-          child: RotatedBox(
-            quarterTurns: quarterTurns,
-            child: SizedBox(
-              width: 16,
-              height: 9,
-              child: Texture(textureId: cameraState.textureId!),
+    final ratio = _aspectRatio.ratio;
+    final screenSize = MediaQuery.of(context).size;
+
+    // Full은 풀스크린, 나머지는 네이티브가 비율에 맞게 크롭한 버퍼를 표시
+    Widget previewWidget;
+    if (ratio == null) {
+      // Full: 9:16 풀스크린
+      previewWidget = SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: isFront
+                ? (Matrix4.identity()..scale(-1.0, 1.0))
+                : Matrix4.identity(),
+            child: RotatedBox(
+              quarterTurns: quarterTurns,
+              child: SizedBox(
+                width: 16,
+                height: 9,
+                child: Texture(textureId: cameraState.textureId!),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    } else {
+      // 비율 모드: 네이티브가 cropW×1080 버퍼를 전달
+      // cropW = 1080/ratio → buffer aspect = 1/ratio
+      // SizedBox(1, ratio) → RotatedBox(1) → (ratio, 1) portrait aspect = ratio
+      // FittedBox.fill은 같은 비율이므로 왜곡 없이 pw×ph에 채움
+      final sw = screenSize.width;
+      final sh = screenSize.height;
+      double pw = sw;
+      double ph = sw / ratio;
+      if (ph > sh) { ph = sh; pw = sh * ratio; }
+
+      previewWidget = Align(
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: pw,
+          height: ph,
+          child: FittedBox(
+            fit: BoxFit.fill,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: isFront
+                  ? (Matrix4.identity()..scale(-1.0, 1.0))
+                  : Matrix4.identity(),
+              child: RotatedBox(
+                quarterTurns: quarterTurns,
+                child: SizedBox(
+                  width: 1.0,
+                  height: ratio,
+                  child: Texture(textureId: cameraState.textureId!),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     // 카드 플립 3D 회전 (시각 애니메이션)
     return AnimatedBuilder(
@@ -498,18 +568,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 설정 버튼
+            // 설정 버튼 (원형 어두운 배경)
             Semantics(
               label: '설정',
               button: true,
-              child: LiquidGlassPill(
+              child: _cameraButton(
                 onTap: () => context.push('/settings'),
-                padding: const EdgeInsets.all(10),
-                child: const Icon(
-                  Icons.settings_outlined,
-                  color: AppColors.shutter,
-                  size: 20,
-                ),
+                child: const Icon(Icons.settings_outlined, color: Colors.white, size: 20),
               ),
             ),
 
@@ -542,23 +607,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               // Before/After 비교 버튼
-              LiquidGlassPill(
+              _cameraButton(
                 onTap: () => _toggleSplitMode(cameraState.isFrontCamera),
-                padding: const EdgeInsets.all(10),
                 child: Icon(
                   Icons.compare_rounded,
-                  color: _isSplitMode ? AppColors.accent : AppColors.shutter,
+                  color: _isSplitMode ? AppColors.accent : Colors.white,
                   size: 20,
                 ),
               ),
               const SizedBox(height: 10),
               // 필터 강도 토글
-              LiquidGlassPill(
+              _cameraButton(
                 onTap: () => setState(() => _showIntensitySlider = !_showIntensitySlider),
-                padding: const EdgeInsets.all(10),
                 child: Icon(
                   Icons.tune_rounded,
-                  color: _showIntensitySlider ? AppColors.accent : AppColors.shutter,
+                  color: _showIntensitySlider ? AppColors.accent : Colors.white,
                   size: 20,
                 ),
               ),
@@ -646,7 +709,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                           ? RepaintBoundary(
                               child: ClipRect(
                                 child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                                  filter: ui.ImageFilter.blur(sigmaX: 0, sigmaY: 0),
                                   child: FilterScrollBar(
                                     isNoFilterSelected: cameraState.activeFilter == null,
                                     onNoFilterSelected: () =>
@@ -657,6 +720,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                             )
                           : const SizedBox.shrink(),
                     ),
+
+                    // 화면 비율 선택 탭
+                    _buildAspectRatioSelector(),
 
                     // 사진/동영상 모드 전환 탭
                     _buildModeSelector(cameraState),
@@ -712,23 +778,23 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              LiquidGlassPill(
+                              _cameraButton(
+                                size: 48,
                                 onTap: () => setState(() => _showFilterPanel = !_showFilterPanel),
-                                padding: const EdgeInsets.all(12),
                                 child: Icon(
                                   Icons.auto_awesome_rounded,
-                                  color: _showFilterPanel ? AppColors.accent : AppColors.shutter,
-                                  size: 24,
+                                  color: _showFilterPanel ? AppColors.accent : Colors.white,
+                                  size: 22,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              LiquidGlassPill(
+                              const SizedBox(width: 10),
+                              _cameraButton(
+                                size: 48,
                                 onTap: _handleCameraFlip,
-                                padding: const EdgeInsets.all(12),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.flip_camera_ios_rounded,
-                                  color: AppColors.shutter,
-                                  size: 24,
+                                  color: Colors.white,
+                                  size: 22,
                                 ),
                               ),
                             ],
@@ -990,6 +1056,110 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
   }
 
+
+  Widget _buildAspectRatioSelector() {
+    // 앱이 세로 고정이므로 orientation 감지 불가 → 6개 전체를 가로 스크롤로 표시
+    const ratios = [
+      CameraAspectRatio.full,
+      CameraAspectRatio.r9x16,
+      CameraAspectRatio.r3x4,
+      CameraAspectRatio.r1x1,
+      CameraAspectRatio.r4x3,
+      CameraAspectRatio.r16x9,
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: ratios.map((r) {
+            final isSelected = _aspectRatio == r;
+            return GestureDetector(
+              onTap: () => _setAspectRatio(r),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.9)
+                      : Colors.black.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  r.label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black87 : Colors.white,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _setAspectRatio(CameraAspectRatio ratio) {
+    setState(() => _aspectRatio = ratio);
+    // 네이티브에 비율 전달 → 사진 촬영 시 JPEG 크롭에 사용
+    CameraEngine.setAspectRatio(ratio.ratio);
+  }
+
+  // MARK: - 비율 크롭 오버레이
+
+  /// 선택된 비율의 크롭 영역 — 화면 중앙 기준
+  Rect _getCropRect(Size screen) {
+    final ratio = _aspectRatio.ratio;
+    if (ratio == null) return Rect.fromLTWH(0, 0, screen.width, screen.height);
+    final sw = screen.width;
+    final sh = screen.height;
+    // 너비 기준으로 높이 계산 (초과하면 높이 기준으로 너비 계산)
+    double w = sw;
+    double h = sw / ratio;
+    if (h > sh) {
+      h = sh;
+      w = sh * ratio;
+    }
+    final left = (sw - w) / 2;
+    final top = (sh - h) / 2;
+    return Rect.fromLTWH(left, top, w, h);
+  }
+
+  // MARK: - 원형 카메라 아이콘 버튼 헬퍼
+
+  Widget _cameraButton({
+    required Widget child,
+    VoidCallback? onTap,
+    double size = 40,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 0.5,
+          ),
+        ),
+        child: Center(child: child),
+      ),
+    );
+  }
+
   // MARK: - 에러 오버레이
 
   Widget _buildErrorOverlay(String message) {
@@ -1018,4 +1188,51 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       ),
     );
   }
+}
+
+// MARK: - 비율 크롭 오버레이 페인터
+
+/// 선택된 비율 밖을 어둡게 처리하고 모서리 가이드를 그림
+class _CropOverlayPainter extends CustomPainter {
+  final Rect cropRect;
+  _CropOverlayPainter(this.cropRect);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dimPaint = Paint()..color = const Color(0xB3000000); // 70% 불투명
+
+    // 크롭 영역 밖 4방향 어둡게
+    final rects = [
+      Rect.fromLTWH(0, 0, size.width, cropRect.top),                          // 위
+      Rect.fromLTWH(0, cropRect.bottom, size.width, size.height - cropRect.bottom), // 아래
+      Rect.fromLTWH(0, cropRect.top, cropRect.left, cropRect.height),          // 왼
+      Rect.fromLTWH(cropRect.right, cropRect.top, size.width - cropRect.right, cropRect.height), // 오른
+    ];
+    for (final r in rects) {
+      if (r.width > 0 && r.height > 0) canvas.drawRect(r, dimPaint);
+    }
+
+    // 모서리 가이드
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+    const len = 22.0;
+
+    // 좌상단
+    canvas.drawLine(Offset(cropRect.left, cropRect.top + len), Offset(cropRect.left, cropRect.top), paint);
+    canvas.drawLine(Offset(cropRect.left, cropRect.top), Offset(cropRect.left + len, cropRect.top), paint);
+    // 우상단
+    canvas.drawLine(Offset(cropRect.right - len, cropRect.top), Offset(cropRect.right, cropRect.top), paint);
+    canvas.drawLine(Offset(cropRect.right, cropRect.top), Offset(cropRect.right, cropRect.top + len), paint);
+    // 좌하단
+    canvas.drawLine(Offset(cropRect.left, cropRect.bottom - len), Offset(cropRect.left, cropRect.bottom), paint);
+    canvas.drawLine(Offset(cropRect.left, cropRect.bottom), Offset(cropRect.left + len, cropRect.bottom), paint);
+    // 우하단
+    canvas.drawLine(Offset(cropRect.right - len, cropRect.bottom), Offset(cropRect.right, cropRect.bottom), paint);
+    canvas.drawLine(Offset(cropRect.right, cropRect.bottom), Offset(cropRect.right, cropRect.bottom - len), paint);
+  }
+
+  @override
+  bool shouldRepaint(_CropOverlayPainter old) => old.cropRect != cropRect;
 }

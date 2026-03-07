@@ -97,6 +97,12 @@ class CameraEngine {
     return path!;
   }
 
+  /// 프리뷰 비율 크롭 설정
+  /// [ratio] portrait W/H 비율 (null = Full, 크롭 없음)
+  static Future<void> setAspectRatio(double? ratio) async {
+    await _channel.invokeMethod('setAspectRatio', {'ratio': ratio ?? 0.0});
+  }
+
   /// 동영상 녹화 종료 + 갤러리 저장
   /// Returns: 저장된 파일 경로
   static Future<String?> stopRecording() async {
