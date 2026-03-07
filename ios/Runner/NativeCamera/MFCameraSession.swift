@@ -34,6 +34,46 @@ class MFCameraSession: NSObject {
 
     var currentAspectRatio: String = "full" // 화면 비율 ('full', '9:16', '3:4', '1:1', '4:3', '16:9')
 
+    // MARK: - 비율별 크롭 Rect 계산 (landscape 버퍼 기준)
+    // captureOutput(프리뷰)과 photoOutput(사진)에서 공유 사용
+    func cropRect(for ratio: String, imageSize: CGSize) -> CGRect {
+        let w = imageSize.width
+        let h = imageSize.height
+
+        switch ratio {
+        case "full", "16:9":
+            return CGRect(origin: .zero, size: imageSize)
+        case "9:16":
+            let targetW = h * 9.0 / 16.0
+            let x = (w - targetW) / 2.0
+            return CGRect(x: x, y: 0, width: targetW, height: h)
+        case "3:4":
+            let targetW = h * 3.0 / 4.0
+            let x = (w - targetW) / 2.0
+            return CGRect(x: x, y: 0, width: targetW, height: h)
+        case "1:1":
+            let side = min(w, h)
+            let x = (w - side) / 2.0
+            let y = (h - side) / 2.0
+            return CGRect(x: x, y: y, width: side, height: side)
+        case "4:3":
+            let targetW = h * 4.0 / 3.0
+            if targetW <= w {
+                let x = (w - targetW) / 2.0
+                return CGRect(x: x, y: 0, width: targetW, height: h)
+            } else {
+                let targetH = w * 3.0 / 4.0
+                let y = (h - targetH) / 2.0
+                return CGRect(x: 0, y: y, width: w, height: targetH)
+            }
+        default:
+            return CGRect(origin: .zero, size: imageSize)
+        }
+    }
+
+    // MARK: - 무음 촬영용 최신 프레임 버퍼
+    private var latestProcessedBuffer: CVPixelBuffer?
+
     // MARK: - 동영상 녹화
     private let recorder = MFVideoRecorder()
     var isRecording: Bool { recorder.isRecording }
@@ -209,6 +249,47 @@ class MFCameraSession: NSObject {
             completion(url?.path)
         }
     }
+
+    // MARK: - 무음 촬영 (현재 프레임 버퍼 저장)
+    func captureSilentPhoto(completion: @escaping (String?) -> Void) {
+        processingQueue.async { [weak self] in
+            guard let self = self,
+                  let buffer = self.latestProcessedBuffer else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+
+            var ciImage = CIImage(cvPixelBuffer: buffer)
+
+            // 비율 크롭 적용
+            let cropR = self.cropRect(for: self.currentAspectRatio, imageSize: ciImage.extent.size)
+            ciImage = ciImage.cropped(to: cropR)
+
+            // CIImage → CGImage → UIImage (EXIF 방향 포함하여 portrait 저장)
+            guard let cgImg = MFLUTEngine.ciContext.createCGImage(ciImage, from: ciImage.extent) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            let orientation: UIImage.Orientation = self.isFront ? .leftMirrored : .right
+            let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
+
+            guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+
+            let tempDir = FileManager.default.temporaryDirectory
+            let fileName = "moodfilm_\(Int(Date().timeIntervalSince1970)).jpg"
+            let filePath = tempDir.appendingPathComponent(fileName)
+
+            do {
+                try jpegData.write(to: filePath)
+                DispatchQueue.main.async { completion(filePath.path) }
+            } catch {
+                DispatchQueue.main.async { completion(nil) }
+            }
+        }
+    }
 }
 
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate + AVCaptureAudioDataOutputSampleBufferDelegate
@@ -227,28 +308,30 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
         // 영상 버퍼 처리
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        let needsProcessing = lutEngine.intensity > 0 && (
+        // 프리뷰: 항상 원본 1920×1080 버퍼 전달 (비율 크롭은 Flutter 레이어에서 처리)
+        // 크롭은 실제 사진/동영상 저장 시에만 적용 (photoOutput 참조)
+        let needsFilter = lutEngine.intensity > 0 && (
             lutEngine.hasLUT || lutEngine.glowIntensity > 0 ||
             lutEngine.grainIntensity > 0 || lutEngine.beautyIntensity > 0
         )
 
         let outputBuffer: CVPixelBuffer
-        if needsProcessing {
-            let ciImage = lutEngine.apply(to: CIImage(cvPixelBuffer: pixelBuffer))
+        if needsFilter {
+            var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+            ciImage = lutEngine.apply(to: ciImage)
+
+            let outW = Int(ciImage.extent.width)
+            let outH = Int(ciImage.extent.height)
             var processed: CVPixelBuffer?
             let attrs: [String: Any] = [
                 kCVPixelBufferMetalCompatibilityKey as String: true,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [:],
             ]
-            CVPixelBufferCreate(kCFAllocatorDefault,
-                                CVPixelBufferGetWidth(pixelBuffer),
-                                CVPixelBufferGetHeight(pixelBuffer),
-                                kCVPixelFormatType_32BGRA,
-                                attrs as CFDictionary,
-                                &processed)
+            CVPixelBufferCreate(kCFAllocatorDefault, outW, outH,
+                                kCVPixelFormatType_32BGRA, attrs as CFDictionary, &processed)
             if let proc = processed {
                 MFLUTEngine.ciContext.render(ciImage, to: proc,
-                                             bounds: CIImage(cvPixelBuffer: pixelBuffer).extent,
+                                             bounds: ciImage.extent,
                                              colorSpace: CGColorSpaceCreateDeviceRGB())
                 outputBuffer = proc
             } else {
@@ -257,6 +340,9 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
         } else {
             outputBuffer = pixelBuffer
         }
+
+        // 무음 촬영을 위한 최신 버퍼 저장
+        latestProcessedBuffer = outputBuffer
 
         // 프리뷰 업데이트
         delegate?.cameraSession(self, didOutput: outputBuffer)
@@ -273,41 +359,8 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
 
 extension MFCameraSession: AVCapturePhotoCaptureDelegate {
 
-    // 비율별 크롭 Rect 계산 (이미지 좌표계 기준)
-    private func cropRect(for ratio: String, imageSize: CGSize) -> CGRect {
-        let w = imageSize.width
-        let h = imageSize.height
-
-        switch ratio {
-        case "full", "16:9":
-            return CGRect(origin: .zero, size: imageSize)
-        case "9:16":
-            let targetW = h * 9.0 / 16.0
-            let x = (w - targetW) / 2.0
-            return CGRect(x: x, y: 0, width: targetW, height: h)
-        case "3:4":
-            let targetW = h * 3.0 / 4.0
-            let x = (w - targetW) / 2.0
-            return CGRect(x: x, y: 0, width: targetW, height: h)
-        case "1:1":
-            let side = min(w, h)
-            let x = (w - side) / 2.0
-            let y = (h - side) / 2.0
-            return CGRect(x: x, y: y, width: side, height: side)
-        case "4:3":
-            let targetW = h * 4.0 / 3.0
-            if targetW <= w {
-                let x = (w - targetW) / 2.0
-                return CGRect(x: x, y: 0, width: targetW, height: h)
-            } else {
-                let targetH = w * 3.0 / 4.0
-                let y = (h - targetH) / 2.0
-                return CGRect(x: 0, y: y, width: w, height: targetH)
-            }
-        default:
-            return CGRect(origin: .zero, size: imageSize)
-        }
-    }
+    // 사진 촬영 시 클래스 레벨 cropRect(for:imageSize:) 사용
+    // (4032×3024 등 풀해상도에도 동일한 비율 로직 적용)
 
     func photoOutput(_ output: AVCapturePhotoOutput,
                      didFinishProcessingPhoto photo: AVCapturePhoto,

@@ -38,14 +38,16 @@ extension CameraAspectRatioX on CameraAspectRatio {
   }
 
   // 네이티브 크롭 전달용 문자열 키
+  // landscape 버퍼(1920×1080) 기준으로 크롭 → RotatedBox(1) 후 portrait 변환
+  // 예: "4:3" 크롭 → 1440×1080 → RotatedBox → 1080×1440 = 3:4 portrait
   String get nativeKey {
     switch (this) {
       case CameraAspectRatio.full: return 'full';
-      case CameraAspectRatio.ratio9_16: return '9:16';
-      case CameraAspectRatio.ratio3_4: return '3:4';
-      case CameraAspectRatio.ratio1_1: return '1:1';
-      case CameraAspectRatio.ratio4_3: return '4:3';
-      case CameraAspectRatio.ratio16_9: return '16:9';
+      case CameraAspectRatio.ratio9_16: return '16:9'; // 무크롭(1920×1080) → 9:16 portrait
+      case CameraAspectRatio.ratio3_4: return '4:3';  // 1440×1080 → 3:4 portrait
+      case CameraAspectRatio.ratio1_1: return '1:1';  // 1080×1080 → 1:1 square
+      case CameraAspectRatio.ratio4_3: return '3:4';  // 810×1080 → 4:3 landscape
+      case CameraAspectRatio.ratio16_9: return '9:16'; // 607×1080 → 16:9 landscape
     }
   }
 }
@@ -84,7 +86,7 @@ class CameraState {
     this.isRecording = false,
     this.recordingSeconds = 0,
     this.favoritesVersion = 0,
-    this.aspectRatio = CameraAspectRatio.full,
+    this.aspectRatio = CameraAspectRatio.ratio3_4,
   });
 
   CameraState copyWith({

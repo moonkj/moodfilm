@@ -53,6 +53,11 @@ class CameraEngine {
     return _channel.invokeMethod<String>('capturePhoto');
   }
 
+  /// 무음 촬영 (현재 프레임 버퍼 저장, 1920×1080)
+  static Future<String?> capturePhotoSilent() async {
+    return _channel.invokeMethod<String>('capturePhotoSilent');
+  }
+
   /// 전면/후면 전환
   static Future<void> flipCamera() async {
     await _channel.invokeMethod('flipCamera');

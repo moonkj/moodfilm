@@ -41,6 +41,9 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
         case "capturePhoto":
             handleCapturePhoto(result: result)
 
+        case "capturePhotoSilent":
+            handleCapturePhotoSilent(result: result)
+
         case "flipCamera":
             cameraSession?.flipCamera()
             result(nil)
@@ -197,6 +200,32 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
     private func handleCapturePhoto(result: @escaping FlutterResult) {
         pendingCapturResult = result
         cameraSession?.capturePhoto()
+    }
+
+    // MARK: - 무음 촬영 (현재 프레임 → 갤러리 저장)
+
+    private func handleCapturePhotoSilent(result: @escaping FlutterResult) {
+        guard let session = cameraSession else {
+            result(FlutterError(code: "NO_SESSION", message: "카메라 세션 없음", details: nil))
+            return
+        }
+        session.captureSilentPhoto { [weak self] path in
+            guard let path = path else {
+                result(FlutterError(code: "CAPTURE_FAILED", message: "무음 촬영 실패", details: nil))
+                return
+            }
+            PHPhotoLibrary.requestAuthorization { status in
+                guard status == .authorized || status == .limited else {
+                    DispatchQueue.main.async { result(path) }
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: URL(fileURLWithPath: path))
+                }) { _, _ in
+                    DispatchQueue.main.async { result(path) }
+                }
+            }
+        }
     }
 
     // MARK: - 동영상 녹화

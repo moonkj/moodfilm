@@ -1,17 +1,43 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
+import '../../../core/services/storage_service.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  @override
   Widget build(BuildContext context) {
+    final prefs = StorageService.prefs;
     return Scaffold(
       backgroundColor: AppColors.primary,
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const Text('설정')),
       body: ListView(
         children: [
+          // 카메라 설정
+          _SettingsSection(
+            title: '카메라',
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.volume_off_rounded),
+                title: const Text('무음 셔터'),
+                subtitle: const Text('촬영음 없이 사진 찍기 (1920×1080 저장)'),
+                value: prefs.isSilentShutter,
+                onChanged: (v) {
+                  setState(() {
+                    prefs.isSilentShutter = v;
+                    prefs.save();
+                  });
+                },
+                activeColor: AppColors.accent,
+              ),
+            ],
+          ),
           // 앱 정보
           _SettingsSection(
             title: '앱 정보',

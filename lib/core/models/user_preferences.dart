@@ -32,6 +32,9 @@ class UserPreferences extends HiveObject {
   @HiveField(8)
   int totalPhotosCapture; // 촬영 횟수 (리텐션 분석용)
 
+  @HiveField(9)
+  bool isSilentShutter; // 무음 셔터
+
   UserPreferences({
     this.hasSeenOnboarding = false,
     this.lastUsedFilterId,
@@ -42,6 +45,7 @@ class UserPreferences extends HiveObject {
     this.hasSeenSwipeHint = false,
     this.hasSeenEditHint = false,
     this.totalPhotosCapture = 0,
+    this.isSilentShutter = false,
   })  : filterIntensities = filterIntensities ?? {},
         favoriteFilterIds = favoriteFilterIds ?? [];
 

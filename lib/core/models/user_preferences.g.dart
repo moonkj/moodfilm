@@ -26,13 +26,14 @@ class UserPreferencesAdapter extends TypeAdapter<UserPreferences> {
       hasSeenSwipeHint: fields[6] as bool,
       hasSeenEditHint: fields[7] as bool,
       totalPhotosCapture: fields[8] as int,
+      isSilentShutter: fields[9] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserPreferences obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.hasSeenOnboarding)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class UserPreferencesAdapter extends TypeAdapter<UserPreferences> {
       ..writeByte(7)
       ..write(obj.hasSeenEditHint)
       ..writeByte(8)
-      ..write(obj.totalPhotosCapture);
+      ..write(obj.totalPhotosCapture)
+      ..writeByte(9)
+      ..write(obj.isSilentShutter);
   }
 
   @override

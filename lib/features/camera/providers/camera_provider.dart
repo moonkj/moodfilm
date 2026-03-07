@@ -38,8 +38,8 @@ class CameraNotifier extends StateNotifier<CameraState> {
       // 필터 바로 적용
       await _applyCurrentFilter();
 
-      // 뽀샤시 기본 적용 (0.25 — 자연스러운 피부 보정)
-      await CameraEngine.setEffect(effectType: 'beauty', intensity: 0.25);
+      // 뽀샤시 기본 적용 (0.45 — 피부 보정 + 은은한 발광)
+      await CameraEngine.setEffect(effectType: 'beauty', intensity: 0.45);
     } catch (e) {
       state = state.copyWith(
         status: CameraStatus.error,
@@ -134,14 +134,16 @@ class CameraNotifier extends StateNotifier<CameraState> {
     state = state.copyWith(status: CameraStatus.capturing);
 
     try {
-      final path = await CameraEngine.capturePhoto();
+      final prefs = StorageService.prefs;
+      final path = prefs.isSilentShutter
+          ? await CameraEngine.capturePhotoSilent()
+          : await CameraEngine.capturePhoto();
       state = state.copyWith(
         status: CameraStatus.ready,
         lastCapturedPath: path,
       );
 
       // 촬영 횟수 증가
-      final prefs = StorageService.prefs;
       prefs.totalPhotosCapture++;
       prefs.save();
 

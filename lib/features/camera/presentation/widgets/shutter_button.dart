@@ -73,19 +73,19 @@ class _ShutterButtonState extends State<ShutterButton>
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // 외곽 크림 링
+              // 외곽 링
               Container(
                 width: AppDimensions.shutterButtonSize,
                 height: AppDimensions.shutterButtonSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.shutter.withValues(alpha:0.6),
-                    width: 3,
+                    color: const Color(0xFFB0AAA5),
+                    width: 2.5,
                   ),
                 ),
               ),
-              // 내부 흰 원 — Liquid Glass 효과
+              // 내부 원
               AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 width: widget.isCapturing
@@ -96,12 +96,14 @@ class _ShutterButtonState extends State<ShutterButton>
                     : AppDimensions.shutterButtonInner,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.shutter,
+                  color: widget.isCapturing
+                      ? const Color(0xFFDDD9D5)
+                      : const Color(0xFFF5F2EF),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha:0.3),
-                      blurRadius: 8,
-                      spreadRadius: 2,
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 6,
+                      spreadRadius: 1,
                     ),
                   ],
                 ),
