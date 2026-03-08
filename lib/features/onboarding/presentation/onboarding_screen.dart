@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 
@@ -44,7 +45,29 @@ class OnboardingScreen extends StatelessWidget {
                     color: Colors.white, size: 48),
               ),
               const SizedBox(height: 32),
-              const Text('Like it!', style: AppTypography.h1),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Like it',
+                      style: GoogleFonts.nunito(
+                        color: AppColors.textPrimary,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '!',
+                      style: GoogleFonts.nunito(
+                        color: AppColors.accent,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 '한 번의 탭으로,\n내 사진이 예뻐지는 경험',

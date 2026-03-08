@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
@@ -291,25 +292,23 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
                     ),
                   )
                 : RichText(
-                    text: const TextSpan(
+                    text: TextSpan(
                       children: [
                         TextSpan(
                           text: 'Like it',
-                          style: TextStyle(
-                            color: Color(0xFF3D3531),
-                            fontSize: 26,
+                          style: GoogleFonts.nunito(
+                            color: const Color(0xFF3D3531),
+                            fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: -0.5,
+                            letterSpacing: -0.3,
                           ),
                         ),
                         TextSpan(
                           text: '!',
-                          style: TextStyle(
+                          style: GoogleFonts.nunito(
                             color: AppColors.accent,
-                            fontSize: 26,
+                            fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            fontStyle: FontStyle.italic,
                           ),
                         ),
                       ],

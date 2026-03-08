@@ -30,6 +30,7 @@ dependencies:
   # 이미지/갤러리
   photo_manager: ^3.6.3
   share_plus: ^10.1.4
+  google_fonts: ^6.2.1
   video_player: ^2.9.2
 
   # 유틸
