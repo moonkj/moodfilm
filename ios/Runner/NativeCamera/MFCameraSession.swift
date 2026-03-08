@@ -420,13 +420,29 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
         // Step 3: LUT 필터 적용
         let filteredImage = lutEngine.apply(to: ciImage)
 
-        // Step 4: CGImage → UIImage(portrait orientation) → JPEG
-        // UIImage.jpegData()는 orientation을 EXIF에 포함 → 갤러리 표시 방향 정상
+        // Step 4: CGImage 생성
         guard let cgImg = MFLUTEngine.ciContext.createCGImage(
             filteredImage, from: filteredImage.extent) else { return }
-        let orientation: UIImage.Orientation = isFront ? .leftMirrored : .right
-        let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
-        guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else { return }
+
+        // Step 4b: JPEG 인코딩 — Live Photo용 메타데이터(content identifier) 보존
+        // UIImage.jpegData()는 Apple MakerNote를 삭제해 JPEG-MOV 페어링 불가
+        // CGImageDestination으로 원본 메타데이터를 그대로 이전하고 orientation만 교체
+        guard let jpegData: Data = {
+            if let src = CGImageSourceCreateWithData(imageData as CFData, nil),
+               var meta = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any] {
+                // EXIF orientation: front=5(leftMirrored), back=6(right/CW 90°)
+                meta[kCGImagePropertyOrientation as String] = isFront ? 5 : 6
+                meta[kCGImageDestinationLossyCompressionQuality as String] = 0.95
+                let buf = NSMutableData()
+                if let dst = CGImageDestinationCreateWithData(buf, "public.jpeg" as CFString, 1, nil) {
+                    CGImageDestinationAddImage(dst, cgImg, meta as CFDictionary)
+                    if CGImageDestinationFinalize(dst) { return buf as Data }
+                }
+            }
+            // 폴백: 일반 JPEG (Live Photo 아닐 때)
+            let ui = UIImage(cgImage: cgImg, scale: 1.0, orientation: isFront ? .leftMirrored : .right)
+            return ui.jpegData(compressionQuality: 0.95)
+        }() else { return }
 
         // Step 5: 임시 파일 저장
         let tempDir = FileManager.default.temporaryDirectory
