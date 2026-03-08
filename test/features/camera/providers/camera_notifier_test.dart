@@ -29,7 +29,7 @@ void _setupMocks() {
       case 'setExposure':
       case 'setZoom':
       case 'setAspectRatio':
-      case 'setLivePhotoEnabled':
+
       case 'stopRecording':
       case 'dispose':
         return null;

@@ -141,20 +141,4 @@ void main() {
     });
   });
 
-  // ────────────────────────────────────────────────────────
-  // 라이브포토
-  // ────────────────────────────────────────────────────────
-  group('CameraEngine 라이브포토', () {
-    test('setLivePhotoEnabled(true) — 채널에 enabled=true가 전달된다', () async {
-      await CameraEngine.setLivePhotoEnabled(true);
-      final call = _calls.firstWhere((c) => c.method == 'setLivePhotoEnabled');
-      expect(call.arguments['enabled'], true);
-    });
-
-    test('setLivePhotoEnabled(false) — 채널에 enabled=false가 전달된다', () async {
-      await CameraEngine.setLivePhotoEnabled(false);
-      final call = _calls.lastWhere((c) => c.method == 'setLivePhotoEnabled');
-      expect(call.arguments['enabled'], false);
-    });
-  });
 }

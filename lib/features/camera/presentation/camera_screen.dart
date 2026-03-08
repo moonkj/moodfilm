@@ -51,6 +51,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   // 필터 패널
   bool _showFilterPanel = false;
 
+  // 색보정 효과 패널
+  bool _showEffectsPanel = false;
+  int _selectedEffectIndex = 0;
+  final Map<String, double> _adjustments = {
+    'brightness': 0.0,
+    'contrast':   0.0,
+    'saturation': 0.0,
+    'softness':   0.0,
+    'beauty':     0.0,
+    'glow':       0.0,
+  };
+
   // 사이드 버튼 레이블 (클릭 시 2초 표시)
   String? _sideBtnLabel;
   Timer? _sideBtnLabelTimer;
@@ -395,19 +407,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             const SizedBox(height: 10),
           ],
           _sideLabeledBtn(
-            label: '라이브포토',
-            icon: Icons.motion_photos_on_rounded,
-            active: StorageService.prefs.isLivePhotoEnabled,
+            label: '강도',
+            icon: Icons.tune_rounded,
+            active: _showIntensitySlider,
             onTap: () {
-              final prefs = StorageService.prefs;
-              final next = !prefs.isLivePhotoEnabled;
-              setState(() {
-                prefs.isLivePhotoEnabled = next;
-                if (next) prefs.isSilentShutter = false;
-                prefs.save();
-              });
-              CameraEngine.setLivePhotoEnabled(next);
-              _showSideBtnLabel('라이브포토');
+              setState(() => _showIntensitySlider = !_showIntensitySlider);
+              _showSideBtnLabel('강도');
             },
           ),
           const SizedBox(height: 10),
@@ -418,16 +423,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             onTap: () {
               _toggleSplitMode(cameraState.isFrontCamera);
               _showSideBtnLabel('비교');
-            },
-          ),
-          const SizedBox(height: 10),
-          _sideLabeledBtn(
-            label: '필터 강도',
-            icon: Icons.tune_rounded,
-            active: _showIntensitySlider,
-            onTap: () {
-              setState(() => _showIntensitySlider = !_showIntensitySlider);
-              _showSideBtnLabel('필터 강도');
             },
           ),
           const SizedBox(height: 10),
@@ -482,24 +477,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Widget _buildBottomArea(CameraState cameraState, double safeBottom) {
     return Column(
       children: [
-        const SizedBox(height: 16),
-        // 활성 필터 이름 (전환 시 fade)
-        AnimatedSwitcher(
-          duration: MediaQuery.of(context).disableAnimations
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          child: Text(
-            cameraState.activeFilter?.name.toUpperCase() ?? '',
-            key: ValueKey(cameraState.activeFilter?.id ?? ''),
-            style: const TextStyle(
-              color: Color(0xFF3D3531),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1.8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         // 강도 슬라이더 (토글)
         AnimatedContainer(
           duration: MediaQuery.of(context).disableAnimations
@@ -539,6 +517,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 )
               : const SizedBox.shrink(),
         ),
+        // 색보정 효과 패널 (토글)
+        AnimatedSize(
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          child: _showEffectsPanel ? _buildEffectsPanel() : const SizedBox.shrink(),
+        ),
         // 필터 스크롤 바 (토글)
         AnimatedSize(
           duration: MediaQuery.of(context).disableAnimations
@@ -552,21 +538,32 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 )
               : const SizedBox.shrink(),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: _showEffectsPanel ? 12 : 4),
         // 사진 / 동영상 모드 탭
         _buildModeSelector(cameraState),
         const Spacer(),
-        // 셔터 행: [갤러리] [셔터(center)] [필터+카메라전환]
+        // 셔터 행: [갤러리, 필터] [셔터(center)] [효과, 카메라전환]
         Padding(
           padding: EdgeInsets.fromLTRB(24, 0, 24, safeBottom > 0 ? safeBottom : 16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 좌측: 갤러리
+              // 좌측: 갤러리 + 필터
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _buildGalleryButton(cameraState),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    _buildGalleryButton(cameraState),
+                    const SizedBox(width: 12),
+                    _iconBtn(
+                      _showFilterPanel ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+                      () => setState(() {
+                        _showFilterPanel = !_showFilterPanel;
+                        if (_showFilterPanel) _showEffectsPanel = false;
+                      }),
+                      active: _showFilterPanel,
+                    ),
+                  ],
                 ),
               ),
               // 중앙: 셔터
@@ -575,29 +572,147 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               else
                 ShutterButton(
                   isCapturing: cameraState.isCapturing,
-                  onTap: () => ref.read(cameraProvider.notifier).capturePhoto(),
+                  onTap: () async {
+                    // 스플릿 모드 중 촬영 시 구분선 없이 필터 적용 사진으로 캡처
+                    if (_isSplitMode) {
+                      CameraEngine.setSplitMode(
+                        position: -1.0,
+                        isFrontCamera: cameraState.isFrontCamera,
+                      );
+                    }
+                    await ref.read(cameraProvider.notifier).capturePhoto();
+                    if (_isSplitMode && mounted) {
+                      CameraEngine.setSplitMode(
+                        position: _computeNativeSplitPos(
+                            _splitPosition, cameraState.isFrontCamera),
+                        isFrontCamera: cameraState.isFrontCamera,
+                      );
+                    }
+                  },
                 ),
-              // 우측: 필터 + 카메라전환
+              // 우측: 색보정 효과 + 카메라전환
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _iconBtn(
-                        _showFilterPanel ? Icons.auto_awesome : Icons.auto_awesome_outlined,
-                        () => setState(() => _showFilterPanel = !_showFilterPanel),
-                        active: _showFilterPanel,
-                      ),
-                      const SizedBox(width: 8),
-                      _iconBtn(Icons.flip_camera_ios_rounded, _handleCameraFlip),
-                    ],
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _iconBtn(
+                      Icons.auto_fix_high_rounded,
+                      () => setState(() {
+                        _showEffectsPanel = !_showEffectsPanel;
+                        if (_showEffectsPanel) _showFilterPanel = false;
+                      }),
+                      active: _showEffectsPanel,
+                    ),
+                    const SizedBox(width: 12),
+                    _iconBtn(Icons.flip_camera_ios_rounded, _handleCameraFlip),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  // MARK: - 색보정 효과 패널
+
+  // (key, label, icon, min, max)
+  static const _effectItems = [
+    ('brightness', '밝기',   Icons.wb_sunny_outlined,               -1.0, 1.0),
+    ('contrast',   '대비',   Icons.contrast_rounded,                -1.0, 1.0),
+    ('saturation', '채도',   Icons.palette_outlined,                -1.0, 1.0),
+    ('softness',   '솜결',   Icons.face_retouching_natural_rounded,  0.0, 1.0),
+    ('beauty',     '뽀얀',   Icons.blur_circular_rounded,            0.0, 1.0),
+    ('glow',       '글로우', Icons.flare_rounded,                    0.0, 1.0),
+  ];
+
+  Widget _buildEffectsPanel() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 효과 선택 버튼 행
+        SizedBox(
+          height: 68,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(_effectItems.length, (i) {
+              final (key, label, icon, _, _) = _effectItems[i];
+              final isActive = i == _selectedEffectIndex;
+              final value = _adjustments[key]!;
+              final n = (value * 100).round();
+              final displayStr = n >= 0 ? '+$n' : '$n';
+              return GestureDetector(
+                onTap: () => setState(() => _selectedEffectIndex = i),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    isActive
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 13, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFADDE6),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              displayStr,
+                              style: const TextStyle(
+                                color: Color(0xFFB06878),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : Icon(icon, color: const Color(0xFF8A8480), size: 20),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isActive
+                            ? const Color(0xFFB06878)
+                            : const Color(0xFF8A8480),
+                        fontSize: 11,
+                        fontWeight:
+                            isActive ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ),
+        // 선택된 효과의 단일 슬라이더
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Builder(builder: (context) {
+            final (key, _, _, min, max) = _effectItems[_selectedEffectIndex];
+            final value = _adjustments[key]!;
+            return SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: const Color(0xFFD4A0B0),
+                inactiveTrackColor: const Color(0xFFEAE4E0),
+                thumbColor: const Color(0xFF8A6870),
+              ),
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                divisions: 200,
+                onChanged: (v) {
+                  setState(() => _adjustments[key] = v);
+                  CameraEngine.setEffect(effectType: key, intensity: v);
+                },
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 4),
       ],
     );
   }
@@ -679,27 +794,45 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   Widget _buildVideoRecordButton(CameraState cameraState) {
     final rec = cameraState.isRecording;
+    final outerSize = AppDimensions.shutterButtonSize + 4; // 80px — layout 고정
     return GestureDetector(
       onTap: () => rec
           ? ref.read(cameraProvider.notifier).stopRecording()
           : ref.read(cameraProvider.notifier).startRecording(),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-        ),
+      child: SizedBox(
+        width: outerSize,
+        height: outerSize,
         child: Center(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: rec ? 28 : 52,
-            height: rec ? 28 : 52,
+            curve: Curves.easeInOut,
+            // 녹화 중: 정지 아이콘 보일 흰 원 + 빨간 사각형 / 대기: 큰 빨간 원
+            width: rec ? outerSize - 4 : outerSize - 6,
+            height: rec ? outerSize - 4 : outerSize - 6,
             decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(rec ? 6 : 26),
+              shape: BoxShape.circle,
+              color: rec ? Colors.white : Colors.red,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.4),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
+            child: rec
+                ? Center(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  )
+                : null,
           ),
         ),
       ),

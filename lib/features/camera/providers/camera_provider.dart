@@ -51,10 +51,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
       // 비율 동기화 (프리뷰와 사진 저장 크롭 일치)
       await CameraEngine.setAspectRatio(state.aspectRatio.nativeKey);
 
-      // 라이브포토 상태 복원 (무음셔터와 상호 배타: 동시에 켜질 수 없음)
-      if (prefs.isLivePhotoEnabled && !prefs.isSilentShutter) {
-        await CameraEngine.setLivePhotoEnabled(true);
-      }
+
     } catch (e, st) {
       debugPrint('[CameraProvider] ❌ 초기화 실패: $e\n$st');
       state = state.copyWith(

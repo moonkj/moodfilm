@@ -17,24 +17,23 @@ class UserPreferencesAdapter extends TypeAdapter<UserPreferences> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return UserPreferences(
-      hasSeenOnboarding: fields[0] as bool? ?? false,
+      hasSeenOnboarding: fields[0] as bool,
       lastUsedFilterId: fields[1] as String?,
-      isProUser: fields[2] as bool? ?? false,
+      isProUser: fields[2] as bool,
       filterIntensities: (fields[3] as Map?)?.cast<String, double>(),
       favoriteFilterIds: (fields[4] as List?)?.cast<String>(),
-      hasSeenDreamyGlowTip: fields[5] as bool? ?? false,
-      hasSeenSwipeHint: fields[6] as bool? ?? false,
-      hasSeenEditHint: fields[7] as bool? ?? false,
-      totalPhotosCapture: fields[8] as int? ?? 0,
-      isSilentShutter: fields[9] as bool? ?? false,
-      isLivePhotoEnabled: fields[10] as bool? ?? false,
+      hasSeenDreamyGlowTip: fields[5] as bool,
+      hasSeenSwipeHint: fields[6] as bool,
+      hasSeenEditHint: fields[7] as bool,
+      totalPhotosCapture: fields[8] as int,
+      isSilentShutter: fields[9] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserPreferences obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.hasSeenOnboarding)
       ..writeByte(1)
@@ -54,9 +53,7 @@ class UserPreferencesAdapter extends TypeAdapter<UserPreferences> {
       ..writeByte(8)
       ..write(obj.totalPhotosCapture)
       ..writeByte(9)
-      ..write(obj.isSilentShutter)
-      ..writeByte(10)
-      ..write(obj.isLivePhotoEnabled);
+      ..write(obj.isSilentShutter);
   }
 
   @override

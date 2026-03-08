@@ -5,13 +5,18 @@ class AppDimensions {
   static const double shutterButtonSize = 76.0;
   static const double shutterButtonInner = 64.0;
 
-  // 필터 썸네일
-  static const double filterThumbnailSize = 60.0;
-  static const double filterThumbnailSizeSelected = 68.0;
+  // 필터 썸네일 (직사각형, 세로 비율 3:4)
+  static const double filterThumbnailWidth = 52.0;
+  static const double filterThumbnailHeight = 70.0;
+  static const double filterThumbnailWidthSelected = 58.0;
+  static const double filterThumbnailHeightSelected = 78.0;
+  // 하위 호환 (정사각형 사용처 대비)
+  static const double filterThumbnailSize = 52.0;
+  static const double filterThumbnailSizeSelected = 58.0;
 
   // 하단 필터 바
-  static const double filterBarHeight = 100.0;
-  static const double filterBarPaddingV = 6.0;
+  static const double filterBarHeight = 112.0;
+  static const double filterBarPaddingV = 4.0;
 
   // 갤러리 썸네일 (카메라 화면 우측 하단)
   static const double galleryThumbnailSize = 44.0;

@@ -627,3 +627,119 @@ try {
 4. **스크린샷 5장** — 6.5" + 5.5" Simulator로 생성
 5. **메타데이터 입력** — 앱 이름, 설명, 키워드
 6. **Xcode Archive → App Store Connect 업로드**
+
+---
+
+## 세션 15 변경사항 (2026-03-08) — UI 전면 개편
+
+### 필터바 UI 개편
+
+- **썸네일 직사각형(3:4)**: `filterThumbnailWidth=52, filterThumbnailHeight=70` (AppDimensions)
+- **이름 분리**: 썸네일 아래 별도 텍스트 레이블 (AppColors.textPrimary/textSecondary)
+- **자동 스크롤 제거**: 필터 선택 시 스크롤 이동 없음 (ScrollController 제거)
+- **Disposable → Lomo** 이름 변경 (`filter_model.dart`)
+- **필터 삭제**: cafe_mood, seoul_night, bronze, noir 4종 제거 → 필터 26종
+
+### 비교(Split) 모드 개선
+
+- 비교 모드 중 촬영 시 구분선 없이 필터만 적용된 사진 저장 (native에 `position: -1.0` 전달 후 복원)
+
+### 에디터 화면 기능 추가
+
+- **비교 토글 버튼** (`compare_rounded`): `_showSplit` 상태로 이미지 Before/After 전환
+- **공유 버튼** (`ios_share_rounded`): `share_plus`로 이미지 공유 (`_shareImage()`)
+
+### 라이브포토 기능 전체 제거
+
+- `UserPreferences.isLivePhotoEnabled` (@HiveField(10)) 필드 삭제 (index 10 예약)
+- `CameraEngine.setLivePhotoEnabled()` 메서드 삭제
+- 카메라 사이드 버튼 라이브포토 토글 제거
+- 설정 화면 라이브포토 SwitchListTile 제거
+- 재구현 가이드는 `## 라이브포토 기능 — 제거됨` 섹션 참조
+
+### 카메라 하단 레이아웃 재편
+
+**버튼 순서:** `[갤러리, 필터] [셔터/동영상] [색보정효과, 카메라전환]`
+
+- **좌측**: 갤러리 + 필터(`auto_awesome`) 버튼
+- **중앙**: 셔터(사진 모드) / 동영상 녹화 버튼
+- **우측**: 색보정 효과(`auto_fix_high_rounded`) + 카메라전환
+
+### 색보정 효과 패널 (카메라 내)
+
+- **패널 토글**: `_showEffectsPanel` 상태, 필터 패널과 상호 배타적
+- **구조**: 6개 버튼 탭 선택 + 단일 슬라이더 (에디터와 동일)
+- **항목**: 밝기, 대비, 채도, 솜결(grain), 뽀얀(fade), 글로우(glow)
+- 패널 열릴 때 사진/동영상 탭과 간격 12px 추가 (`SizedBox(height: _showEffectsPanel ? 12 : 4)`)
+
+### 강도 슬라이더 위치
+
+- 프리뷰 우측 사이드 버튼 (설정 버튼 위) — `_showIntensitySlider` 토글
+
+### 갤러리(GalleryPickerScreen) 리디자인
+
+- **배경**: 흰색 (`Colors.white`)
+- **그리드**: 2컬럼 → **3컬럼 마소니 그리드** (`gap=2.0`, shortest-column 알고리즘)
+- **동영상 재생시간 뱃지**: 우하단 `mm:ss` 형식 (`_formatDuration`)
+- **하단 탭 바**: 앨범 탭(선택됨) + 카메라 탭 (`_buildBottomTabBar()`)
+- **텍스트/아이콘**: 라이트 테마 (`Color(0xFF3D3531)`)
+
+### 버튼 디자인 개편
+
+**셔터 버튼 (`shutter_button.dart`):**
+- 외곽 민트 그라디언트 링: `Color(0xFF5CE8D8)` → `Color(0xFF8FF5EC)`, 두께 ~3.5px
+- 외부: 80px (`shutterButtonSize+4`), 내부: 73px (`shutterButtonInner+9`)
+- 내부 원: 흰색→크림 그라디언트 + 라벤더 글로우 그림자
+
+**동영상 버튼 (`_buildVideoRecordButton`):**
+- **민트 링 없음** — 동영상 모드는 링 제거
+- 대기 중: 큰 빨간 원 (74px), 빨간 글로우 그림자 (`Colors.red.withValues(alpha:0.4)`)
+- 녹화 중: 흰 원 배경 + 빨간 사각형(28px, radius:6) — 정지 아이콘
+
+---
+
+## 라이브포토 기능 — 제거됨 (향후 구현 예정)
+
+### 제거 이유
+- 앱 스토어 출시 전 기능 간소화
+- 무음셔터와 상호 배타 로직 복잡성
+- 추후 별도 업데이트로 추가 예정
+
+### 제거된 항목
+- `UserPreferences.isLivePhotoEnabled` (@HiveField(10)) — 필드 삭제, index 10은 예약됨
+- `CameraEngine.setLivePhotoEnabled(bool)` — 메서드 삭제
+- 카메라 화면 사이드 버튼 "라이브포토"
+- 설정 화면 "라이브포토" SwitchListTile
+
+### 재구현 시 필요 작업
+1. `UserPreferences`에 `@HiveField(10) bool isLivePhotoEnabled` 재추가 (index 10 그대로 사용)
+2. `CameraEngine.setLivePhotoEnabled(bool)` 메서드 재추가
+3. `MFCameraSession.swift` — `isLivePhotoEnabled`, `setLivePhotoEnabled()`, `livePhotoMovieURL` 로직 복원
+4. `CameraEnginePlugin.swift` — `setLivePhotoEnabled` case 핸들러 + `didCapturePhoto` delegate에서 PHAssetCreationRequest pairedVideo 복원
+5. 카메라 화면 사이드 버튼 추가 + 무음셔터 상호배타 처리
+6. 설정 화면 토글 추가
+
+### Swift 구현 핵심 (메모)
+```swift
+// MFCameraSession.swift
+var isLivePhotoEnabled: Bool = false
+private var livePhotoMovieURL: URL?
+
+func capturePhoto() {
+    if isLivePhotoEnabled && photoOutput.isLivePhotoCaptureSupported {
+        let movURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".mov")
+        livePhotoMovieURL = movURL
+        settings.livePhotoMovieFileURL = movURL
+    }
+}
+
+// CameraEnginePlugin.swift — didCapturePhoto delegate
+if let movURL = livePhotoMovieURL {
+    // PHAssetCreationRequest + pairedVideo
+    request.addResource(with: .photo, fileURL: photoURL, options: nil)
+    let videoOptions = PHAssetResourceCreationOptions()
+    videoOptions.shouldMoveFile = true
+    request.addResource(with: .pairedVideo, fileURL: movURL, options: videoOptions)
+}
+```

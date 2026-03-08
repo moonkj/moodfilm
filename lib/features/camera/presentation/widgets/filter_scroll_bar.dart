@@ -26,29 +26,6 @@ class FilterScrollBar extends ConsumerStatefulWidget {
 }
 
 class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
-  late ScrollController _scrollController;
-  static const double _itemWidth = AppDimensions.filterThumbnailSize + 16;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController();
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToFilter(int index) {
-    final offset = (index * _itemWidth) - (MediaQuery.of(context).size.width / 2) + (_itemWidth / 2);
-    _scrollController.animateTo(
-      offset.clamp(0.0, _scrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +45,6 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
     return SizedBox(
       height: AppDimensions.filterBarHeight,
       child: ListView.builder(
-        controller: _scrollController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimensions.paddingM,
@@ -98,10 +74,7 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
           return _FilterItem(
             filter: filter,
             isSelected: isSelected,
-            onTap: () {
-              ref.read(cameraProvider.notifier).selectFilter(filter);
-              _scrollToFilter(filterIndex);
-            },
+            onTap: () => ref.read(cameraProvider.notifier).selectFilter(filter),
           );
         },
       ),
@@ -122,94 +95,97 @@ class _FilterItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double thumbW = isSelected
+        ? AppDimensions.filterThumbnailWidthSelected
+        : AppDimensions.filterThumbnailWidth;
+    final double thumbH = isSelected
+        ? AppDimensions.filterThumbnailHeightSelected
+        : AppDimensions.filterThumbnailHeight;
+
     return Semantics(
       label: '${filter.name} 필터',
       button: true,
       selected: isSelected,
       child: GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        width: isSelected
-            ? AppDimensions.filterThumbnailSizeSelected
-            : AppDimensions.filterThumbnailSize,
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 썸네일
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
-              width: isSelected
-                  ? AppDimensions.filterThumbnailSizeSelected
-                  : AppDimensions.filterThumbnailSize,
-              height: isSelected
-                  ? AppDimensions.filterThumbnailSizeSelected
-                  : AppDimensions.filterThumbnailSize,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(isSelected ? 14 : 12),
-                border: isSelected
-                    ? Border.all(color: AppColors.shutter, width: 2)
-                    : null,
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha:0.3),
-                          blurRadius: 6,
-                        )
-                      ]
-                    : null,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(isSelected ? 12 : 10),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // 썸네일 이미지 (없으면 필터별 그라디언트 fallback)
-                    Image.asset(
-                      filter.thumbnailAssetPath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => _filterFallbackGradient(filter),
-                    ),
-                    // NEW 배지
-                    if (filter.isNew)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: const Text(
-                            'NEW',
-                            style: AppTypography.proBadge,
+        onTap: onTap,
+        child: Container(
+          width: AppDimensions.filterThumbnailWidthSelected,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 썸네일 (직사각형)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 100),
+                width: thumbW,
+                height: thumbH,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(isSelected ? 14 : 12),
+                  border: isSelected
+                      ? Border.all(color: AppColors.shutter, width: 2)
+                      : null,
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 6)]
+                      : null,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(isSelected ? 12 : 10),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // 썸네일 이미지 (없으면 필터별 그라디언트 fallback)
+                      Image.asset(
+                        filter.thumbnailAssetPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint('THUMBNAIL ERROR [${filter.id}]: $error');
+                          return _filterFallbackGradient(filter);
+                        },
+                      ),
+                      // NEW 배지
+                      if (filter.isNew)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: const Text(
+                              'NEW',
+                              style: AppTypography.proBadge,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            // 필터 이름
-            Text(
-              filter.name,
-              style: AppTypography.filterLabel.copyWith(
-                color: isSelected ? AppColors.shutter : AppColors.shutter.withValues(alpha:0.7),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              const SizedBox(height: 4),
+              // 필터 이름 (썸네일 하단 별도 텍스트, 최대 2줄)
+              SizedBox(
+                width: AppDimensions.filterThumbnailWidthSelected,
+                child: Text(
+                  filter.name,
+                  style: AppTypography.filterLabel.copyWith(
+                    color: isSelected
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -237,8 +213,6 @@ class _FilterItem extends StatelessWidget {
       case 'soft_pink':   return (const Color(0xFFD07898), const Color(0xFFF4B8CC));
       case 'lavender':    return (const Color(0xFF8870B8), const Color(0xFFCCB8E8));
       case 'dusty_blue':  return (const Color(0xFF506090), const Color(0xFF8098C0));
-      case 'cafe_mood':   return (const Color(0xFF805030), const Color(0xFFC09060));
-      case 'seoul_night': return (const Color(0xFF202060), const Color(0xFF5858A8));
       default:
         switch (filter.category) {
           case FilterCategory.warm:      return (AppColors.warmTone, const Color(0xFFF5E0C0));
@@ -291,25 +265,25 @@ class _NoFilterItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double thumbW = isSelected
+        ? AppDimensions.filterThumbnailWidthSelected
+        : AppDimensions.filterThumbnailWidth;
+    final double thumbH = isSelected
+        ? AppDimensions.filterThumbnailHeightSelected
+        : AppDimensions.filterThumbnailHeight;
+
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        width: isSelected
-            ? AppDimensions.filterThumbnailSizeSelected
-            : AppDimensions.filterThumbnailSize,
+      child: Container(
+        width: AppDimensions.filterThumbnailWidthSelected,
         margin: const EdgeInsets.symmetric(horizontal: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 100),
-              width: isSelected
-                  ? AppDimensions.filterThumbnailSizeSelected
-                  : AppDimensions.filterThumbnailSize,
-              height: isSelected
-                  ? AppDimensions.filterThumbnailSizeSelected
-                  : AppDimensions.filterThumbnailSize,
+              width: thumbW,
+              height: thumbH,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(isSelected ? 14 : 12),
                 border: isSelected
@@ -331,13 +305,17 @@ class _NoFilterItem extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              '없음',
-              style: AppTypography.filterLabel.copyWith(
-                color: isSelected ? AppColors.shutter : AppColors.shutter.withValues(alpha: 0.7),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            SizedBox(
+              width: AppDimensions.filterThumbnailWidthSelected,
+              child: Text(
+                '없음',
+                style: AppTypography.filterLabel.copyWith(
+                  color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
+                maxLines: 2,
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -356,14 +334,14 @@ class _AllFiltersButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: AppDimensions.filterThumbnailSize,
+        width: AppDimensions.filterThumbnailWidthSelected,
         margin: const EdgeInsets.symmetric(horizontal: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: AppDimensions.filterThumbnailSize,
-              height: AppDimensions.filterThumbnailSize,
+              width: AppDimensions.filterThumbnailWidth,
+              height: AppDimensions.filterThumbnailHeight,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
@@ -379,12 +357,16 @@ class _AllFiltersButton extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              '전체',
-              style: AppTypography.filterLabel.copyWith(
-                color: AppColors.shutter.withValues(alpha: 0.7),
+            SizedBox(
+              width: AppDimensions.filterThumbnailWidthSelected,
+              child: Text(
+                '전체',
+                style: AppTypography.filterLabel.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+                maxLines: 2,
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),

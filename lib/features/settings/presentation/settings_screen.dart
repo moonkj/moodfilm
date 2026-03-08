@@ -32,29 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) {
                   setState(() {
                     prefs.isSilentShutter = v;
-                    // 무음셔터 켜면 라이브포토 끔 (상호 배타)
-                    if (v && prefs.isLivePhotoEnabled) {
-                      prefs.isLivePhotoEnabled = false;
-                      CameraEngine.setLivePhotoEnabled(false);
-                    }
-                    prefs.save();
-                  });
-                },
-                activeThumbColor: AppColors.accent,
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.motion_photos_on_rounded),
-                title: const Text('라이브포토'),
-                subtitle: const Text('움직이는 사진으로 촬영 (무음셔터와 함께 사용 불가)'),
-                value: prefs.isLivePhotoEnabled,
-                onChanged: (v) {
-                  setState(() {
-                    prefs.isLivePhotoEnabled = v;
-                    // 라이브포토 켜면 무음셔터 끔 (상호 배타)
-                    if (v && prefs.isSilentShutter) {
-                      prefs.isSilentShutter = false;
-                    }
-                    CameraEngine.setLivePhotoEnabled(v);
                     prefs.save();
                   });
                 },

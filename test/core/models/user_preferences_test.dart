@@ -49,10 +49,6 @@ void main() {
       expect(prefs.isSilentShutter, false);
     });
 
-    test('기본값: isLivePhotoEnabled=false', () {
-      expect(prefs.isLivePhotoEnabled, false);
-    });
-
     test('기본값: totalPhotosCapture=0', () {
       expect(prefs.totalPhotosCapture, 0);
     });

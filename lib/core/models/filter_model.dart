@@ -193,7 +193,7 @@ class FilterData {
     ),
     FilterModel(
       id: 'disposable',
-      name: 'Disposable',
+      name: 'Lomo',
       category: FilterCategory.film,
       lutFileName: 'disposable.cube',
       description: '일회용 카메라 느낌',
@@ -241,22 +241,6 @@ class FilterData {
       description: '먼지낀 파란색 빈티지',
       isPro: true,
     ),
-    FilterModel(
-      id: 'cafe_mood',
-      name: 'Cafe Mood',
-      category: FilterCategory.aesthetic,
-      lutFileName: 'cafe_mood.cube',
-      description: '카페 안 따뜻한 오후',
-      isPro: true,
-    ),
-    FilterModel(
-      id: 'seoul_night',
-      name: 'Seoul Night',
-      category: FilterCategory.aesthetic,
-      lutFileName: 'seoul_night.cube',
-      description: '서울 야경 네온빛',
-      isPro: true,
-    ),
 
     // ── W11 추가 8종 ─────────────────────────────────────────
     // Warm +2
@@ -295,26 +279,6 @@ class FilterData {
       category: FilterCategory.cool,
       lutFileName: 'winter.cube',
       description: '겨울 아침 청량함',
-      isPro: true,
-      isNew: true,
-    ),
-
-    // Film +2
-    FilterModel(
-      id: 'bronze',
-      name: 'Bronze',
-      category: FilterCategory.film,
-      lutFileName: 'bronze.cube',
-      description: '구리빛 복고 필름',
-      isPro: true,
-      isNew: true,
-    ),
-    FilterModel(
-      id: 'noir',
-      name: 'Noir',
-      category: FilterCategory.film,
-      lutFileName: 'noir.cube',
-      description: '흑백 감성 필름',
       isPro: true,
       isNew: true,
     ),
@@ -368,15 +332,11 @@ class FilterData {
     'soft_pink':   0.55,
     'lavender':    0.55,
     'dusty_blue':  0.60,
-    'cafe_mood':   0.55,
-    'seoul_night': 0.65,
     // W11 추가
     'latte':       0.55,
     'mocha':       0.55,
     'pale':        0.55,
     'winter':      0.60,
-    'bronze':      0.65,
-    'noir':        0.70,
     'blossom':     0.55,
     'vivid':       0.60,
   };

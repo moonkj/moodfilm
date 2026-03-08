@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
@@ -39,6 +40,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   String? _filteredPreviewPath;
   bool _isGeneratingPreview = false;
 
+  bool _showSplit = false;
   double _splitPosition = 0.5;
 
   // 하단 탭: 'filter' | 'effect'
@@ -150,13 +152,48 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             onPressed: () => Navigator.of(context).pop(),
           ),
           const Spacer(),
-          if (widget.assetId != null)
+          // 비교 버튼 (Before/After 토글)
+          GestureDetector(
+            onTap: () => setState(() => _showSplit = !_showSplit),
+            child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: _showSplit
+                    ? const Color(0xFF3D3531)
+                    : const Color(0xFFF5F0EC),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
+              ),
+              child: Icon(Icons.compare_rounded,
+                  color: _showSplit ? Colors.white : const Color(0xFF3D3531),
+                  size: 18),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (widget.assetId != null) ...[
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded,
                   color: Color(0xFF3D3531), size: 22),
               onPressed: _deletePhoto,
             ),
-          const SizedBox(width: 4),
+            const SizedBox(width: 4),
+          ],
+          // 공유 버튼
+          GestureDetector(
+            onTap: _shareImage,
+            child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F0EC),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
+              ),
+              child: const Icon(Icons.ios_share_rounded,
+                  color: Color(0xFF3D3531), size: 18),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 저장 버튼
           GestureDetector(
             onTap: _saveImage,
             child: Container(
@@ -184,20 +221,25 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             color: Colors.black26, size: 64),
       );
     }
+    final displayPath = _filteredPreviewPath ?? widget.imagePath!;
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
-      child: GestureDetector(
-        onHorizontalDragUpdate: (d) {
-          final w = MediaQuery.sizeOf(context).width - 32;
-          setState(() {
-            _splitPosition = (_splitPosition + d.delta.dx / w).clamp(0.05, 0.95);
-          });
-        },
-        child: LayoutBuilder(
-          builder: (ctx, constraints) =>
-              _buildSplitView(constraints.maxWidth, constraints.maxHeight),
-        ),
-      ),
+      child: _showSplit
+          ? GestureDetector(
+              onHorizontalDragUpdate: (d) {
+                final w = MediaQuery.sizeOf(context).width - 32;
+                setState(() {
+                  _splitPosition =
+                      (_splitPosition + d.delta.dx / w).clamp(0.05, 0.95);
+                });
+              },
+              child: LayoutBuilder(
+                builder: (ctx, constraints) =>
+                    _buildSplitView(constraints.maxWidth, constraints.maxHeight),
+              ),
+            )
+          : Image.file(File(displayPath), fit: BoxFit.cover,
+              width: double.infinity),
     );
   }
 
@@ -568,6 +610,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         behavior: SnackBarBehavior.floating,
       ));
     }
+  }
+
+  // MARK: - 공유
+
+  Future<void> _shareImage() async {
+    if (widget.imagePath == null) return;
+    final sharePath = _filteredPreviewPath ?? widget.imagePath!;
+    await Share.shareXFiles([XFile(sharePath)]);
   }
 
   // MARK: - 삭제

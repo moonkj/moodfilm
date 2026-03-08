@@ -77,42 +77,50 @@ class _ShutterButtonState extends State<ShutterButton>
           child: child,
         ),
         child: SizedBox(
-          width: AppDimensions.shutterButtonSize,
-          height: AppDimensions.shutterButtonSize,
+          width: AppDimensions.shutterButtonSize + 4,
+          height: AppDimensions.shutterButtonSize + 4,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // 외곽 링
+              // 민트 외곽 링 (얇게)
               Container(
-                width: AppDimensions.shutterButtonSize,
-                height: AppDimensions.shutterButtonSize,
-                decoration: BoxDecoration(
+                width: AppDimensions.shutterButtonSize + 4,
+                height: AppDimensions.shutterButtonSize + 4,
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFFB0AAA5),
-                    width: 2.5,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF5CE8D8), // bright mint
+                      Color(0xFF8FF5EC), // light mint
+                    ],
                   ),
                 ),
               ),
-              // 내부 원
+              // 내부 원 (촬영 시 축소) — 링 두께 ~3.5px
               AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 width: widget.isCapturing
                     ? AppDimensions.shutterButtonInner * 0.85
-                    : AppDimensions.shutterButtonInner,
+                    : AppDimensions.shutterButtonInner + 9,
                 height: widget.isCapturing
                     ? AppDimensions.shutterButtonInner * 0.85
-                    : AppDimensions.shutterButtonInner,
+                    : AppDimensions.shutterButtonInner + 9,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: widget.isCapturing
-                      ? const Color(0xFFDDD9D5)
-                      : const Color(0xFFF5F2EF),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: widget.isCapturing
+                        ? [const Color(0xFFE8E0D8), const Color(0xFFD8D0C8)]
+                        : [Colors.white, const Color(0xFFF5EEE8)],
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 6,
-                      spreadRadius: 1,
+                      color: const Color(0xFFC8A2D0).withValues(alpha: 0.35),
+                      blurRadius: 14,
+                      spreadRadius: 2,
                     ),
                   ],
                 ),

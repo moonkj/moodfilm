@@ -35,8 +35,7 @@ class UserPreferences extends HiveObject {
   @HiveField(9)
   bool isSilentShutter; // 무음 셔터
 
-  @HiveField(10)
-  bool isLivePhotoEnabled; // 라이브포토 (무음셔터와 상호 배타)
+  // @HiveField(10) isLivePhotoEnabled — 제거됨 (process.md 참고)
 
   UserPreferences({
     this.hasSeenOnboarding = false,
@@ -49,7 +48,6 @@ class UserPreferences extends HiveObject {
     this.hasSeenEditHint = false,
     this.totalPhotosCapture = 0,
     this.isSilentShutter = false,
-    this.isLivePhotoEnabled = false,
   })  : filterIntensities = filterIntensities ?? {},
         favoriteFilterIds = favoriteFilterIds ?? [];
 
