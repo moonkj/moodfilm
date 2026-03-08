@@ -70,13 +70,13 @@ class FilterData {
   FilterData._();
 
   static final List<FilterModel> all = [
-    // ── MoodFilm 시그니처 (2종) ──────────────────────────────
+    // ── Like it! 시그니처 (2종) ──────────────────────────────
     FilterModel(
       id: 'mood',
       name: 'Mood',
       category: FilterCategory.warm,
       lutFileName: 'mood.cube',
-      description: 'MoodFilm 시그니처 — 따뜻한 드리미 필름',
+      description: 'Like it! 시그니처 — 따뜻한 드리미 필름',
       isPro: false,
       isNew: true,
     ),

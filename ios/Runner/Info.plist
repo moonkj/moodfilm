@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>MoodFilm</string>
+	<string>Like it!</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>MoodFilm</string>
+	<string>Like it!</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -29,7 +29,7 @@
 
 	<!-- 카메라 권한 — App Store 심사 필수 -->
 	<key>NSCameraUsageDescription</key>
-	<string>MoodFilm이 감성 필터를 실시간으로 적용하여 사진을 촬영하기 위해 카메라에 접근합니다. 카메라 데이터는 기기 내에서만 처리되며 서버로 전송되지 않습니다.</string>
+	<string>Like it!이 감성 필터를 실시간으로 적용하여 사진을 촬영하기 위해 카메라에 접근합니다. 카메라 데이터는 기기 내에서만 처리되며 서버로 전송되지 않습니다.</string>
 
 	<!-- 사진 라이브러리 저장 권한 -->
 	<key>NSPhotoLibraryAddUsageDescription</key>

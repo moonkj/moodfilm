@@ -53,7 +53,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
             // 타이틀
             const Text(
-              'MoodFilm Pro',
+              'Like it! Pro',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 30,

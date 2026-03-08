@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/services/router.dart';
 import 'core/theme/app_theme.dart';
 
-class MoodFilmApp extends ConsumerWidget {
-  const MoodFilmApp({super.key});
+class LikeItApp extends ConsumerWidget {
+  const LikeItApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'MoodFilm',
+      title: 'Like it!',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,

@@ -44,7 +44,7 @@ class OnboardingScreen extends StatelessWidget {
                     color: Colors.white, size: 48),
               ),
               const SizedBox(height: 32),
-              const Text('MoodFilm', style: AppTypography.h1),
+              const Text('Like it!', style: AppTypography.h1),
               const SizedBox(height: 8),
               Text(
                 '한 번의 탭으로,\n내 사진이 예뻐지는 경험',
