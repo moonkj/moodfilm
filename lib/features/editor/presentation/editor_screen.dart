@@ -204,8 +204,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final filtered = _filteredPreviewPath ?? original;
     final lineX = w * _splitPosition;
 
-    return Stack(
-      children: [
+    return SizedBox(
+      width: w,
+      height: h,
+      child: Stack(
+        children: [
         // 오른쪽 (After = 필터 적용)
         Positioned.fill(
           child: Image.file(File(filtered), fit: BoxFit.cover),
@@ -254,7 +257,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           top: h / 2 + 18,
           child: _splitLabel('After'),
         ),
-      ],
+        ],
+      ),
     );
   }
 

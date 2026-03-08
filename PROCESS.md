@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-07 (세션 7)
+> 마지막 업데이트: 2026-03-08 (세션 13)
 
 ---
 
@@ -202,7 +202,15 @@ flutter build ios --release --no-codesign
 - [x] `build_runner build` — `user_preferences.g.dart` HiveField(10) 재생성
 - [x] `flutter analyze`: 0 issues
 
-### ⏳ W13 — App Store 준비 (세션 13)
+### ✅ W13 — EditorScreen Split-View 버그 수정 (세션 13)
+
+- [x] **Before/After 스플릿 뷰 렌더링 버그 수정**
+  - 원인: Stack에 명시적 크기 없음 → ClipRect 너비 변화에 따라 Stack 전체가 줄어들어 Positioned.fill 이미지도 함께 사라지는 현상
+  - 수정: `SizedBox(width: w, height: h)` 로 Stack 크기 고정
+
+---
+
+### ⏳ W14 — App Store 준비 (세션 14)
 
 **가격:** ₩2,500 (Tier 2, 목표 ₩2,200에 가장 근접한 Apple 한국 티어)
 
@@ -233,7 +241,7 @@ flutter build ios --release --no-codesign
 - [ ] 아이콘 1024×1024 JPG (알파채널 없음)
 - [ ] 빌드 업로드 (Xcode Archive → Distribute → App Store Connect)
 
-### ⏳ W14 — TestFlight + App Store 제출 (세션 14)
+### ⏳ W15 — TestFlight + App Store 제출 (세션 15)
 
 **심사 거절 위험 요소 사전 점검:**
 
