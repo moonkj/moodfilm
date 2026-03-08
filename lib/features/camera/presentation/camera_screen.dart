@@ -59,8 +59,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     'brightness': 0.0,
     'contrast':   0.0,
     'saturation': 0.0,
-    'softness':   0.0,
-    'beauty':     0.0,
+    'softness':   0.3,  // 기본 솜결 30%
+    'beauty':     0.25, // 기본 뽀얀 25%
     'glow':       0.0,
   };
 
@@ -80,8 +80,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(cameraProvider.notifier).initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(cameraProvider.notifier).initialize();
+      _applyDefaultEffects();
       _checkOnboardingHints();
     });
   }
@@ -95,6 +96,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     // RouteObserver 구독 (화면 전환 감지)
     final route = ModalRoute.of(context);
     if (route != null) routeObserver.subscribe(this, route);
+  }
+
+  void _applyDefaultEffects() {
+    for (final entry in _adjustments.entries) {
+      if (entry.value != 0.0) {
+        CameraEngine.setEffect(effectType: entry.key, intensity: entry.value);
+      }
+    }
   }
 
   void _checkOnboardingHints() {
@@ -143,7 +152,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.read(cameraProvider.notifier).initialize();
+      ref.read(cameraProvider.notifier).initialize().then((_) => _applyDefaultEffects());
     } else if (state == AppLifecycleState.inactive) {
       ref.read(cameraProvider.notifier).disposeCamera();
     }
