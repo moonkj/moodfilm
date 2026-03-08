@@ -260,17 +260,17 @@ class MFLUTEngine {
     private func applySoftness(to image: CIImage, intensity: Float) -> CIImage {
         guard let blurFilter = CIFilter(name: "CIGaussianBlur") else { return image }
         blurFilter.setValue(image, forKey: kCIInputImageKey)
-        blurFilter.setValue(intensity * 5.0, forKey: kCIInputRadiusKey)
+        blurFilter.setValue(intensity * 10.0, forKey: kCIInputRadiusKey)  // radius: 최대 10
         guard let blurred = blurFilter.outputImage?.cropped(to: image.extent) else { return image }
 
-        // 원본과 블러를 alpha로 블렌딩 (intensity * 0.55 비율)
+        // 원본과 블러를 alpha로 블렌딩 (intensity * 0.75 비율)
         guard let alphaFilter = CIFilter(name: "CIColorMatrix"),
               let composite = CIFilter(name: "CISourceOverCompositing") else { return image }
         alphaFilter.setValue(blurred, forKey: kCIInputImageKey)
         alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
         alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
         alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
-        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity * 0.55)), forKey: "inputAVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity * 0.75)), forKey: "inputAVector")
         guard let semiBlur = alphaFilter.outputImage else { return image }
         composite.setValue(semiBlur, forKey: kCIInputImageKey)
         composite.setValue(image, forKey: kCIInputBackgroundImageKey)
