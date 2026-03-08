@@ -52,7 +52,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     (label: '밝기',  icon: Icons.wb_sunny_outlined,               min: -1.0, max: 1.0),
     (label: '대비',  icon: Icons.contrast,                         min: -1.0, max: 1.0),
     (label: '채도',  icon: Icons.palette_outlined,                 min: -1.0, max: 1.0),
-    (label: '뽀용',  icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
+    (label: '솜결',  icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
     (label: '글로우', icon: Icons.flare_rounded,                    min: 0.0,  max: 1.0),
   ];
 

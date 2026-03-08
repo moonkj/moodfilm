@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-08 (세션 13)
+> 마지막 업데이트: 2026-03-08 (세션 13, 업데이트 2)
 
 ---
 
@@ -202,11 +202,18 @@ flutter build ios --release --no-codesign
 - [x] `build_runner build` — `user_preferences.g.dart` HiveField(10) 재생성
 - [x] `flutter analyze`: 0 issues
 
-### ✅ W13 — EditorScreen Split-View 버그 수정 (세션 13)
+### ✅ W13 — UI 개선 및 버그 수정 (세션 13)
 
 - [x] **Before/After 스플릿 뷰 렌더링 버그 수정**
   - 원인: Stack에 명시적 크기 없음 → ClipRect 너비 변화에 따라 Stack 전체가 줄어들어 Positioned.fill 이미지도 함께 사라지는 현상
   - 수정: `SizedBox(width: w, height: h)` 로 Stack 크기 고정
+- [x] **EditorScreen 이펙트 이름 변경** — '뽀용' → '솜결' (순우리말, 브랜드 감성 일치)
+- [x] **앱 이름 변경** — MoodFilm → 라이크잇 (Like it!)
+- [x] **GalleryPickerScreen 리디자인**
+  - 상단 헤더: `Like it!` 브랜딩 (흰색 이탤릭 볼드 + accent `!`)
+  - 기존 3열 균등 그리드 → 2열 벽돌 격자 (Masonry Grid)
+  - 각 셀 높이 = `asset.width / asset.height` 비율로 계산, 짧은 컬럼에 우선 배분
+  - 썸네일 `BorderRadius(6)` 라운딩
 
 ---
 

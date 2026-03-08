@@ -36,7 +36,6 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
   void initState() {
     super.initState();
     _loadPhotos();
-    // iOS Photos 변경 감지 (삭제/추가 후 자동 동기화)
     PhotoManager.addChangeCallback(_onPhotosChanged);
     PhotoManager.startChangeNotify();
   }
@@ -72,7 +71,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     }
 
     final albums = await PhotoManager.getAssetPathList(
-      type: RequestType.common, // 사진 + 동영상 (오디오 제외)
+      type: RequestType.common,
       onlyAll: true,
     );
 
@@ -136,8 +135,8 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
         backgroundColor: AppColors.darkSurface,
         title: Text('$count개 삭제',
             style: const TextStyle(color: Colors.white, fontSize: 17)),
-        content: Text('선택한 항목을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
-            style: const TextStyle(color: Colors.white60, fontSize: 14)),
+        content: const Text('선택한 항목을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
+            style: TextStyle(color: Colors.white60, fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -153,9 +152,6 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     if (confirmed != true || !mounted) return;
 
     final ids = _selectedIds.toList();
-
-    // iOS 16+에서 deleteWithIds는 시스템 확인 다이얼로그를 추가로 표시
-    // deletedIds 반환값이 iOS에서 불안정하므로 낙관적 UI 업데이트 사용
     await PhotoManager.editor.deleteWithIds(ids);
     if (!mounted) return;
 
@@ -214,7 +210,6 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
     int successCount = 0;
     for (final asset in selected) {
-      // 동영상은 이미지 필터 처리 불가 → 건너뜀
       if (asset.type == AssetType.video) {
         if (mounted) setState(() => _processedCount++);
         continue;
@@ -233,9 +228,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
       if (result != null) successCount++;
 
-      if (mounted) {
-        setState(() => _processedCount++);
-      }
+      if (mounted) setState(() => _processedCount++);
     }
 
     if (!mounted) return;
@@ -254,47 +247,99 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     );
   }
 
+  // MARK: - Build
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.darkBg,
-      appBar: AppBar(
-        backgroundColor: AppColors.darkSurface,
-        foregroundColor: Colors.white,
-        title: _isMultiSelectMode
-            ? Text('${_selectedIds.length}장 선택됨', style: AppTypography.h2)
-            : const Text('갤러리', style: AppTypography.h2),
-        leading: IconButton(
-          icon: Icon(_isMultiSelectMode ? Icons.close_rounded : Icons.arrow_back_ios_rounded),
-          onPressed: _isMultiSelectMode ? _toggleMultiSelectMode : () => context.pop(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(),
+            Expanded(child: _buildBody()),
+          ],
         ),
-        actions: [
+      ),
+    );
+  }
+
+  // MARK: - 상단 바
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(
+              _isMultiSelectMode ? Icons.close_rounded : Icons.arrow_back_ios_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            onPressed: _isMultiSelectMode ? _toggleMultiSelectMode : () => context.pop(),
+          ),
+          Expanded(
+            child: _isMultiSelectMode
+                ? Text(
+                    '${_selectedIds.length}장 선택됨',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                : RichText(
+                    text: const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Like it',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            fontStyle: FontStyle.italic,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '!',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
           if (!_isMultiSelectMode)
             TextButton(
               onPressed: _toggleMultiSelectMode,
-              child: const Text('선택', style: TextStyle(color: AppColors.accent)),
+              child: const Text('선택', style: TextStyle(color: AppColors.accent, fontSize: 15)),
             ),
           if (_isMultiSelectMode && _selectedIds.isNotEmpty) ...[
             IconButton(
               onPressed: _shareSelected,
-              icon: const Icon(Icons.ios_share_rounded, color: AppColors.accent),
-              tooltip: '공유',
+              icon: const Icon(Icons.ios_share_rounded, color: AppColors.accent, size: 22),
             ),
             IconButton(
               onPressed: _confirmAndDelete,
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-              tooltip: '삭제',
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),
             ),
             TextButton(
               onPressed: _showBatchFilterPicker,
-              child: const Text('필터 적용', style: TextStyle(color: AppColors.accent)),
+              child: const Text('필터', style: TextStyle(color: AppColors.accent, fontSize: 15)),
             ),
           ],
         ],
       ),
-      body: _buildBody(),
     );
   }
+
+  // MARK: - 바디
 
   Widget _buildBody() {
     if (_isBatchProcessing) {
@@ -324,11 +369,13 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
           children: [
             const Icon(Icons.photo_library_outlined, color: Colors.white38, size: 48),
             const SizedBox(height: 16),
-            const Text('갤러리 접근 권한이 필요합니다', style: TextStyle(color: Colors.white60, fontSize: 16)),
+            const Text('갤러리 접근 권한이 필요합니다',
+                style: TextStyle(color: Colors.white60, fontSize: 16)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => PhotoManager.openSetting(),
-              child: const Text('설정에서 허용하기', style: TextStyle(color: AppColors.accent)),
+              child: const Text('설정에서 허용하기',
+                  style: TextStyle(color: AppColors.accent)),
             ),
           ],
         ),
@@ -336,34 +383,84 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     }
 
     if (_assets.isEmpty) {
-      return const Center(child: Text('사진이 없습니다', style: TextStyle(color: Colors.white38)));
+      return const Center(
+        child: Text('사진이 없습니다', style: TextStyle(color: Colors.white38)),
+      );
     }
 
-    return GridView.builder(
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-      ),
-      itemCount: _assets.length,
-      itemBuilder: (context, index) {
-        final asset = _assets[index];
-        final isSelected = _selectedIds.contains(asset.id);
-        return _AssetThumbnail(
-          key: ValueKey(asset.id),
-          asset: asset,
-          isSelected: isSelected,
-          isMultiSelectMode: _isMultiSelectMode,
-          onTap: () => _selectAsset(asset),
-          onLongPress: () async {
-            // 롱프레스: 단일 사진 바로 공유
-            final file = await asset.file;
-            if (file == null || !mounted) return;
-            await Share.shareXFiles([XFile(file.path)]);
-          },
+    return _buildMasonryGrid();
+  }
+
+  // MARK: - 벽돌 격자 (Masonry Grid)
+
+  Widget _buildMasonryGrid() {
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        const gap = 3.0;
+        final colWidth = (constraints.maxWidth - gap) / 2;
+
+        // 두 컬럼에 자산 분배 (높이 합산이 짧은 쪽에 추가)
+        final List<(AssetEntity, double)> leftCol = [];
+        final List<(AssetEntity, double)> rightCol = [];
+        double leftH = 0, rightH = 0;
+
+        for (final asset in _assets) {
+          final ar = (asset.width > 0 && asset.height > 0)
+              ? asset.width / asset.height
+              : 1.0;
+          final cellH = colWidth / ar;
+
+          if (leftH <= rightH) {
+            leftCol.add((asset, cellH));
+            leftH += cellH + gap;
+          } else {
+            rightCol.add((asset, cellH));
+            rightH += cellH + gap;
+          }
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildColumn(leftCol, colWidth, gap),
+              SizedBox(width: gap),
+              _buildColumn(rightCol, colWidth, gap),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildColumn(List<(AssetEntity, double)> items, double width, double gap) {
+    return SizedBox(
+      width: width,
+      child: Column(
+        children: items.map((item) {
+          final (asset, height) = item;
+          final isSelected = _selectedIds.contains(asset.id);
+          return Padding(
+            padding: EdgeInsets.only(bottom: gap),
+            child: SizedBox(
+              height: height,
+              child: _AssetThumbnail(
+                key: ValueKey(asset.id),
+                asset: asset,
+                isSelected: isSelected,
+                isMultiSelectMode: _isMultiSelectMode,
+                onTap: () => _selectAsset(asset),
+                onLongPress: () async {
+                  final file = await asset.file;
+                  if (file == null || !mounted) return;
+                  await Share.shareXFiles([XFile(file.path)]);
+                },
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -403,7 +500,8 @@ class _FilterPickerSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child: const Icon(Icons.filter_rounded, color: Colors.white38, size: 24),
+                      child: const Icon(Icons.filter_rounded,
+                          color: Colors.white38, size: 24),
                     ),
                     const SizedBox(height: 4),
                     Text(f.name, style: AppTypography.caption),
@@ -460,7 +558,7 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
 
   Future<void> _loadThumbnail() async {
     final bytes = await widget.asset.thumbnailDataWithSize(
-      const ThumbnailSize(300, 300),
+      const ThumbnailSize(400, 400),
       quality: 80,
     );
     if (mounted) setState(() => _bytes = bytes);
@@ -471,48 +569,52 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
     return GestureDetector(
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _bytes != null
-              ? Image.memory(_bytes!, fit: BoxFit.cover)
-              : const ColoredBox(color: AppColors.darkSurface),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _bytes != null
+                ? Image.memory(_bytes!, fit: BoxFit.cover)
+                : const ColoredBox(color: AppColors.darkSurface),
 
-          // 동영상 플레이 아이콘
-          if (widget.asset.type == AssetType.video)
-            const Positioned(
-              bottom: 4,
-              left: 4,
-              child: Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 20),
-            ),
-
-          // 다중 선택 체크박스
-          if (widget.isMultiSelectMode)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.isSelected ? AppColors.accent : Colors.transparent,
-                  border: Border.all(
-                    color: widget.isSelected ? AppColors.accent : Colors.white,
-                    width: 2,
-                  ),
-                ),
-                child: widget.isSelected
-                    ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
-                    : null,
+            // 동영상 플레이 아이콘
+            if (widget.asset.type == AssetType.video)
+              const Positioned(
+                bottom: 6,
+                left: 6,
+                child: Icon(Icons.play_circle_outline_rounded,
+                    color: Colors.white, size: 22),
               ),
-            ),
 
-          // 선택 시 어두운 오버레이
-          if (widget.isMultiSelectMode && widget.isSelected)
-            const ColoredBox(color: Color(0x44000000)),
-        ],
+            // 다중 선택 체크박스
+            if (widget.isMultiSelectMode)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.isSelected ? AppColors.accent : Colors.transparent,
+                    border: Border.all(
+                      color: widget.isSelected ? AppColors.accent : Colors.white,
+                      width: 2,
+                    ),
+                  ),
+                  child: widget.isSelected
+                      ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
+                      : null,
+                ),
+              ),
+
+            // 선택 시 어두운 오버레이
+            if (widget.isMultiSelectMode && widget.isSelected)
+              const ColoredBox(color: Color(0x44000000)),
+          ],
+        ),
       ),
     );
   }
