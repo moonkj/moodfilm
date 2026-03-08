@@ -30,10 +30,10 @@ void _setupMocks() {
       case 'setZoom':
       case 'setAspectRatio':
       case 'setLivePhotoEnabled':
-      case 'startRecording':
       case 'stopRecording':
       case 'dispose':
         return null;
+      case 'startRecording': return '/tmp/test_video.mp4';
       case 'capturePhoto': return '/tmp/test_photo.jpg';
       case 'capturePhotoSilent': return '/tmp/test_silent.jpg';
       default: return null;
@@ -284,6 +284,130 @@ void main() {
       await notifier.selectFilter(FilterData.byId('milk')!);
       await notifier.setFilterIntensity(0.3);
       expect(notifier.state.filterIntensity, 0.3);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // initialize
+  // ────────────────────────────────────────────────────────
+  group('CameraNotifier initialize', () {
+    late CameraNotifier notifier;
+
+    setUp(() => notifier = CameraNotifier());
+    tearDown(() => notifier.dispose());
+
+    test('initialize — status가 ready가 된다', () async {
+      await notifier.initialize();
+      expect(notifier.state.status, CameraStatus.ready);
+    });
+
+    test('initialize — textureId가 설정된다', () async {
+      await notifier.initialize();
+      expect(notifier.state.textureId, 42);
+    });
+
+    test('initialize — isFrontCamera 파라미터가 반영된다', () async {
+      await notifier.initialize(frontCamera: false);
+      expect(notifier.state.isFrontCamera, false);
+    });
+
+    test('initialize — activeFilter가 설정된다 (기본 Milk)', () async {
+      await notifier.initialize();
+      expect(notifier.state.activeFilter, isNotNull);
+    });
+
+    test('initialize — initialize 채널이 호출된다', () async {
+      await notifier.initialize(frontCamera: true);
+      final call = _capturedCalls.firstWhere((c) => c.method == 'initialize');
+      expect(call.arguments['frontCamera'], true);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // capturePhoto
+  // ────────────────────────────────────────────────────────
+  group('CameraNotifier capturePhoto', () {
+    late CameraNotifier notifier;
+
+    setUp(() async {
+      notifier = CameraNotifier();
+      await notifier.initialize(); // ready 상태로 만들기
+    });
+    tearDown(() => notifier.dispose());
+
+    test('capturePhoto — lastCapturedPath가 설정된다', () async {
+      await notifier.capturePhoto();
+      expect(notifier.state.lastCapturedPath, isNotNull);
+    });
+
+    test('capturePhoto — 완료 후 status가 ready다', () async {
+      await notifier.capturePhoto();
+      expect(notifier.state.status, CameraStatus.ready);
+    });
+
+    test('capturePhoto — capturePhoto 채널이 호출된다', () async {
+      await notifier.capturePhoto();
+      expect(_capturedCalls.any((c) => c.method == 'capturePhoto'), true);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // startRecording / stopRecording
+  // ────────────────────────────────────────────────────────
+  group('CameraNotifier 녹화', () {
+    late CameraNotifier notifier;
+
+    setUp(() async {
+      notifier = CameraNotifier();
+      await notifier.initialize();
+    });
+    tearDown(() => notifier.dispose());
+
+    test('startRecording — isRecording이 true가 된다', () async {
+      await notifier.startRecording();
+      expect(notifier.state.isRecording, true);
+    });
+
+    test('startRecording — recordingSeconds가 0에서 시작된다', () async {
+      await notifier.startRecording();
+      expect(notifier.state.recordingSeconds, 0);
+    });
+
+    test('stopRecording — isRecording이 false가 된다', () async {
+      await notifier.startRecording();
+      await notifier.stopRecording();
+      expect(notifier.state.isRecording, false);
+    });
+
+    test('stopRecording — recordingSeconds가 0으로 리셋된다', () async {
+      await notifier.startRecording();
+      await notifier.stopRecording();
+      expect(notifier.state.recordingSeconds, 0);
+    });
+
+    test('stopRecording — 녹화 중이 아닐 때는 아무것도 안 한다', () async {
+      expect(notifier.state.isRecording, false);
+      await notifier.stopRecording(); // 호출해도 오류 없음
+      expect(notifier.state.isRecording, false);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // disposeCamera
+  // ────────────────────────────────────────────────────────
+  group('CameraNotifier disposeCamera', () {
+    late CameraNotifier notifier;
+
+    setUp(() async {
+      notifier = CameraNotifier();
+      await notifier.initialize();
+    });
+    tearDown(() => notifier.dispose());
+
+    test('disposeCamera — state가 초기화된다', () async {
+      await notifier.disposeCamera();
+      expect(notifier.state.status, CameraStatus.uninitialized);
+      expect(notifier.state.textureId, isNull);
     });
   });
 }
