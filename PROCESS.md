@@ -579,7 +579,47 @@ flutter build ios --release --no-codesign
 
 - `initialize()` 시 `setAspectRatio(state.aspectRatio.nativeKey)` 추가 — 초기화 후 프리뷰와 사진 저장 비율 동기화
 
-## 다음 세션에서 할 일 (W13)
+## 세션 14 변경사항 (2026-03-08) — 흰화면 버그 수정
+
+### 문제: 앱 실행 시 흰 화면만 표시
+
+**원인 1 — Flutter Texture 투명 렌더링:**
+- `Texture(textureId)` 위젯은 첫 프레임이 도착하기 전까지 투명하게 렌더링됨
+- 카메라가 textureId를 반환했지만 아직 프레임이 없는 구간 → 투명 Texture 아래 흰 `Scaffold(backgroundColor: Colors.white)` 배경이 노출
+- 카메라 세션 자체에 문제가 있어 프레임이 아예 안 오는 경우에도 동일 현상
+
+**원인 2 — Hive 박스 손상 시 앱 크래시:**
+- `await StorageService.init()`에 예외 처리 없음 → Hive 박스 손상 시 `main()` 크래시 → `runApp()` 미실행 → 흰 화면
+
+### 수정
+
+**`camera_screen.dart` — 프리뷰 Stack 검은 배경 추가:**
+```dart
+Stack(
+  fit: StackFit.expand,
+  children: [
+    const ColoredBox(color: Colors.black), // 추가: Texture 투명 시 흰 배경 방지
+    _buildCameraPreview(cameraState),
+    ...
+  ],
+)
+```
+
+**`main.dart` — Hive 초기화 에러 처리:**
+```dart
+try {
+  await StorageService.init();
+} catch (_) {
+  await Hive.deleteBoxFromDisk('user_preferences'); // 손상 박스 삭제
+  await StorageService.init(); // 기본값으로 재초기화
+}
+```
+
+**결과:** `flutter clean` + `flutter run --release` → 앱 정상 구동 확인
+
+---
+
+## 다음 세션에서 할 일 (W14)
 
 1. **App Store Connect 앱 레코드 생성** — Bundle ID: com.moodfilm.moodfilm, 가격 Tier 2 (₩2,500)
 2. **개인정보처리방침 URL** — GitHub Pages 또는 Notion으로 생성

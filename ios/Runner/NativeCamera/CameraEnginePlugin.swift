@@ -110,16 +110,20 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
     // MARK: - 초기화
 
     private func handleInitialize(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        NSLog("[CameraEnginePlugin] handleInitialize 시작")
         guard let registry = textureRegistry else {
+            NSLog("[CameraEnginePlugin] ❌ textureRegistry 없음")
             result(FlutterError(code: "NO_REGISTRY", message: "TextureRegistry 없음", details: nil))
             return
         }
 
         let args = call.arguments as? [String: Any]
         let frontCamera = args?["frontCamera"] as? Bool ?? true
+        NSLog("[CameraEnginePlugin] frontCamera=%d, 권한 요청 중...", frontCamera ? 1 : 0)
 
         // 카메라 권한 요청 (notDetermined 포함)
         AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+            NSLog("[CameraEnginePlugin] 권한 결과: granted=%d", granted ? 1 : 0)
             guard granted else {
                 DispatchQueue.main.async {
                     result(FlutterError(code: "PERMISSION_DENIED", message: "카메라 권한이 없습니다", details: nil))
@@ -131,18 +135,22 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
                 guard let self = self else { return }
 
                 let preview = MFCameraPreview(textureRegistry: registry)
+                NSLog("[CameraEnginePlugin] MFCameraPreview 생성 textureId=%lld", preview.textureId)
                 let session = MFCameraSession()
                 session.delegate = self
 
                 self.cameraPreview = preview
                 self.cameraSession = session
 
+                NSLog("[CameraEnginePlugin] session.setup() 호출 중...")
                 session.setup(frontCamera: frontCamera) { success in
+                    NSLog("[CameraEnginePlugin] session.setup() 완료 success=%d", success ? 1 : 0)
                     guard success else {
                         result(FlutterError(code: "SETUP_FAILED", message: "카메라 설정 실패", details: nil))
                         return
                     }
                     session.start()
+                    NSLog("[CameraEnginePlugin] session.start() 호출됨, textureId=%lld 반환", preview.textureId)
                     result(preview.textureId)
                 }
             }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/models/effect_model.dart';
@@ -15,9 +16,12 @@ class CameraNotifier extends StateNotifier<CameraState> {
   // MARK: - 초기화
 
   Future<void> initialize({bool frontCamera = true}) async {
+    debugPrint('[CameraProvider] initialize() 시작 frontCamera=$frontCamera');
     state = state.copyWith(status: CameraStatus.initializing);
     try {
+      debugPrint('[CameraProvider] CameraEngine.initialize() 호출 중...');
       final textureId = await CameraEngine.initialize(frontCamera: frontCamera);
+      debugPrint('[CameraProvider] textureId=$textureId 반환됨');
 
       // 마지막 사용 필터 복원
       final prefs = StorageService.prefs;
@@ -26,6 +30,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
         lastFilter = FilterData.byId(prefs.lastUsedFilterId!);
       }
       lastFilter ??= FilterData.all.first; // 기본: Milk
+      debugPrint('[CameraProvider] 초기 필터: ${lastFilter.id}');
 
       state = state.copyWith(
         status: CameraStatus.ready,
@@ -36,10 +41,12 @@ class CameraNotifier extends StateNotifier<CameraState> {
       );
 
       // 필터 바로 적용
+      debugPrint('[CameraProvider] _applyCurrentFilter() 호출');
       await _applyCurrentFilter();
 
       // 뽀샤시 기본 적용 (0.45 — 피부 보정 + 은은한 발광)
       await CameraEngine.setEffect(effectType: 'beauty', intensity: 0.45);
+      debugPrint('[CameraProvider] 초기화 완료 ✓');
 
       // 비율 동기화 (프리뷰와 사진 저장 크롭 일치)
       await CameraEngine.setAspectRatio(state.aspectRatio.nativeKey);
@@ -48,7 +55,8 @@ class CameraNotifier extends StateNotifier<CameraState> {
       if (prefs.isLivePhotoEnabled && !prefs.isSilentShutter) {
         await CameraEngine.setLivePhotoEnabled(true);
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[CameraProvider] ❌ 초기화 실패: $e\n$st');
       state = state.copyWith(
         status: CameraStatus.error,
         errorMessage: e.toString(),

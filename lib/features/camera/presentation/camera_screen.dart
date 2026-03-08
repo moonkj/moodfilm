@@ -293,6 +293,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     return Stack(
       fit: StackFit.expand,
       children: [
+        const ColoredBox(color: Colors.black), // 카메라 미초기화/투명 프레임 시 흰 배경 방지
         _buildCameraPreview(cameraState),
         GestureDetector(
           behavior: HitTestBehavior.translucent,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'core/services/storage_service.dart';
 import 'app.dart';
 
@@ -19,8 +20,13 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Hive 초기화
-  await StorageService.init();
+  // Hive 초기화 — 박스 손상 시 초기화 후 재시도
+  try {
+    await StorageService.init();
+  } catch (_) {
+    await Hive.deleteBoxFromDisk('user_preferences');
+    await StorageService.init();
+  }
 
 
   // Firebase 초기화 — google-services.json 추가 후 활성화

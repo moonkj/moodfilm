@@ -79,8 +79,6 @@ class MFCameraSession: NSObject {
 
     // MARK: - 라이브포토 MOV 임시 경로
     private var livePhotoMovieURL: URL?
-    // 라이브포토 완성 대기: JPEG와 MOV 둘 다 완료돼야 PHPhotoLibrary에 저장
-    private var pendingLivePhotoJPEGPath: String?
 
     // MARK: - 동영상 녹화
     private let recorder = MFVideoRecorder()
@@ -149,18 +147,15 @@ class MFCameraSession: NSObject {
         // 사진 출력
         let photoOut = AVCapturePhotoOutput()
         photoOut.isHighResolutionCaptureEnabled = true
+        if photoOut.isLivePhotoCaptureSupported {
+            photoOut.isLivePhotoCaptureEnabled = isLivePhotoEnabled
+        }
         if captureSession.canAddOutput(photoOut) {
             captureSession.addOutput(photoOut)
         }
         photoOutput = photoOut
 
         captureSession.commitConfiguration()
-
-        // ⚠️ isLivePhotoCaptureSupported는 세션에 추가+commitConfiguration 이후에만 올바른 값 반환
-        // 이전에 체크하면 항상 false → Live Photo 영구 비활성화 버그
-        if isLivePhotoEnabled && photoOut.isLivePhotoCaptureSupported {
-            photoOut.isLivePhotoCaptureEnabled = true
-        }
         return true
     }
 
@@ -236,24 +231,21 @@ class MFCameraSession: NSObject {
     // MARK: - 사진 촬영
 
     func capturePhoto() {
-        // sessionQueue에서 실행: isLivePhotoCaptureEnabled 읽기와 capturePhoto 호출이
-        // setLivePhotoEnabled의 sessionQueue.async 블록과 같은 큐에서 직렬화됨 (경쟁조건 방지)
-        sessionQueue.async { [weak self] in
-            guard let self = self, let photoOutput = self.photoOutput else { return }
-            let settings = AVCapturePhotoSettings()
-            settings.isHighResolutionPhotoEnabled = true
+        guard let photoOutput = photoOutput else { return }
+        let settings = AVCapturePhotoSettings()
+        settings.isHighResolutionPhotoEnabled = true
 
-            if photoOutput.isLivePhotoCaptureEnabled {
-                let movURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("moodfilm_live_\(Int(Date().timeIntervalSince1970)).mov")
-                self.livePhotoMovieURL = movURL
-                settings.livePhotoMovieFileURL = movURL
-            } else {
-                self.livePhotoMovieURL = nil
-            }
-
-            photoOutput.capturePhoto(with: settings, delegate: self)
+        // 라이브포토 활성화 (지원 기기 + 활성화 상태일 때)
+        if isLivePhotoEnabled && photoOutput.isLivePhotoCaptureSupported {
+            let movURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("moodfilm_live_\(Int(Date().timeIntervalSince1970)).mov")
+            livePhotoMovieURL = movURL
+            settings.livePhotoMovieFileURL = movURL
+        } else {
+            livePhotoMovieURL = nil
         }
+
+        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
     // MARK: - 라이브포토 활성화 설정
@@ -426,29 +418,13 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
         // Step 3: LUT 필터 적용
         let filteredImage = lutEngine.apply(to: ciImage)
 
-        // Step 4: CGImage 생성
+        // Step 4: CGImage → UIImage(portrait orientation) → JPEG
+        // UIImage.jpegData()는 orientation을 EXIF에 포함 → 갤러리 표시 방향 정상
         guard let cgImg = MFLUTEngine.ciContext.createCGImage(
             filteredImage, from: filteredImage.extent) else { return }
-
-        // Step 4b: JPEG 인코딩 — Live Photo용 메타데이터(content identifier) 보존
-        // UIImage.jpegData()는 Apple MakerNote를 삭제해 JPEG-MOV 페어링 불가
-        // CGImageDestination으로 원본 메타데이터를 그대로 이전하고 orientation만 교체
-        guard let jpegData: Data = {
-            if let src = CGImageSourceCreateWithData(imageData as CFData, nil),
-               var meta = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any] {
-                // EXIF orientation: front=5(leftMirrored), back=6(right/CW 90°)
-                meta[kCGImagePropertyOrientation as String] = isFront ? 5 : 6
-                meta[kCGImageDestinationLossyCompressionQuality as String] = 0.95
-                let buf = NSMutableData()
-                if let dst = CGImageDestinationCreateWithData(buf, "public.jpeg" as CFString, 1, nil) {
-                    CGImageDestinationAddImage(dst, cgImg, meta as CFDictionary)
-                    if CGImageDestinationFinalize(dst) { return buf as Data }
-                }
-            }
-            // 폴백: 일반 JPEG (Live Photo 아닐 때)
-            let ui = UIImage(cgImage: cgImg, scale: 1.0, orientation: isFront ? .leftMirrored : .right)
-            return ui.jpegData(compressionQuality: 0.95)
-        }() else { return }
+        let orientation: UIImage.Orientation = isFront ? .leftMirrored : .right
+        let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
+        guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else { return }
 
         // Step 5: 임시 파일 저장
         let tempDir = FileManager.default.temporaryDirectory
@@ -457,43 +433,11 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
 
         do {
             try jpegData.write(to: filePath)
-
-            // resolvedSettings.livePhotoMovieDimensions != zero → AVFoundation이 실제로 Live Photo MOV를 기록 중
-            // zero면 Live Photo 촬영이 안 된 것(설정 불일치 등) → 즉시 일반 사진으로 저장 (데드락 방지)
-            let liveDims = photo.resolvedSettings.livePhotoMovieDimensions
-            let isActuallyLivePhoto = livePhotoMovieURL != nil
-                && (liveDims.width > 0 && liveDims.height > 0)
-
-            if isActuallyLivePhoto {
-                // 라이브포토: MOV 완성 콜백(didFinishProcessingLivePhotoToMovieFileAt)에서 최종 저장
-                pendingLivePhotoJPEGPath = filePath.path
-            } else {
-                // 일반 촬영 또는 Live Photo 촬영 실패: 바로 저장
-                livePhotoMovieURL = nil
-                delegate?.cameraSession(self, didCapturePhoto: filePath.path, livePhotoMovieURL: nil)
-            }
+            delegate?.cameraSession(self, didCapturePhoto: filePath.path,
+                                    livePhotoMovieURL: livePhotoMovieURL)
+            livePhotoMovieURL = nil
         } catch {
             delegate?.cameraSession(self, didFailWithError: error)
-        }
-    }
-
-    // MOV 파일 완성 콜백 — JPEG와 MOV 둘 다 준비됐을 때 delegate 호출
-    func photoOutput(_ output: AVCapturePhotoOutput,
-                     didFinishProcessingLivePhotoToMovieFileAt outputFileURL: URL,
-                     duration: CMTime,
-                     photoDisplayTime: CMTime,
-                     resolvedSettings: AVCaptureResolvedPhotoSettings,
-                     error: Error?) {
-        guard let jpegPath = pendingLivePhotoJPEGPath else { return }
-        pendingLivePhotoJPEGPath = nil
-        livePhotoMovieURL = nil
-
-        if let err = error {
-            // MOV 실패 시 일반 사진으로 저장
-            print("[MFCameraSession] Live Photo MOV 실패: \(err). 일반 사진으로 저장.")
-            delegate?.cameraSession(self, didCapturePhoto: jpegPath, livePhotoMovieURL: nil)
-        } else {
-            delegate?.cameraSession(self, didCapturePhoto: jpegPath, livePhotoMovieURL: outputFileURL)
         }
     }
 }
