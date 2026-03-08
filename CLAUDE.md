@@ -178,6 +178,47 @@ flutter build ios --release
 
 ---
 
+## TDD 방침
+
+### Red → Green → Refactor 사이클
+1. 🔴 **RED**: 테스트 먼저 작성 → `flutter test` 실행 → 실패 확인
+2. 🟢 **GREEN**: 테스트를 통과하는 최소한의 코드 작성 → 재실행 확인
+3. 🔵 **REFACTOR**: 테스트가 통과한 상태에서 코드 품질 개선
+
+### 커버리지 목표: 70%+
+```bash
+flutter test --coverage
+genhtml coverage/lcov.info -o coverage/html
+open coverage/html/index.html
+```
+
+### 테스트 대상 우선순위
+| 우선순위 | 대상 | 이유 |
+|---------|------|------|
+| 1 | Provider (CameraProvider, UserPreferences) | 상태 로직 핵심 |
+| 2 | 모델 (FilterModel, FilterData) | 데이터 정합성 |
+| 3 | 유틸 (HapticUtils, StorageService) | 순수 함수 테스트 용이 |
+| 4 | Widget 스모크 테스트 | 기본 렌더링 확인 |
+
+### 테스트 파일 위치
+```
+test/
+├── features/
+│   ├── camera/providers/camera_provider_test.dart
+│   └── editor/editor_screen_test.dart
+├── core/
+│   ├── models/filter_model_test.dart
+│   └── services/storage_service_test.dart
+└── widget_test.dart
+```
+
+### 규칙
+- Native Plugin (Method Channel) 호출은 `MockMethodChannel`로 대체
+- Hive는 `hive_test` 패키지 또는 in-memory box 사용
+- 테스트명: `한국어로 동작을 서술` (예: `'필터 선택 시 activeFilter가 업데이트된다'`)
+
+---
+
 ## 주의사항
 
 1. **Firebase 초기화**: `main.dart`에서 주석 처리됨. `google-services.json` / `GoogleService-Info.plist` 추가 후 활성화 필요
