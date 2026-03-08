@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-08 (세션 13, 업데이트 3)
+> 마지막 업데이트: 2026-03-08 (세션 13, 업데이트 4)
 
 ---
 
@@ -217,6 +217,14 @@ flutter build ios --release --no-codesign
 - [x] **갤러리 썸네일 깜박임 수정** — `_thumbCache` (Map) 부모 상태에서 관리, 재빌드 시 캐시 즉시 복원
 - [x] **뽀얀 이펙트 추가** — 기존 `_fade` (CIColorMatrix 화이트 바이어스) UI 노출, 솜결 옆에 배치
   - 효과 순서: 밝기 → 대비 → 채도 → 솜결 → 뽀얀 → 글로우
+- [x] **TDD 전면 도입** (CLAUDE.md TDD 방침 추가 + 테스트 4파일 신규 작성)
+  - `test/core/models/filter_model_test.dart` — FilterModel, FilterData 15 tests
+  - `test/features/camera/models/camera_state_test.dart` — CameraState 초기값/계산속성/copyWith/AspectRatio 32 tests
+  - `test/core/models/user_preferences_test.dart` — UserPreferences 순수 로직 + Hive 연동 24 tests
+  - `test/features/camera/providers/camera_notifier_test.dart` — CameraNotifier 채널/StorageService 28 tests
+  - `test/widget_test.dart` — AppColors + FilterModel 위젯 렌더링 7 tests (기존 placeholder 교체)
+  - **전체 106 tests, 0 failures** (`flutter test` 통과)
+  - StorageService 테스트 픽스: `path_provider` 채널 mock + `StorageService.init()` 경유로 `_prefsBox` 올바르게 초기화
 
 ---
 
