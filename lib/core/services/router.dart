@@ -23,8 +23,14 @@ final GoRouter appRouter = GoRouter(
       path: '/editor',
       name: 'editor',
       builder: (context, state) {
-        final imagePath = state.extra as String?;
-        return EditorScreen(imagePath: imagePath);
+        final extra = state.extra;
+        if (extra is Map<String, String?>) {
+          return EditorScreen(
+            imagePath: extra['path'],
+            assetId: extra['assetId'],
+          );
+        }
+        return EditorScreen(imagePath: extra as String?);
       },
     ),
     GoRoute(

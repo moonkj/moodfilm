@@ -513,6 +513,46 @@ flutter build ios --release --no-codesign
 
 **결과:** `flutter analyze` 0 issues, git commit `9b25a02`
 
+---
+
+## 세션 12 변경사항 (2026-03-08)
+
+### EditorScreen 완전 리디자인 (갤러리 사진 클릭 시)
+
+**UI 구조 변경:**
+- 배경: 검정 → **흰색**
+- 상단 바: ← 뒤로 / 🗑️ 삭제 / ↓ 저장 (심플 아이콘)
+- 이미지 영역: 패딩+rounded corners(14), **항상 Before/After 스플릿 뷰** (왼쪽=원본, 오른쪽=필터)
+- 조정 행: 5개 파라미터 수평 배치 (밝기/대비/채도/뽀용/글로우), 활성 항목 분홍 pill로 값 표시
+- 슬라이더: 분홍 테마 (`#D4A0B0` active / `#8A6870` thumb)
+- 하단 탭: 필터 / 효과 2개로 단순화
+
+**삭제 기능 추가:**
+- `EditorScreen.assetId` 파라미터 추가 (optional)
+- 갤러리에서 올 때만 🗑️ 버튼 표시 → `PhotoManager.editor.deleteWithIds`
+
+**라우터 + 갤러리 업데이트:**
+- `router.dart`: extra `Map<String, String?>` 처리 (`path` + `assetId`)
+- `gallery_picker_screen.dart`: `context.push('/editor', extra: {'path': ..., 'assetId': ...})`
+
+### 사진 저장 EXIF 버그 수정 (MFCameraSession.swift)
+
+**문제:** `ciContext.jpegRepresentation`은 EXIF orientation 메타데이터를 제거 → 저장 사진이 가로(landscape)로 저장됨
+
+**수정:** `UIImage.jpegData(compressionQuality:)` 방식으로 변경
+- `UIImage(cgImage: cgImg, scale: 1.0, orientation: isFront ? .leftMirrored : .right)` → `jpegData()`
+- EXIF orientation JPEG에 포함 → 갤러리에서 **세로(portrait 3:4)** 로 올바르게 표시
+
+**동작 흐름:**
+1. `CIImage(data: imageData)` — raw landscape extent (e.g. 4032×3024)
+2. 사용자 aspect ratio 크롭 (1:1/9:16 등 선택 시)
+3. LUT 필터 적용
+4. `createCGImage` → `UIImage(.right)` → `jpegData()` — portrait EXIF 포함
+
+### camera_provider.dart
+
+- `initialize()` 시 `setAspectRatio(state.aspectRatio.nativeKey)` 추가 — 초기화 후 프리뷰와 사진 저장 비율 동기화
+
 ## 다음 세션에서 할 일 (W13)
 
 1. **App Store Connect 앱 레코드 생성** — Bundle ID: com.moodfilm.moodfilm, 가격 Tier 2 (₩2,500)

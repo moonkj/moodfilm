@@ -403,32 +403,36 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
             return
         }
 
-        guard var imageData = photo.fileDataRepresentation(),
-              let ciImage = CIImage(data: imageData) else { return }
+        guard let imageData = photo.fileDataRepresentation(),
+              var ciImage = CIImage(data: imageData) else { return }
+        // ciImage.extent = 카메라 raw landscape (e.g. iPhone 12: 4032×3024), origin (0,0)
+        // UIImage.Orientation.right 적용 후 portrait 3:4로 표시됨 → 프리뷰(3:4 컨테이너)와 비율 일치
 
-        // 비율에 따라 크롭 (LUT 적용 전)
-        let cropR = cropRect(for: currentAspectRatio, imageSize: ciImage.extent.size)
-        let croppedImage = ciImage.cropped(to: cropR)
-
-        // Full-res LUT 필터 적용
-        let filteredImage = lutEngine.apply(to: croppedImage)
-
-        // JPEG 변환
-        if let jpegData = MFLUTEngine.ciContext.jpegRepresentation(
-            of: filteredImage,
-            colorSpace: CGColorSpaceCreateDeviceRGB(),
-            options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.95]
-        ) {
-            imageData = jpegData
+        // 사용자 지정 aspect ratio 크롭 (1:1, 9:16 등 선택 시 적용)
+        if currentAspectRatio != "full" && currentAspectRatio != "16:9" {
+            var ratioRect = cropRect(for: currentAspectRatio, imageSize: ciImage.extent.size)
+            ratioRect = ratioRect.offsetBy(dx: ciImage.extent.origin.x, dy: ciImage.extent.origin.y)
+            ciImage = ciImage.cropped(to: ratioRect)
         }
 
-        // 임시 파일 저장
+        // Step 3: LUT 필터 적용
+        let filteredImage = lutEngine.apply(to: ciImage)
+
+        // Step 4: CGImage → UIImage(portrait orientation) → JPEG
+        // UIImage.jpegData()는 orientation을 EXIF에 포함 → 갤러리 표시 방향 정상
+        guard let cgImg = MFLUTEngine.ciContext.createCGImage(
+            filteredImage, from: filteredImage.extent) else { return }
+        let orientation: UIImage.Orientation = isFront ? .leftMirrored : .right
+        let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
+        guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else { return }
+
+        // Step 5: 임시 파일 저장
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "moodfilm_\(Int(Date().timeIntervalSince1970)).jpg"
         let filePath = tempDir.appendingPathComponent(fileName)
 
         do {
-            try imageData.write(to: filePath)
+            try jpegData.write(to: filePath)
             delegate?.cameraSession(self, didCapturePhoto: filePath.path,
                                     livePhotoMovieURL: livePhotoMovieURL)
             livePhotoMovieURL = nil

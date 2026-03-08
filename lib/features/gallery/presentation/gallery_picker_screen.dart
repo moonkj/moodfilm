@@ -113,7 +113,10 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       return;
     }
 
-    context.push('/editor', extra: file.path);
+    context.push('/editor', extra: <String, String?>{
+      'path': file.path,
+      'assetId': asset.id,
+    });
   }
 
   void _toggleMultiSelectMode() {
