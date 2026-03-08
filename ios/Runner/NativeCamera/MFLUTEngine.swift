@@ -30,6 +30,10 @@ class MFLUTEngine {
     var grainIntensity: Float = 0.0
     var beautyIntensity: Float = 0.0
     var lightLeakIntensity: Float = 0.0
+    var softnessIntensity: Float = 0.0
+    var brightnessIntensity: Float = 0.0  // -1.0 ~ 1.0
+    var contrastIntensity: Float = 0.0    // -1.0 ~ 1.0
+    var saturationIntensity: Float = 0.0  // -1.0 ~ 1.0
 
     // MARK: - Before/After 스플릿 (splitPosition < 0 = 비활성)
     var splitPosition: Float = -1.0
@@ -147,27 +151,45 @@ class MFLUTEngine {
             }
         }
 
-        // 2. Dreamy Glow 이펙트 (시그니처)
+        // 2. 색보정 조정 (brightness / contrast / saturation)
+        let hasColorAdjust = brightnessIntensity != 0 || contrastIntensity != 0 || saturationIntensity != 0
+        if hasColorAdjust, let colorFilter = CIFilter(name: "CIColorControls") {
+            colorFilter.setValue(result, forKey: kCIInputImageKey)
+            // brightness: -1~1 → CIColorControls range: -1~1
+            colorFilter.setValue(CGFloat(brightnessIntensity * 0.5), forKey: kCIInputBrightnessKey)
+            // contrast: -1~1 → CIColorControls range: 0~4 (1 = 기본)
+            colorFilter.setValue(1.0 + CGFloat(contrastIntensity), forKey: kCIInputContrastKey)
+            // saturation: -1~1 → CIColorControls range: 0~2 (1 = 기본)
+            colorFilter.setValue(1.0 + CGFloat(saturationIntensity), forKey: kCIInputSaturationKey)
+            result = colorFilter.outputImage?.cropped(to: result.extent) ?? result
+        }
+
+        // 3. Softness (솜결) — 부드러운 피부 소프트닝
+        if softnessIntensity > 0 {
+            result = applySoftness(to: result, intensity: softnessIntensity)
+        }
+
+        // 4. Dreamy Glow 이펙트 (시그니처)
         if glowIntensity > 0 {
             result = applyDreamyGlow(to: result, intensity: glowIntensity)
         }
 
-        // 3. Film Grain
+        // 5. Film Grain
         if grainIntensity > 0 {
             result = applyFilmGrain(to: result, intensity: grainIntensity)
         }
 
-        // 4. Beauty (뽀샤시)
+        // 6. Beauty (뽀샤시)
         if beautyIntensity > 0 {
             result = applyBeauty(to: result, intensity: beautyIntensity)
         }
 
-        // 5. Light Leak
+        // 7. Light Leak
         if lightLeakIntensity > 0 {
             result = applyLightLeak(to: result, intensity: lightLeakIntensity)
         }
 
-        // 6. Before/After 스플릿
+        // 8. Before/After 스플릿
         if splitPosition >= 0 {
             result = applyBeforeAfterSplit(original: image, filtered: result,
                                            position: CGFloat(splitPosition))
@@ -230,6 +252,29 @@ class MFLUTEngine {
         blendFilter.setValue(image, forKey: kCIInputBackgroundImageKey)
 
         return blendFilter.outputImage?.cropped(to: image.extent) ?? image
+    }
+
+    // MARK: - Softness (솜결) 이펙트
+    // 원본과 블러를 블렌딩해 피부를 부드럽게 — Beauty보다 자연스러운 소프트닝
+
+    private func applySoftness(to image: CIImage, intensity: Float) -> CIImage {
+        guard let blurFilter = CIFilter(name: "CIGaussianBlur") else { return image }
+        blurFilter.setValue(image, forKey: kCIInputImageKey)
+        blurFilter.setValue(intensity * 5.0, forKey: kCIInputRadiusKey)
+        guard let blurred = blurFilter.outputImage?.cropped(to: image.extent) else { return image }
+
+        // 원본과 블러를 alpha로 블렌딩 (intensity * 0.55 비율)
+        guard let alphaFilter = CIFilter(name: "CIColorMatrix"),
+              let composite = CIFilter(name: "CISourceOverCompositing") else { return image }
+        alphaFilter.setValue(blurred, forKey: kCIInputImageKey)
+        alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity * 0.55)), forKey: "inputAVector")
+        guard let semiBlur = alphaFilter.outputImage else { return image }
+        composite.setValue(semiBlur, forKey: kCIInputImageKey)
+        composite.setValue(image, forKey: kCIInputBackgroundImageKey)
+        return composite.outputImage?.cropped(to: image.extent) ?? image
     }
 
     // MARK: - Beauty (뽀샤시) 이펙트

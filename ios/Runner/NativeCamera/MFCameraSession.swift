@@ -342,7 +342,10 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
         // 크롭은 실제 사진/동영상 저장 시에만 적용 (photoOutput 참조)
         // LUT 필터와 이펙트를 독립적으로 체크 (AND 조건 제거)
         let hasLUTFilter = lutEngine.intensity > 0 && lutEngine.hasLUT
-        let hasEffect = lutEngine.glowIntensity > 0 || lutEngine.grainIntensity > 0 || lutEngine.beautyIntensity > 0
+        let hasEffect = lutEngine.glowIntensity > 0 || lutEngine.grainIntensity > 0
+            || lutEngine.beautyIntensity > 0 || lutEngine.softnessIntensity > 0
+            || lutEngine.brightnessIntensity != 0 || lutEngine.contrastIntensity != 0
+            || lutEngine.saturationIntensity != 0
         let needsFilter = hasLUTFilter || hasEffect
 
         let outputBuffer: CVPixelBuffer

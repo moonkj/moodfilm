@@ -206,7 +206,7 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
         }
 
         switch effectType {
-        case "dreamyGlow":
+        case "dreamyGlow", "glow":
             cameraSession?.lutEngine.glowIntensity = Float(intensity)
         case "filmGrain":
             cameraSession?.lutEngine.grainIntensity = Float(intensity)
@@ -214,6 +214,14 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             cameraSession?.lutEngine.beautyIntensity = Float(intensity)
         case "lightLeak":
             cameraSession?.lutEngine.lightLeakIntensity = Float(intensity)
+        case "softness":
+            cameraSession?.lutEngine.softnessIntensity = Float(intensity)
+        case "brightness":
+            cameraSession?.lutEngine.brightnessIntensity = Float(intensity)
+        case "contrast":
+            cameraSession?.lutEngine.contrastIntensity = Float(intensity)
+        case "saturation":
+            cameraSession?.lutEngine.saturationIntensity = Float(intensity)
         default:
             break
         }
