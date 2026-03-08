@@ -225,6 +225,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
         intensity: 1.0,
         adjustments: {},
         effects: {},
+        saveToGallery: true,
       );
 
       if (result != null) successCount++;
