@@ -149,15 +149,18 @@ class MFCameraSession: NSObject {
         // 사진 출력
         let photoOut = AVCapturePhotoOutput()
         photoOut.isHighResolutionCaptureEnabled = true
-        if photoOut.isLivePhotoCaptureSupported {
-            photoOut.isLivePhotoCaptureEnabled = isLivePhotoEnabled
-        }
         if captureSession.canAddOutput(photoOut) {
             captureSession.addOutput(photoOut)
         }
         photoOutput = photoOut
 
         captureSession.commitConfiguration()
+
+        // ⚠️ isLivePhotoCaptureSupported는 세션에 추가+commitConfiguration 이후에만 올바른 값 반환
+        // 이전에 체크하면 항상 false → Live Photo 영구 비활성화 버그
+        if isLivePhotoEnabled && photoOut.isLivePhotoCaptureSupported {
+            photoOut.isLivePhotoCaptureEnabled = true
+        }
         return true
     }
 
@@ -233,21 +236,24 @@ class MFCameraSession: NSObject {
     // MARK: - 사진 촬영
 
     func capturePhoto() {
-        guard let photoOutput = photoOutput else { return }
-        let settings = AVCapturePhotoSettings()
-        settings.isHighResolutionPhotoEnabled = true
+        // sessionQueue에서 실행: isLivePhotoCaptureEnabled 읽기와 capturePhoto 호출이
+        // setLivePhotoEnabled의 sessionQueue.async 블록과 같은 큐에서 직렬화됨 (경쟁조건 방지)
+        sessionQueue.async { [weak self] in
+            guard let self = self, let photoOutput = self.photoOutput else { return }
+            let settings = AVCapturePhotoSettings()
+            settings.isHighResolutionPhotoEnabled = true
 
-        // 라이브포토 활성화: isLivePhotoCaptureEnabled 확인 (supported + enabled 둘 다 필요)
-        if photoOutput.isLivePhotoCaptureEnabled {
-            let movURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("moodfilm_live_\(Int(Date().timeIntervalSince1970)).mov")
-            livePhotoMovieURL = movURL
-            settings.livePhotoMovieFileURL = movURL
-        } else {
-            livePhotoMovieURL = nil
+            if photoOutput.isLivePhotoCaptureEnabled {
+                let movURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("moodfilm_live_\(Int(Date().timeIntervalSince1970)).mov")
+                self.livePhotoMovieURL = movURL
+                settings.livePhotoMovieFileURL = movURL
+            } else {
+                self.livePhotoMovieURL = nil
+            }
+
+            photoOutput.capturePhoto(with: settings, delegate: self)
         }
-
-        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
     // MARK: - 라이브포토 활성화 설정
@@ -452,12 +458,18 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
         do {
             try jpegData.write(to: filePath)
 
-            if livePhotoMovieURL != nil {
-                // 라이브포토: MOV 파일이 완성될 때까지 대기
-                // didFinishProcessingLivePhotoToMovieFileAt 콜백에서 최종 저장
+            // resolvedSettings.livePhotoMovieDimensions != zero → AVFoundation이 실제로 Live Photo MOV를 기록 중
+            // zero면 Live Photo 촬영이 안 된 것(설정 불일치 등) → 즉시 일반 사진으로 저장 (데드락 방지)
+            let liveDims = photo.resolvedSettings.livePhotoMovieDimensions
+            let isActuallyLivePhoto = livePhotoMovieURL != nil
+                && (liveDims.width > 0 && liveDims.height > 0)
+
+            if isActuallyLivePhoto {
+                // 라이브포토: MOV 완성 콜백(didFinishProcessingLivePhotoToMovieFileAt)에서 최종 저장
                 pendingLivePhotoJPEGPath = filePath.path
             } else {
-                // 일반 촬영: 바로 저장
+                // 일반 촬영 또는 Live Photo 촬영 실패: 바로 저장
+                livePhotoMovieURL = nil
                 delegate?.cameraSession(self, didCapturePhoto: filePath.path, livePhotoMovieURL: nil)
             }
         } catch {
