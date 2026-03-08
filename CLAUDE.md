@@ -1,11 +1,11 @@
-# MoodFilm — CLAUDE.md
+# Like it! — CLAUDE.md
 > 이 파일은 Claude Code가 세션 간 컨텍스트를 유지하기 위한 프로젝트 규칙서입니다.
 
 ---
 
 ## 프로젝트 개요
 
-**앱 이름:** MoodFilm
+**앱 이름:** Like it! (구 MoodFilm)
 **설명:** 감성 필터 카메라 앱 — "한 번의 탭으로, 내 사진이 예뻐지는 경험"
 **타겟:** 15-25세 여성, 인스타그램/틱톡, 셀카 중심, 한국 감성
 **개발 형태:** 1인 개발
@@ -25,6 +25,7 @@
 | 인앱결제 | purchases_flutter ^8.7.0 (RevenueCat) |
 | 분석/크래시 | firebase_core + firebase_analytics + firebase_crashlytics |
 | 이미지 | photo_manager ^3.6.3, share_plus ^10.1.4 |
+| 폰트 | google_fonts ^6.2.1 (Nunito — 앱 타이틀용) |
 | 코드 gen | build_runner ^2.4.13 |
 | iOS 카메라 | AVFoundation + CIFilter + MTKView (Native Plugin) |
 | iOS 필터 | CIColorCube LUT (.cube 포맷) + Metal |
@@ -95,13 +96,28 @@ AppColors.proBadge     // #D4A574 골드
 
 ## 필터 시스템 규칙
 
-- MVP 20종 고정 (Warm 5 / Cool 5 / Film 5 / Aesthetic 5)
+- 총 30종 (Warm / Cool / Film / Aesthetic 각 5~8종)
 - 무료 8종: Milk, Cream, Sky, Cloud, Film98, Disposable, Soft Pink, Lavender
-- Pro 12종: 나머지 전부
-- LUT 파일: `assets/luts/*.cube` (64x64x64 3D LUT, 약 1.5MB/개)
+- Pro 22종: 나머지 전부
+- LUT 파일: `assets/luts/*.cube` (33×33×33 3D LUT)
 - 썸네일: `assets/thumbnails/<filterId>.jpg` (60x60pt)
 - 필터 강도: 0.0 ~ 1.0, 마지막 강도 Hive에 저장 (`UserPreferences.filterIntensities`)
 - 시그니처 이펙트: **Dreamy Glow** (CIBloom + Gaussian Blur) — 절대 삭제 금지
+
+### 이펙트 시스템 (카메라 실시간)
+| effectType 키 | 한국어 | 범위 | Swift 프로퍼티 |
+|---|---|---|---|
+| `brightness` | 밝기 | -1.0~1.0 | `brightnessIntensity` |
+| `contrast` | 대비 | -1.0~1.0 | `contrastIntensity` |
+| `saturation` | 채도 | -1.0~1.0 | `saturationIntensity` |
+| `softness` | 솜결 | 0.0~1.0 | `softnessIntensity` |
+| `beauty` | 뽀얀 | 0.0~1.0 | `beautyIntensity` |
+| `glow` / `dreamyGlow` | 글로우 | 0.0~1.0 | `glowIntensity` |
+| `filmGrain` | 필름그레인 | 0.0~1.0 | `grainIntensity` |
+| `lightLeak` | 라이트릭 | 0.0~1.0 | `lightLeakIntensity` |
+
+- 카메라 시작 시 기본값: 솜결 30%, 뽀얀 25% (`_applyDefaultEffects()`)
+- `"glow"` 와 `"dreamyGlow"` 는 동일하게 처리 (두 키 모두 허용)
 
 ---
 
@@ -223,7 +239,11 @@ test/
 
 1. **Firebase 초기화**: `main.dart`에서 주석 처리됨. `google-services.json` / `GoogleService-Info.plist` 추가 후 활성화 필요
 2. **Xcode 설정**: `ios/Runner/NativeCamera/` 폴더의 Swift 파일들을 Xcode에서 Runner 타겟에 수동 추가 필요
-3. **Pretendard 폰트**: `assets/fonts/` 에 `.otf` 파일 4개 직접 추가 필요 (라이선스: OFL)
-4. **LUT 파일**: W4에서 제작. 현재 `assets/luts/` 폴더는 비어있음
+3. **Pretendard 폰트**: `assets/fonts/` 에 `.otf` 파일 4개 직접 추가 필요 (라이선스: OFL) — 미추가 시 시스템 폰트 사용
+4. **LUT 파일**: `assets/luts/` 에 30종 `.cube` 파일 존재 (33×33×33 포맷)
 5. **riverpod_generator 미사용**: hive_generator ^2.0.1과 analyzer 버전 충돌로 제외. Provider는 모두 수동 작성
-6. **iOS 최소 버전**: Podfile에서 `platform :ios, '17.0'` 설정 확인 필요
+6. **iOS 최소 버전**: iOS 16.0 (W11에서 17→16 변경). Podfile `platform :ios, '16.0'`
+7. **앱 이름 변경**: 표시명 "Like it!", Bundle ID는 `com.moodfilm.moodfilm` 유지 (App Store 연동)
+8. **Dart 패키지명**: `pubspec.yaml name: moodfilm` 유지 — 변경 시 모든 `package:moodfilm/` import 수정 필요
+9. **실기기 설치**: `flutter build ios --release` → `xcrun devicectl device install app --device 00008150-001128391EF0401C build/ios/iphoneos/Runner.app`
+10. **갤러리 배치 필터 저장**: `FilterEngine.processImage()` 호출 시 `saveToGallery: true` 명시 필요 (기본값 false)

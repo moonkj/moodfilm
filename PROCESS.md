@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-08 (세션 17)
+> 마지막 업데이트: 2026-03-09 (세션 18)
 
 ---
 
@@ -817,3 +817,42 @@ if let movURL = livePhotoMovieURL {
 - **문제:** `_FilterPickerSheet` 필터 아이템이 `Icons.filter_rounded` 플레이스홀더만 표시
 - **해결:** `Image.asset(f.thumbnailAssetPath)` + `ClipRRect`로 실제 썸네일 이미지 로드
 - errorBuilder: 썸네일 로드 실패 시 fallback 아이콘 표시
+
+---
+
+## 세션 18 변경사항 (2026-03-09) — 앱 이름·아이콘·이펙트·폰트
+
+### 앱 아이콘 교체
+- iOS AppIcon.appiconset 전체 사이즈 (1024 포함) 교체 — 하트 렌즈 아이콘
+- Android mipmap-hdpi/mdpi/xhdpi/xxhdpi/xxxhdpi 교체
+- 마스터 원본: `icon_master_1024.png` (소프트 피치 배경 + 라벤더 렌즈 + 하트)
+
+### 앱 이름 MoodFilm → Like it! 변경
+- iOS Info.plist: CFBundleDisplayName, CFBundleName, NSCameraUsageDescription
+- Android AndroidManifest.xml: android:label
+- pubspec.yaml: description
+- `lib/app.dart`: 클래스명 `MoodFilmApp` → `LikeItApp`, title
+- `lib/main.dart`: `LikeItApp()` 참조
+- 온보딩·페이월·필터모델 문자열 전체 수정
+- **유지:** Bundle ID `com.moodfilm.moodfilm`, pubspec name `moodfilm`, Method Channel 명
+
+### 카메라 이펙트 버그 수정
+- `"glow"` 키 → `"dreamyGlow"`와 동일 처리 (Flutter ↔ Swift 불일치 해소)
+- `softness` / `brightness` / `contrast` / `saturation` Swift 처리 추가
+  - `applySoftness()`: Gaussian blur(radius×10) + alpha 블렌딩(0.75)
+  - 색보정: `CIColorControls` (brightness×0.5, contrast 1+v, saturation 1+v)
+- `MFCameraSession.hasEffect` 조건에 신규 이펙트 추가
+
+### 카메라 기본 이펙트값 설정
+- 솜결(softness) 기본 30%, 뽀얀(beauty) 기본 25%
+- 카메라 초기화 후 `_applyDefaultEffects()` 자동 호출
+- 백그라운드 복귀(`didChangeAppLifecycleState resumed`) 시 재적용
+
+### Nunito 폰트 적용 (google_fonts ^6.2.1)
+- 갤러리 타이틀 "Like it!": italic bold → Nunito w800 (부드럽고 귀여운 느낌)
+- 온보딩 타이틀: AppTypography.h1 → Nunito w800 size 36
+- "Like it" 다크(`#3D3531`), "!" 라벤더 accent(`#C8A2D0`) 색상 유지
+
+### 갤러리 배치 필터 저장 버그 수정
+- 다중선택 → 필터 적용 후 갤러리에 저장 안 되는 버그
+- `FilterEngine.processImage()` 호출 시 `saveToGallery: true` 명시 (기본값 false였음)
