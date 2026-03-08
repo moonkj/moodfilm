@@ -53,6 +53,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     (label: '대비',  icon: Icons.contrast,                         min: -1.0, max: 1.0),
     (label: '채도',  icon: Icons.palette_outlined,                 min: -1.0, max: 1.0),
     (label: '솜결',  icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
+    (label: '뽀얀',  icon: Icons.blur_circular_rounded,            min: 0.0,  max: 1.0),
     (label: '글로우', icon: Icons.flare_rounded,                    min: 0.0,  max: 1.0),
   ];
 
@@ -62,7 +63,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       case 1: return _contrast;
       case 2: return _saturation;
       case 3: return _beauty;
-      case 4: return _dreamyGlow;
+      case 4: return _fade;
+      case 5: return _dreamyGlow;
       default: return 0;
     }
   }
@@ -363,7 +365,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       case 1: _contrast = v;
       case 2: _saturation = v;
       case 3: _beauty = v;
-      case 4: _dreamyGlow = v;
+      case 4: _fade = v;
+      case 5: _dreamyGlow = v;
     }
   }
 
