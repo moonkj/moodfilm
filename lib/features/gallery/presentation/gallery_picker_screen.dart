@@ -322,20 +322,31 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
               child: const Text('선택', style: TextStyle(color: AppColors.accent, fontSize: 15)),
             ),
           if (_isMultiSelectMode && _selectedIds.isNotEmpty) ...[
-            IconButton(
-              onPressed: _shareSelected,
-              icon: const Icon(Icons.ios_share_rounded, color: AppColors.accent, size: 22),
-            ),
-            IconButton(
-              onPressed: _confirmAndDelete,
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),
-            ),
+            _topCircleBtn(Icons.ios_share_rounded, color: const Color(0xFF3D3531), onTap: _shareSelected),
+            const SizedBox(width: 8),
+            _topCircleBtn(Icons.delete_outline_rounded, color: Colors.red, onTap: _confirmAndDelete),
+            const SizedBox(width: 8),
             TextButton(
               onPressed: _showBatchFilterPicker,
               child: const Text('필터', style: TextStyle(color: AppColors.accent, fontSize: 15)),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _topCircleBtn(IconData icon, {required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F0EC),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
+        ),
+        child: Icon(icon, color: color, size: 18),
       ),
     );
   }
@@ -428,74 +439,33 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     return _buildMasonryGrid();
   }
 
-  // MARK: - 3컬럼 마소니 그리드
+  // MARK: - 3컬럼 균등 격자 그리드
 
   Widget _buildMasonryGrid() {
-    return LayoutBuilder(
-      builder: (ctx, constraints) {
-        const gap = 2.0;
-        final colWidth = (constraints.maxWidth - gap * 2) / 3;
-
-        final List<List<(AssetEntity, double)>> cols = [[], [], []];
-        final List<double> colHeights = [0, 0, 0];
-
-        for (final asset in _assets) {
-          final ar = (asset.width > 0 && asset.height > 0)
-              ? asset.width / asset.height
-              : 1.0;
-          final cellH = colWidth / ar;
-
-          int shortest = 0;
-          for (int i = 1; i < 3; i++) {
-            if (colHeights[i] < colHeights[shortest]) shortest = i;
-          }
-          cols[shortest].add((asset, cellH));
-          colHeights[shortest] += cellH + gap;
-        }
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (int i = 0; i < 3; i++) ...[
-                if (i > 0) const SizedBox(width: gap),
-                _buildColumn(cols[i], colWidth, gap),
-              ],
-            ],
-          ),
+    return GridView.builder(
+      padding: const EdgeInsets.only(bottom: 8),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
+      ),
+      itemCount: _assets.length,
+      itemBuilder: (context, index) {
+        final asset = _assets[index];
+        final isSelected = _selectedIds.contains(asset.id);
+        return _AssetThumbnail(
+          key: ValueKey(asset.id),
+          asset: asset,
+          isSelected: isSelected,
+          isMultiSelectMode: _isMultiSelectMode,
+          onTap: () => _selectAsset(asset),
+          onLongPress: () async {
+            final file = await asset.file;
+            if (file == null || !mounted) return;
+            await Share.shareXFiles([XFile(file.path)]);
+          },
         );
       },
-    );
-  }
-
-  Widget _buildColumn(List<(AssetEntity, double)> items, double width, double gap) {
-    return SizedBox(
-      width: width,
-      child: Column(
-        children: items.map((item) {
-          final (asset, height) = item;
-          final isSelected = _selectedIds.contains(asset.id);
-          return Padding(
-            padding: EdgeInsets.only(bottom: gap),
-            child: SizedBox(
-              height: height,
-              child: _AssetThumbnail(
-                key: ValueKey(asset.id),
-                asset: asset,
-                isSelected: isSelected,
-                isMultiSelectMode: _isMultiSelectMode,
-                onTap: () => _selectAsset(asset),
-                onLongPress: () async {
-                  final file = await asset.file;
-                  if (file == null || !mounted) return;
-                  await Share.shareXFiles([XFile(file.path)]);
-                },
-              ),
-            ),
-          );
-        }).toList(),
-      ),
     );
   }
 }
@@ -505,7 +475,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 class _FilterPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final filters = FilterData.all.where((f) => !f.isPro).toList();
+    final filters = FilterData.all;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -593,8 +563,8 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
 
   Future<void> _loadThumbnail() async {
     final bytes = await widget.asset.thumbnailDataWithSize(
-      const ThumbnailSize(400, 400),
-      quality: 80,
+      const ThumbnailSize(180, 180),
+      quality: 70,
     );
     if (mounted) setState(() => _bytes = bytes);
   }

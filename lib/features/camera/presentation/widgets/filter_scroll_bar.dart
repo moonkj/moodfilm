@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -40,7 +39,7 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
 
     final hasNoFilter = widget.onNoFilterSelected != null;
     // hasNoFilter이면 index 0 = "효과 없음", 나머지 +1 offset
-    final itemCount = filters.length + 1 + (hasNoFilter ? 1 : 0);
+    final itemCount = filters.length + (hasNoFilter ? 1 : 0);
 
     return SizedBox(
       height: AppDimensions.filterBarHeight,
@@ -61,12 +60,6 @@ class _FilterScrollBarState extends ConsumerState<FilterScrollBar> {
           }
 
           final filterIndex = hasNoFilter ? index - 1 : index;
-
-          // 마지막 아이템: "전체" 버튼
-          if (filterIndex == filters.length) {
-            return _AllFiltersButton(onTap: () => context.push('/library'));
-          }
-
           final filter = filters[filterIndex];
           final isSelected = !widget.isNoFilterSelected &&
               cameraState.activeFilter?.id == filter.id;
@@ -287,19 +280,16 @@ class _NoFilterItem extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(isSelected ? 14 : 12),
                 border: isSelected
-                    ? Border.all(color: AppColors.shutter, width: 2)
-                    : Border.all(
-                        color: AppColors.shutter.withValues(alpha: 0.4),
-                        width: 1.5),
-                color: Colors.black.withValues(alpha: 0.4),
-                boxShadow: isSelected
-                    ? [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 6)]
-                    : null,
+                    ? Border.all(color: AppColors.accent, width: 2)
+                    : Border.all(color: const Color(0xFFCCC8C4), width: 1.5),
+                color: isSelected
+                    ? AppColors.accent.withValues(alpha: 0.08)
+                    : const Color(0xFFF0EDEA),
               ),
               child: Center(
                 child: Icon(
                   Icons.block_rounded,
-                  color: isSelected ? AppColors.shutter : AppColors.shutter.withValues(alpha: 0.7),
+                  color: isSelected ? AppColors.accent : const Color(0xFF5A5450),
                   size: 22,
                 ),
               ),
@@ -324,53 +314,3 @@ class _NoFilterItem extends StatelessWidget {
   }
 }
 
-/// 필터 스크롤바 끝 "전체" 버튼 → 필터 라이브러리 이동
-class _AllFiltersButton extends StatelessWidget {
-  const _AllFiltersButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: AppDimensions.filterThumbnailWidthSelected,
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: AppDimensions.filterThumbnailWidth,
-              height: AppDimensions.filterThumbnailHeight,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.shutter.withValues(alpha: 0.4),
-                  width: 1.5,
-                ),
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-              child: const Icon(
-                Icons.apps_rounded,
-                color: AppColors.shutter,
-                size: 22,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: AppDimensions.filterThumbnailWidthSelected,
-              child: Text(
-                '전체',
-                style: AppTypography.filterLabel.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-                maxLines: 2,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

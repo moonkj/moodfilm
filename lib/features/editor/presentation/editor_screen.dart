@@ -114,25 +114,48 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     child: _buildImageSection(),
                   ),
                 ),
-                if (_activeTab == 'effect') ...[
-                  _buildEffectRow(),
-                  _buildTickSlider(),
-                  const SizedBox(height: 4),
-                ] else
-                  _buildFilterSection(),
+                SizedBox(
+                  height: 152,
+                  child: _activeTab == 'effect'
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildEffectRow(),
+                            _buildTickSlider(),
+                            if (_hasChanges)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _exposure = 0; _contrast = 0; _saturation = 0;
+                                      _beauty = 0; _fade = 0; _dreamyGlow = 0;
+                                      _lightLeak = 0; _filmGrain = 0;
+                                      _highlights = 0; _shadows = 0; _temperature = 0;
+                                      _tint = 0; _sharpness = 0; _vignette = 0; _skinTone = 0;
+                                    });
+                                    _generatePreview();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF5F2EF),
+                                      borderRadius: BorderRadius.circular(100),
+                                    ),
+                                    child: const Text('전체 초기화',
+                                        style: TextStyle(fontSize: 12, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
+                                  ),
+                                ),
+                              )
+                            else
+                              const SizedBox(height: 4),
+                          ],
+                        )
+                      : _buildFilterSection(),
+                ),
                 _buildBottomTabBar(),
               ],
             ),
-            if (_isGeneratingPreview)
-              const IgnorePointer(
-                child: ColoredBox(
-                  color: Colors.black12,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.accent, strokeWidth: 2),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -152,6 +175,34 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             onPressed: () => Navigator.of(context).pop(),
           ),
           const Spacer(),
+          // 전체 초기화 버튼 (필터 + 효과)
+          if (!_editorNoFilter || _hasChanges) ...[
+            GestureDetector(
+              onTap: () {
+                ref.read(cameraProvider.notifier).clearFilter();
+                setState(() {
+                  _editorNoFilter = true;
+                  _filteredPreviewPath = null;
+                  _exposure = 0; _contrast = 0; _saturation = 0;
+                  _beauty = 0; _fade = 0; _dreamyGlow = 0;
+                  _lightLeak = 0; _filmGrain = 0;
+                  _highlights = 0; _shadows = 0; _temperature = 0;
+                  _tint = 0; _sharpness = 0; _vignette = 0; _skinTone = 0;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F2EF),
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
+                ),
+                child: const Text('초기화',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           // 비교 버튼 (Before/After 토글)
           GestureDetector(
             onTap: () => setState(() => _showSplit = !_showSplit),
@@ -171,12 +222,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           ),
           const SizedBox(width: 8),
           if (widget.assetId != null) ...[
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded,
-                  color: Color(0xFF3D3531), size: 22),
-              onPressed: _deletePhoto,
+            GestureDetector(
+              onTap: _deletePhoto,
+              child: Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F0EC),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
+                ),
+                child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+              ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
           ],
           // 공유 버튼
           GestureDetector(
@@ -222,9 +280,18 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       );
     }
     final displayPath = _filteredPreviewPath ?? widget.imagePath!;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: _showSplit
+    return Stack(
+      children: [
+        // 배경: 사진이 contain으로 letterbox될 때 보이는 영역
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: const ColoredBox(color: Color(0xFFF5F2EF)),
+          ),
+        ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: _showSplit
           ? GestureDetector(
               onHorizontalDragUpdate: (d) {
                 final w = MediaQuery.sizeOf(context).width - 32;
@@ -238,8 +305,23 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     _buildSplitView(constraints.maxWidth, constraints.maxHeight),
               ),
             )
-          : Image.file(File(displayPath), fit: BoxFit.cover,
-              width: double.infinity),
+          : Image.file(File(displayPath), fit: BoxFit.contain,
+              gaplessPlayback: true, width: double.infinity, height: double.infinity),
+        ),
+        if (_isGeneratingPreview)
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: const ColoredBox(
+                color: Colors.black12,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.accent, strokeWidth: 2),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -255,7 +337,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         children: [
         // 오른쪽 (After = 필터 적용)
         Positioned.fill(
-          child: Image.file(File(filtered), fit: BoxFit.cover),
+          child: Image.file(File(filtered), fit: BoxFit.cover, gaplessPlayback: true),
         ),
         // 왼쪽 (Before = 원본)
         ClipRect(
@@ -265,7 +347,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             child: SizedBox(
               width: w,
               height: h,
-              child: Image.file(File(original), fit: BoxFit.cover),
+              child: Image.file(File(original), fit: BoxFit.cover, gaplessPlayback: true),
             ),
           ),
         ),
@@ -415,18 +497,50 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 필터 섹션
 
   Widget _buildFilterSection() {
-    return SizedBox(
-      height: 116,
-      child: FilterScrollBar(
-        isNoFilterSelected: _editorNoFilter,
-        onNoFilterSelected: () {
-          ref.read(cameraProvider.notifier).clearFilter();
-          setState(() {
-            _editorNoFilter = true;
-            _filteredPreviewPath = null;
-          });
-        },
-      ),
+    final camera = ref.watch(cameraProvider);
+    final intensity = _editorNoFilter ? 1.0 : camera.filterIntensity;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 100,
+          child: FilterScrollBar(
+            isNoFilterSelected: _editorNoFilter,
+            onNoFilterSelected: () {
+              ref.read(cameraProvider.notifier).clearFilter();
+              setState(() {
+                _editorNoFilter = true;
+                _filteredPreviewPath = null;
+              });
+            },
+          ),
+        ),
+        if (!_editorNoFilter)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: const Color(0xFFD4A0B0),
+                inactiveTrackColor: const Color(0xFFEAE4E0),
+                thumbColor: const Color(0xFF8A6870),
+              ),
+              child: Slider(
+                value: intensity.clamp(0.0, 1.0),
+                min: 0.0,
+                max: 1.0,
+                onChanged: (v) {
+                  ref.read(cameraProvider.notifier).setFilterIntensity(v);
+                },
+                onChangeEnd: (_) => _generatePreview(),
+              ),
+            ),
+          )
+        else
+          const SizedBox(height: 36),
+      ],
     );
   }
 
@@ -457,12 +571,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       {bool hasDot = false}) {
     final isActive = _activeTab == tabId;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _activeTab = tabId),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -487,8 +602,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           ),
           if (hasDot)
             Positioned(
-              top: -2,
-              right: 16,
+              top: 6,
+              right: 24,
               child: Container(
                 width: 6, height: 6,
                 decoration: const BoxDecoration(
@@ -616,8 +731,54 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   Future<void> _shareImage() async {
     if (widget.imagePath == null) return;
-    final sharePath = _filteredPreviewPath ?? widget.imagePath!;
-    await Share.shareXFiles([XFile(sharePath)]);
+
+    // 필터/효과가 없으면 원본 바로 공유
+    final camera = ref.read(cameraProvider);
+    final hasFilter = !_editorNoFilter && camera.activeFilter != null;
+    if (!hasFilter && !_hasChanges) {
+      await Share.shareXFiles([XFile(widget.imagePath!)]);
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('공유 준비 중...'),
+      backgroundColor: Color(0xFF3D3531),
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 30),
+    ));
+
+    try {
+      final path = await FilterEngine.processImage(
+        sourcePath: widget.imagePath!,
+        lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
+        intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
+        adjustments: {
+          'exposure': _exposure, 'contrast': _contrast,
+          'highlights': _highlights, 'shadows': _shadows,
+          'saturation': _saturation, 'temperature': _temperature,
+          'tint': _tint, 'sharpness': _sharpness,
+          'fade': _fade, 'vignette': _vignette, 'skinTone': _skinTone,
+        },
+        effects: {
+          'filmGrain': _filmGrain, 'dreamyGlow': _dreamyGlow,
+          'beauty': _beauty, 'lightLeak': _lightLeak,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (path != null) {
+        await Share.shareXFiles([XFile(path)]);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('공유 실패: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   // MARK: - 삭제

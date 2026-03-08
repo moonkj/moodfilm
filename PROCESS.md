@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-08 (세션 13, 업데이트 4)
+> 마지막 업데이트: 2026-03-08 (세션 16)
 
 ---
 
@@ -695,6 +695,51 @@ try {
 - **민트 링 없음** — 동영상 모드는 링 제거
 - 대기 중: 큰 빨간 원 (74px), 빨간 글로우 그림자 (`Colors.red.withValues(alpha:0.4)`)
 - 녹화 중: 흰 원 배경 + 빨간 사각형(28px, radius:6) — 정지 아이콘
+
+---
+
+## 세션 16 변경사항
+
+### 에디터 / 갤러리 UX 개선
+
+**효과 로딩 오버레이 위치 수정:**
+- 기존: `SafeArea` 전체를 덮는 반투명 오버레이 → 전체화면 깜빡거림
+- 수정: `_buildImageSection()` 내부 `Stack`으로 이동 → 이미지 영역에만 표시
+
+**필터 전체보기("전체") 버튼 제거:**
+- `FilterScrollBar`에서 `_AllFiltersButton` 클래스 삭제
+- `go_router` import 제거, `itemCount`에서 +1 제거
+
+**갤러리 상단 바 버튼 스타일 통일:**
+- 다중선택 모드 공유·삭제 버튼: `IconButton` → 회색 원 `GestureDetector` + `Container`
+- 에디터 삭제 버튼: `IconButton` → 회색 원 Container, 아이콘 빨간색
+
+**공유 기능 — 필터+효과 적용 결과물 공유:**
+- 에디터: 필터·효과 있으면 `FilterEngine.processImage()` 후 공유, 없으면 원본 즉시 공유
+- 동영상 플레이어: 필터·효과 있으면 `FilterEngine.processVideo(saveToGallery: false)` 후 공유
+- 갤러리 목록 다중선택: 원본 파일 공유
+
+**사진 크롭 문제 수정 (에디터):**
+- `Image.file()` `BoxFit.cover` → `BoxFit.contain` + `height: double.infinity`
+- letterbox 배경: `Positioned.fill` + `ColoredBox(Color(0xFFF5F2EF))` 추가
+
+**패널 고정 높이 — 이미지 위로 올라가는 문제 해결:**
+- 에디터/동영상 플레이어: 필터·효과 패널을 `SizedBox(height: 152)`로 감쌈
+- 탭 전환 시 이미지 크기 변화 없음
+
+**탭 버튼 터치 영역 개선:**
+- `GestureDetector`에 `behavior: HitTestBehavior.opaque` 추가
+- 패딩 `horizontal: 24` → `horizontal: 32, vertical: 8`
+
+**전체 초기화 버튼 (필터 + 효과):**
+- 에디터·동영상 플레이어 상단 바에 "초기화" pill 버튼 추가
+- 필터 또는 효과 중 하나라도 적용 시 표시
+- 탭 시 `clearFilter()` + 모든 효과값 0 초기화
+
+**필터 강도 슬라이더 (에디터·동영상 플레이어):**
+- 필터 선택 시 FilterScrollBar 아래에 강도 슬라이더 표시
+- `cameraProvider.setFilterIntensity()` 연동
+- 에디터: `onChangeEnd` → `_generatePreview()` 트리거
 
 ---
 
