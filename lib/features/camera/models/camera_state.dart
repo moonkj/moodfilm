@@ -73,7 +73,7 @@ class CameraState {
   const CameraState({
     this.status = CameraStatus.uninitialized,
     this.textureId,
-    this.isFrontCamera = true,
+    this.isFrontCamera = false,
     this.activeFilter,
     this.filterIntensity = 1.0,
     this.effects = const {},

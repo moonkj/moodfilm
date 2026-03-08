@@ -11,6 +11,7 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/utils/haptic_utils.dart';
+import '../../../core/services/router.dart' show routeObserver;
 import '../../../native_plugins/camera_engine/camera_engine.dart';
 import '../providers/camera_provider.dart';
 import '../models/camera_state.dart';
@@ -25,7 +26,7 @@ class CameraScreen extends ConsumerStatefulWidget {
 }
 
 class _CameraScreenState extends ConsumerState<CameraScreen>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin, RouteAware {
 
   late final AnimationController _flipController;
 
@@ -48,8 +49,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   double _splitPosition = 0.5;
   Timer? _splitAutoHideTimer;
 
-  // 필터 패널
-  bool _showFilterPanel = false;
+  // 필터 패널 (앱 실행 시 기본 열림)
+  bool _showFilterPanel = true;
 
   // 색보정 효과 패널
   bool _showEffectsPanel = false;
@@ -91,6 +92,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     // Reduce Motion 대응
     final disable = MediaQuery.of(context).disableAnimations;
     _flipController.duration = disable ? Duration.zero : const Duration(milliseconds: 600);
+    // RouteObserver 구독 (화면 전환 감지)
+    final route = ModalRoute.of(context);
+    if (route != null) routeObserver.subscribe(this, route);
   }
 
   void _checkOnboardingHints() {
@@ -115,12 +119,25 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _splitAutoHideTimer?.cancel();
     _sideBtnLabelTimer?.cancel();
     _flipController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     ref.read(cameraProvider.notifier).disposeCamera();
     super.dispose();
+  }
+
+  // 다른 화면으로 이동 → 카메라 세션 일시정지
+  @override
+  void didPushNext() {
+    CameraEngine.pauseSession();
+  }
+
+  // 다른 화면에서 돌아옴 → 카메라 세션 재개
+  @override
+  void didPopNext() {
+    CameraEngine.resumeSession();
   }
 
   @override
@@ -291,6 +308,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
             ],
           ),
+          // 강도 슬라이더 (프리뷰 위 오버레이 — 레이아웃 영향 없음)
+          if (_showIntensitySlider)
+            Positioned(
+              top: safeTop + previewH - 52,
+              left: 24,
+              right: 24,
+              child: _buildIntensitySliderWidget(cameraState),
+            ),
           if (_showSwipeHint) _buildSwipeHint(),
           if (cameraState.errorMessage != null)
             _buildErrorOverlay(cameraState.errorMessage!),
@@ -397,7 +422,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Widget _buildPreviewSideButtons(CameraState cameraState) {
     return Positioned(
       right: 10,
-      bottom: 12,
+      bottom: 68, // 강도 슬라이더(하단 52px) 위에 배치
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -474,71 +499,66 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   // MARK: - 하단 컨트롤 영역
 
+  Widget _buildIntensitySliderWidget(CameraState cameraState) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wb_sunny_outlined, color: Colors.white70, size: 15),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                overlayShape: SliderComponentShape.noOverlay,
+              ),
+              child: Slider(
+                value: cameraState.filterIntensity,
+                min: 0,
+                max: 1,
+                onChanged: (v) => ref.read(cameraProvider.notifier).setFilterIntensity(v),
+                activeColor: Colors.white,
+                inactiveColor: Colors.white30,
+              ),
+            ),
+          ),
+          Text(
+            '${(cameraState.filterIntensity * 100).toInt()}%',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomArea(CameraState cameraState, double safeBottom) {
     return Column(
       children: [
         const SizedBox(height: 8),
-        // 강도 슬라이더 (토글)
-        AnimatedContainer(
-          duration: MediaQuery.of(context).disableAnimations
-              ? Duration.zero
-              : const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          height: _showIntensitySlider ? 40 : 0,
-          child: _showIntensitySlider
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.wb_sunny_outlined, color: Color(0xFF8A8480), size: 15),
-                      Expanded(
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                            overlayShape: SliderComponentShape.noOverlay,
-                          ),
-                          child: Slider(
-                            value: cameraState.filterIntensity,
-                            min: 0,
-                            max: 1,
-                            onChanged: (v) => ref.read(cameraProvider.notifier).setFilterIntensity(v),
-                            activeColor: const Color(0xFF3D3531),
-                            inactiveColor: const Color(0xFFDDD9D5),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${(cameraState.filterIntensity * 100).toInt()}%',
-                        style: const TextStyle(color: Color(0xFF8A8480), fontSize: 11),
-                      ),
-                    ],
-                  ),
-                )
-              : const SizedBox.shrink(),
+        // 패널 영역: 고정 높이로 사진/동영상 텍스트 위치 고정
+        SizedBox(
+          height: 116,
+          child: AnimatedSwitcher(
+            duration: MediaQuery.of(context).disableAnimations
+                ? Duration.zero
+                : const Duration(milliseconds: 200),
+            child: _showEffectsPanel
+                ? _buildEffectsPanel()
+                : _showFilterPanel
+                    ? FilterScrollBar(
+                        key: const ValueKey('filter'),
+                        isNoFilterSelected: cameraState.activeFilter == null,
+                        onNoFilterSelected: () => ref.read(cameraProvider.notifier).clearFilter(),
+                      )
+                    : const SizedBox.shrink(),
+          ),
         ),
-        // 색보정 효과 패널 (토글)
-        AnimatedSize(
-          duration: MediaQuery.of(context).disableAnimations
-              ? Duration.zero
-              : const Duration(milliseconds: 220),
-          curve: Curves.easeInOut,
-          child: _showEffectsPanel ? _buildEffectsPanel() : const SizedBox.shrink(),
-        ),
-        // 필터 스크롤 바 (토글)
-        AnimatedSize(
-          duration: MediaQuery.of(context).disableAnimations
-              ? Duration.zero
-              : const Duration(milliseconds: 220),
-          curve: Curves.easeInOut,
-          child: _showFilterPanel
-              ? FilterScrollBar(
-                  isNoFilterSelected: cameraState.activeFilter == null,
-                  onNoFilterSelected: () => ref.read(cameraProvider.notifier).clearFilter(),
-                )
-              : const SizedBox.shrink(),
-        ),
-        SizedBox(height: _showEffectsPanel ? 12 : 4),
+        const SizedBox(height: 4),
         // 사진 / 동영상 모드 탭
         _buildModeSelector(cameraState),
         const Spacer(),
@@ -737,7 +757,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         duration: const Duration(milliseconds: 200),
         style: TextStyle(
           color: isActive ? const Color(0xFF3D3531) : const Color(0xFFBBB6B2),
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
           letterSpacing: 0.5,
         ),
@@ -806,19 +826,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
-            // 녹화 중: 정지 아이콘 보일 흰 원 + 빨간 사각형 / 대기: 큰 빨간 원
-            width: rec ? outerSize - 4 : outerSize - 6,
-            height: rec ? outerSize - 4 : outerSize - 6,
+            // 녹화 중: 정지 아이콘 보일 흰 원 + 빨간 사각형 / 대기: 중간 크기 빨간 원
+            width: rec ? outerSize - 4 : 62,
+            height: rec ? outerSize - 4 : 62,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: rec ? Colors.white : Colors.red,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.red.withValues(alpha: 0.4),
-                  blurRadius: 16,
-                  spreadRadius: 2,
-                ),
-              ],
             ),
             child: rec
                 ? Center(
@@ -879,15 +892,35 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   child: const Icon(Icons.compare_arrows_rounded, color: Colors.black54, size: 18),
                 ),
               ),
+              // 라벨: 선 기준 좌우 영역에 각각 배치 — 선을 절대 넘지 않음
               Positioned(
-                right: (constraints.maxWidth - lineX + 8).clamp(8.0, constraints.maxWidth - 20.0),
                 top: cy + 42,
-                child: _splitLabel(filterName),
-              ),
-              Positioned(
-                left: (lineX + 8).clamp(8.0, constraints.maxWidth - 56.0),
-                top: cy + 42,
-                child: _splitLabel('원본'),
+                left: 0,
+                right: 0,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: lineX,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _splitLabel(filterName),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: constraints.maxWidth - lineX,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: _splitLabel('원본'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

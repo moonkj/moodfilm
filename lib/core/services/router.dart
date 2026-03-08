@@ -7,7 +7,11 @@ import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/gallery/presentation/gallery_picker_screen.dart';
 
+/// 화면 전환 감지용 RouteObserver (카메라 pause/resume에 사용)
+final routeObserver = RouteObserver<ModalRoute<void>>();
+
 final GoRouter appRouter = GoRouter(
+  observers: [routeObserver],
   initialLocation: '/',
   redirect: (context, state) {
     // 첫 실행: 온보딩 강제 없이 카메라 바로 시작 (Progressive Disclosure)

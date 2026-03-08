@@ -44,6 +44,14 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
         case "capturePhotoSilent":
             handleCapturePhotoSilent(result: result)
 
+        case "pauseSession":
+            cameraSession?.stop()
+            result(nil)
+
+        case "resumeSession":
+            cameraSession?.start()
+            result(nil)
+
         case "flipCamera":
             cameraSession?.flipCamera()
             result(nil)

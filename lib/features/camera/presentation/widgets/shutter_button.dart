@@ -116,13 +116,6 @@ class _ShutterButtonState extends State<ShutterButton>
                         ? [const Color(0xFFE8E0D8), const Color(0xFFD8D0C8)]
                         : [Colors.white, const Color(0xFFF5EEE8)],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFC8A2D0).withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      spreadRadius: 2,
-                    ),
-                  ],
                 ),
               ),
             ],

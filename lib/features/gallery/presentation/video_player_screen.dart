@@ -434,18 +434,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                isActive
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFADDE6),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(_formatValue(i),
-                            style: const TextStyle(
-                              color: Color(0xFFB06878), fontSize: 13, fontWeight: FontWeight.w700)),
-                      )
-                    : Icon(param.icon, color: const Color(0xFF8A8480), size: 20),
+                SizedBox(
+                  width: 52, height: 28,
+                  child: Center(
+                    child: isActive
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFADDE6),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(_formatValue(i),
+                                style: const TextStyle(
+                                  color: Color(0xFFB06878), fontSize: 12, fontWeight: FontWeight.w700)),
+                          )
+                        : Icon(param.icon, color: const Color(0xFF8A8480), size: 20),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(param.label,
                     style: TextStyle(

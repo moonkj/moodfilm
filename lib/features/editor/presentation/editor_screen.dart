@@ -308,19 +308,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           : Image.file(File(displayPath), fit: BoxFit.contain,
               gaplessPlayback: true, width: double.infinity, height: double.infinity),
         ),
-        if (_isGeneratingPreview)
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: const ColoredBox(
-                color: Colors.black12,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.accent, strokeWidth: 2),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -414,25 +401,29 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                isActive
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 13, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFADDE6),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          _formatValue(i),
-                          style: const TextStyle(
-                            color: Color(0xFFB06878),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      )
-                    : Icon(param.icon,
-                        color: const Color(0xFF8A8480), size: 20),
+                SizedBox(
+                  width: 52, height: 28,
+                  child: Center(
+                    child: isActive
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFADDE6),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              _formatValue(i),
+                              style: const TextStyle(
+                                color: Color(0xFFB06878),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : Icon(param.icon,
+                            color: const Color(0xFF8A8480), size: 20),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   param.label,

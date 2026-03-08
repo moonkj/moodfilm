@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-08 (세션 16)
+> 마지막 업데이트: 2026-03-08 (세션 17)
 
 ---
 
@@ -788,3 +788,32 @@ if let movURL = livePhotoMovieURL {
     request.addResource(with: .pairedVideo, fileURL: movURL, options: videoOptions)
 }
 ```
+
+---
+
+## 세션 17 변경사항 (2026-03-08) — 카메라 UX 개선
+
+### 카메라 화면 강도 슬라이더 레이아웃 수정
+- **문제:** 강도 버튼 탭 시 슬라이더가 Column에 삽입되어 셔터 버튼 등이 아래로 밀림
+- **해결:** `AnimatedContainer` 제거 → 카메라 프리뷰 Stack의 `Positioned` 오버레이로 이동
+- 슬라이더 스타일: 반투명 검정 pill 배경 (`Colors.black.withValues(alpha: 0.45)`)
+- 위치: 프리뷰 하단 52px 위 (`top: safeTop + previewH - 52`)
+
+### 카메라 사이드 버튼 위치 조정 (강도/비교/설정)
+- 기존: `Positioned(right:10, bottom:12)` — 슬라이더와 겹침
+- 수정: `Positioned(right:10, bottom:68)` — 슬라이더 위 충분한 여백
+
+### 사진/동영상 텍스트 위치 고정
+- **문제:** 필터 패널(100px)↔효과 패널(~140px) 전환 시 텍스트 위치 변동
+- **해결:** 두 패널을 `SizedBox(height: 116)` + `AnimatedSwitcher`로 고정
+- 탭 전환해도 모드 텍스트·셔터 버튼 위치 변동 없음
+
+### 스플릿 비교 라벨 겹침 버그 수정
+- **문제:** 스플릿 라인을 우측 끝으로 이동 시 "원본" 라벨이 선 왼쪽으로 튀어나옴
+- **해결:** `Positioned` 개별 clamp 방식 → `Row(SizedBox, SizedBox)` 분할 레이아웃으로 교체
+- 라벨이 항상 선의 각자 영역 안에 배치됨 (overflow 시 자동으로 공간 없어져 숨겨짐)
+
+### 갤러리 일괄 필터 선택 바텀시트 썸네일 수정
+- **문제:** `_FilterPickerSheet` 필터 아이템이 `Icons.filter_rounded` 플레이스홀더만 표시
+- **해결:** `Image.asset(f.thumbnailAssetPath)` + `ClipRRect`로 실제 썸네일 이미지 로드
+- errorBuilder: 썸네일 로드 실패 시 fallback 아이콘 표시

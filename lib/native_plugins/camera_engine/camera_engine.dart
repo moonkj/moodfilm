@@ -23,6 +23,16 @@ class CameraEngine {
     await _channel.invokeMethod('dispose');
   }
 
+  /// 카메라 세션 일시정지 (다른 화면 진입 시)
+  static Future<void> pauseSession() async {
+    await _channel.invokeMethod('pauseSession');
+  }
+
+  /// 카메라 세션 재개 (카메라 화면 복귀 시)
+  static Future<void> resumeSession() async {
+    await _channel.invokeMethod('resumeSession');
+  }
+
   /// LUT 필터 적용 (실시간 프리뷰)
   /// [lutFileName] .cube 파일명 (e.g. 'milk.cube')
   /// [intensity] 0.0 ~ 1.0

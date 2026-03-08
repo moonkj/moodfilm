@@ -497,16 +497,21 @@ class _FilterPickerSheet extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: AppColors.darkBg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white24),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        f.thumbnailAssetPath,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 60,
+                          height: 60,
+                          color: AppColors.darkBg,
+                          child: const Icon(Icons.filter_rounded,
+                              color: Colors.white38, size: 24),
+                        ),
                       ),
-                      child: const Icon(Icons.filter_rounded,
-                          color: Colors.white38, size: 24),
                     ),
                     const SizedBox(height: 4),
                     Text(f.name, style: AppTypography.caption),
