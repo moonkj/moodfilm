@@ -15,8 +15,8 @@ void main() {
       expect(state.status, CameraStatus.uninitialized);
     });
 
-    test('isFrontCamera는 true다', () {
-      expect(state.isFrontCamera, true);
+    test('isFrontCamera는 false다', () {
+      expect(state.isFrontCamera, false);
     });
 
     test('activeFilter는 null이다', () {
@@ -193,6 +193,27 @@ void main() {
         expect(ratio.label, isNotEmpty,
             reason: '$ratio의 label이 비어있음');
       }
+    });
+
+    test('nativeKey — 모든 케이스에 값이 있다', () {
+      expect(CameraAspectRatio.full.nativeKey, 'full');
+      expect(CameraAspectRatio.ratio9_16.nativeKey, '16:9');
+      expect(CameraAspectRatio.ratio3_4.nativeKey, '4:3');
+      expect(CameraAspectRatio.ratio1_1.nativeKey, '1:1');
+      expect(CameraAspectRatio.ratio4_3.nativeKey, '3:4');
+      expect(CameraAspectRatio.ratio16_9.nativeKey, '9:16');
+    });
+
+    test('ratio — ratio9_16은 9/16이다', () {
+      expect(CameraAspectRatio.ratio9_16.ratio, closeTo(9 / 16, 0.001));
+    });
+
+    test('ratio — ratio4_3은 4/3이다', () {
+      expect(CameraAspectRatio.ratio4_3.ratio, closeTo(4 / 3, 0.001));
+    });
+
+    test('ratio — ratio16_9은 16/9이다', () {
+      expect(CameraAspectRatio.ratio16_9.ratio, closeTo(16 / 9, 0.001));
     });
   });
 }

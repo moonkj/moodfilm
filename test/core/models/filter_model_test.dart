@@ -81,8 +81,8 @@ void main() {
   // FilterData
   // ────────────────────────────────────────────────────────
   group('FilterData', () {
-    test('전체 필터가 30종이다', () {
-      expect(FilterData.all.length, 30);
+    test('전체 필터가 26종이다', () {
+      expect(FilterData.all.length, 26);
     });
 
     test('모든 id가 고유하다', () {

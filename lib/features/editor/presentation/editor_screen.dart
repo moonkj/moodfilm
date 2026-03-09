@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +22,9 @@ class EditorScreen extends ConsumerStatefulWidget {
 }
 
 class _EditorScreenState extends ConsumerState<EditorScreen> {
+  // 공유 버튼 위치 (iOS sharePositionOrigin)
+  final _shareButtonKey = GlobalKey();
+
   // 기본 조정값
   double _exposure = 0;
   double _contrast = 0;
@@ -239,6 +241,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           ],
           // 공유 버튼
           GestureDetector(
+            key: _shareButtonKey,
             onTap: _shareImage,
             child: Container(
               width: 36, height: 36,
@@ -1028,26 +1031,52 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   // MARK: - 공유
 
+  /// 공유 버튼의 화면 위치를 Rect로 반환 (iOS sharePositionOrigin 용)
+  Rect? _shareOriginRect() {
+    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    final pos = box.localToGlobal(Offset.zero);
+    return pos & box.size;
+  }
+
   Future<void> _shareImage() async {
     if (widget.imagePath == null) return;
 
-    // 필터/효과가 없으면 원본(또는 크롭본) 바로 공유
     final camera = ref.read(cameraProvider);
     final hasFilter = !_editorNoFilter && camera.activeFilter != null;
-    if (!hasFilter && !_hasChanges) {
-      await Share.shareXFiles([XFile(_effectiveSourcePath)]);
-      return;
-    }
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('공유 준비 중...'),
-      backgroundColor: Color(0xFF3D3531),
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 30),
-    ));
+    final origin = _shareOriginRect();
 
     try {
+      // 변경 없음 — 원본(또는 크롭본) 바로 공유
+      if (!hasFilter && !_hasChanges) {
+        final src = _effectiveSourcePath;
+        if (!File(src).existsSync()) {
+          _showSnackBar('파일을 찾을 수 없습니다', isError: true);
+          return;
+        }
+        await Share.shareXFiles(
+          [XFile(src, mimeType: _mimeType(src))],
+          sharePositionOrigin: origin,
+        );
+        return;
+      }
+
+      // 이미 프리뷰가 생성돼 있으면 재처리 없이 바로 공유
+      if (_filteredPreviewPath != null) {
+        final p = _filteredPreviewPath!;
+        if (File(p).existsSync()) {
+          await Share.shareXFiles(
+            [XFile(p, mimeType: _mimeType(p))],
+            sharePositionOrigin: origin,
+          );
+          return;
+        }
+        // 프리뷰 파일이 사라진 경우 재처리로 폴백
+      }
+
+      if (!mounted) return;
+      _showSnackBar('공유 준비 중...', duration: 30);
+
       final path = await FilterEngine.processImage(
         sourcePath: _effectiveSourcePath,
         lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
@@ -1067,17 +1096,38 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       if (path != null) {
-        await Share.shareXFiles([XFile(path)]);
+        await Share.shareXFiles(
+          [XFile(path, mimeType: _mimeType(path))],
+          sharePositionOrigin: origin,
+        );
+      } else {
+        _showSnackBar('공유에 실패했습니다 (처리 오류)', isError: true);
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('공유 실패: $e'),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ));
+      _showSnackBar('공유 실패: $e', isError: true);
     }
+  }
+
+  String _mimeType(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg': case 'jpeg': return 'image/jpeg';
+      case 'png': return 'image/png';
+      case 'heic': case 'heif': return 'image/heic';
+      default: return 'image/jpeg';
+    }
+  }
+
+  void _showSnackBar(String msg, {bool isError = false, int duration = 4}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: isError ? Colors.red : const Color(0xFF3D3531),
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: duration),
+    ));
   }
 
   // MARK: - 삭제

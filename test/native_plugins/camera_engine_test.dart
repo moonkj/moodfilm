@@ -87,6 +87,40 @@ void main() {
   });
 
   // ────────────────────────────────────────────────────────
+  // 세션 관리
+  // ────────────────────────────────────────────────────────
+  group('CameraEngine 세션', () {
+    test('pauseSession — 채널이 호출된다', () async {
+      await CameraEngine.pauseSession();
+      expect(_calls.any((c) => c.method == 'pauseSession'), true);
+    });
+
+    test('resumeSession — 채널이 호출된다', () async {
+      await CameraEngine.resumeSession();
+      expect(_calls.any((c) => c.method == 'resumeSession'), true);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // 필터 / 이펙트
+  // ────────────────────────────────────────────────────────
+  group('CameraEngine 필터/이펙트', () {
+    test('setFilter — 채널에 lutFile과 intensity가 전달된다', () async {
+      await CameraEngine.setFilter(lutFileName: 'milk.cube', intensity: 0.8);
+      final call = _calls.firstWhere((c) => c.method == 'setFilter');
+      expect(call.arguments['lutFile'], 'milk.cube');
+      expect(call.arguments['intensity'], 0.8);
+    });
+
+    test('setEffect — 채널에 effectType과 intensity가 전달된다', () async {
+      await CameraEngine.setEffect(effectType: 'glow', intensity: 0.5);
+      final call = _calls.firstWhere((c) => c.method == 'setEffect');
+      expect(call.arguments['effectType'], 'glow');
+      expect(call.arguments['intensity'], 0.5);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
   // 카메라 제어
   // ────────────────────────────────────────────────────────
   group('CameraEngine 카메라 제어', () {

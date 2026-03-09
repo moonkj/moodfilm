@@ -349,6 +349,13 @@ void main() {
       await notifier.capturePhoto();
       expect(_capturedCalls.any((c) => c.method == 'capturePhoto'), true);
     });
+
+    test('capturePhoto — isSilentShutter=true이면 capturePhotoSilent 채널이 호출된다', () async {
+      StorageService.prefs.isSilentShutter = true;
+      await notifier.capturePhoto();
+      expect(_capturedCalls.any((c) => c.method == 'capturePhotoSilent'), true);
+      StorageService.prefs.isSilentShutter = false; // 복원
+    });
   });
 
   // ────────────────────────────────────────────────────────

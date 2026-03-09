@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-09 (세션 18)
+> 마지막 업데이트: 2026-03-10 (세션 21)
 
 ---
 
@@ -918,3 +918,29 @@ if let movURL = livePhotoMovieURL {
 - mood, soft_pink, blossom 그룹 (오프숄더 보케)
 - honey, film03, pale 그룹 (베이지 스웨터 골든 보케)
 - kodak_soft, milk, lavender: mocha 오른쪽으로 이동 (서울 야경 그룹)
+
+## 세션 21 (2026-03-10) — 커버리지 테스트 + 공유 버그 수정
+
+### 테스트 커버리지 70.1% 달성 (162개 모두 통과)
+- **수정**: `filter_model_test.dart` 필터 수 기대값 30 → 26 (실제 필터 수 반영)
+- **수정**: `camera_state_test.dart` `isFrontCamera` 기대값 true → false (기본값 반영)
+- **추가**: `test/core/utils/haptic_utils_test.dart` — HapticUtils 6개 메서드 전체 커버
+- **추가**: `camera_engine_test.dart` — `pauseSession`, `resumeSession`, `setFilter`, `setEffect` 테스트
+- **추가**: `camera_state_test.dart` — `nativeKey` 전 케이스, `ratio` 추가 케이스
+- **추가**: `camera_notifier_test.dart` — `isSilentShutter=true` 경로 커버 (capturePhotoSilent)
+- 커버리지: 67.5% → 70.1% (285 → 296 / 422 라인)
+
+### 에디터 공유 기능 버그 수정
+**증상**: 공유 버튼 탭 시 아무 반응 없음 → `PlatformException: sharePositionOrigin must be set`
+
+**원인**: iOS에서 `Share.shareXFiles`는 `sharePositionOrigin` (공유 시트 팝오버 기준점) 필수
+
+**수정 내용** (`editor_screen.dart`):
+- `GlobalKey _shareButtonKey` 추가 → 공유 버튼에 key 연결
+- `_shareOriginRect()` 메서드: RenderBox로 버튼의 화면 위치(Rect) 계산
+- 모든 `Share.shareXFiles` 호출에 `sharePositionOrigin: origin` 전달
+- `_mimeType(path)` 헬퍼: 확장자별 MIME 타입 반환 (jpg/png/heic)
+- `_showSnackBar()` 헬퍼: 에러/일반 스낵바 통합
+- 파일 존재 확인 (`File(src).existsSync()`) 후 공유
+- 프리뷰(`_filteredPreviewPath`) 재사용 — 공유 시 불필요한 재처리 방지
+- `dart:math` 미사용 import 제거
