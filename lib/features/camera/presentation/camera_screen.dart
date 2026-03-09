@@ -335,15 +335,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     ref.listen<FilterModel?>(
       cameraProvider.select((s) => s.activeFilter),
       (prev, next) {
-        if (prev?.id != next?.id) {
-          if (prev != null) _triggerFilterFlash();
-          // 필터 선택 시 강도 슬라이더 자동 오픈
-          if (next != null && !_showIntensitySlider) {
-            setState(() => _showIntensitySlider = true);
-          } else if (next == null) {
-            setState(() => _showIntensitySlider = false);
-          }
-        }
+        if (prev?.id != next?.id && prev != null) _triggerFilterFlash();
       },
     );
 
