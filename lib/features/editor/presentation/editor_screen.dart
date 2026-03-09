@@ -1,12 +1,17 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';
+
+enum _CropHandle { tl, tr, bl, br }
 
 class EditorScreen extends ConsumerStatefulWidget {
   const EditorScreen({super.key, this.imagePath, this.assetId});
@@ -43,8 +48,28 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   bool _showSplit = false;
   double _splitPosition = 0.5;
 
-  // 하단 탭: 'filter' | 'effect'
+  // 하단 탭: 'filter' | 'effect' | 'crop'
   String _activeTab = 'effect';
+
+  // 자르기
+  String? _croppedSourcePath;
+  Size? _sourceImageSize;
+  Rect _cropNorm = const Rect.fromLTRB(0, 0, 1, 1);
+  int _aspectIndex = 0;
+  _CropHandle? _activeCropHandle;
+  bool _draggingCropInterior = false;
+  Offset? _cropDragStart;
+  Rect? _cropDragStartNorm;
+
+  static const _aspectOptions = [
+    (label: '자유형', ratio: null as double?),
+    (label: '정방형', ratio: 1.0),
+    (label: '4:5', ratio: 4.0 / 5),
+    (label: '9:16', ratio: 9.0 / 16),
+    (label: '3:4', ratio: 3.0 / 4),
+    (label: '16:9', ratio: 16.0 / 9),
+    (label: '4:3', ratio: 4.0 / 3),
+  ];
 
   // 효과 탭 선택된 파라미터 인덱스
   int _activeParamIndex = 0;
@@ -122,36 +147,12 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                           children: [
                             _buildEffectRow(),
                             _buildTickSlider(),
-                            if (_hasChanges)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _exposure = 0; _contrast = 0; _saturation = 0;
-                                      _beauty = 0; _fade = 0; _dreamyGlow = 0;
-                                      _lightLeak = 0; _filmGrain = 0;
-                                      _highlights = 0; _shadows = 0; _temperature = 0;
-                                      _tint = 0; _sharpness = 0; _vignette = 0; _skinTone = 0;
-                                    });
-                                    _generatePreview();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF5F2EF),
-                                      borderRadius: BorderRadius.circular(100),
-                                    ),
-                                    child: const Text('전체 초기화',
-                                        style: TextStyle(fontSize: 12, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
-                                  ),
-                                ),
-                              )
-                            else
-                              const SizedBox(height: 4),
+                            const SizedBox(height: 4),
                           ],
                         )
-                      : _buildFilterSection(),
+                      : _activeTab == 'crop'
+                          ? _buildCropSection()
+                          : _buildFilterSection(),
                 ),
                 _buildBottomTabBar(),
               ],
@@ -279,7 +280,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             color: Colors.black26, size: 64),
       );
     }
-    final displayPath = _filteredPreviewPath ?? widget.imagePath!;
+    final displayPath = _filteredPreviewPath ?? _croppedSourcePath ?? widget.imagePath!;
     return Stack(
       children: [
         // 배경: 사진이 contain으로 letterbox될 때 보이는 영역
@@ -308,6 +309,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           : Image.file(File(displayPath), fit: BoxFit.contain,
               gaplessPlayback: true, width: double.infinity, height: double.infinity),
         ),
+        // 자르기 오버레이
+        if (_activeTab == 'crop')
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: _buildCropOverlay(),
+            ),
+          ),
       ],
     );
   }
@@ -324,7 +333,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         children: [
         // 오른쪽 (After = 필터 적용)
         Positioned.fill(
-          child: Image.file(File(filtered), fit: BoxFit.cover, gaplessPlayback: true),
+          child: Image.file(File(filtered), fit: BoxFit.contain, gaplessPlayback: true),
         ),
         // 왼쪽 (Before = 원본)
         ClipRect(
@@ -334,7 +343,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             child: SizedBox(
               width: w,
               height: h,
-              child: Image.file(File(original), fit: BoxFit.cover, gaplessPlayback: true),
+              child: Image.file(File(original), fit: BoxFit.contain, gaplessPlayback: true),
             ),
           ),
         ),
@@ -450,7 +459,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final param = _params[_activeParamIndex];
     final value = _getParamValue(_activeParamIndex);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.only(top: 24, left: 20, right: 20),
       child: SliderTheme(
         data: SliderTheme.of(context).copyWith(
           trackHeight: 2,
@@ -506,33 +515,323 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             },
           ),
         ),
-        if (!_editorNoFilter)
+        if (!_editorNoFilter) ...[
+          const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 2,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                overlayShape: SliderComponentShape.noOverlay,
-                activeTrackColor: const Color(0xFFD4A0B0),
-                inactiveTrackColor: const Color(0xFFEAE4E0),
-                thumbColor: const Color(0xFF8A6870),
-              ),
-              child: Slider(
-                value: intensity.clamp(0.0, 1.0),
-                min: 0.0,
-                max: 1.0,
-                onChanged: (v) {
-                  ref.read(cameraProvider.notifier).setFilterIntensity(v);
-                },
-                onChangeEnd: (_) => _generatePreview(),
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                      overlayShape: SliderComponentShape.noOverlay,
+                      activeTrackColor: const Color(0xFFD4A0B0),
+                      inactiveTrackColor: const Color(0xFFEAE4E0),
+                      thumbColor: const Color(0xFF8A6870),
+                    ),
+                    child: Slider(
+                      value: intensity.clamp(0.0, 1.0),
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: (v) {
+                        ref.read(cameraProvider.notifier).setFilterIntensity(v);
+                      },
+                      onChangeEnd: (_) => _generatePreview(),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 38,
+                  child: Text(
+                    '${(intensity * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF8A8480),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
             ),
-          )
-        else
+          ),
+        ] else
           const SizedBox(height: 36),
       ],
     );
+  }
+
+  // MARK: - 자르기
+
+  Widget _buildCropOverlay() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final widgetW = constraints.maxWidth;
+        final widgetH = constraints.maxHeight;
+        final imgSize = _sourceImageSize ?? const Size(1, 1);
+        final imgAspect = imgSize.width / imgSize.height;
+        final widgetAspect = widgetW / widgetH;
+
+        late final double iW, iH, iX, iY;
+        if (imgAspect > widgetAspect) {
+          iW = widgetW; iH = widgetW / imgAspect;
+        } else {
+          iH = widgetH; iW = widgetH * imgAspect;
+        }
+        iX = (widgetW - iW) / 2;
+        iY = (widgetH - iH) / 2;
+
+        final cx = iX + _cropNorm.left * iW;
+        final cy = iY + _cropNorm.top * iH;
+        final cw = _cropNorm.width * iW;
+        final ch = _cropNorm.height * iH;
+        final cropDisplay = Rect.fromLTWH(cx, cy, cw, ch);
+
+        return GestureDetector(
+          onPanStart: (d) {
+            final pos = d.localPosition;
+            const r = 24.0;
+            _CropHandle? hit;
+            if ((pos - cropDisplay.topLeft).distance < r)      hit = _CropHandle.tl;
+            else if ((pos - cropDisplay.topRight).distance < r)  hit = _CropHandle.tr;
+            else if ((pos - cropDisplay.bottomLeft).distance < r) hit = _CropHandle.bl;
+            else if ((pos - cropDisplay.bottomRight).distance < r) hit = _CropHandle.br;
+
+            _activeCropHandle = hit;
+            _draggingCropInterior = hit == null && cropDisplay.contains(pos);
+            _cropDragStart = pos;
+            _cropDragStartNorm = _cropNorm;
+          },
+          onPanUpdate: (d) {
+            if (_cropDragStart == null || _cropDragStartNorm == null) return;
+            final delta = d.localPosition - _cropDragStart!;
+            final dx = delta.dx / iW;
+            final dy = delta.dy / iH;
+            final startNorm = _cropDragStartNorm!;
+            final ratio = _aspectOptions[_aspectIndex].ratio;
+
+            setState(() {
+              if (_draggingCropInterior) {
+                final newL = (startNorm.left + dx).clamp(0.0, 1.0 - startNorm.width);
+                final newT = (startNorm.top + dy).clamp(0.0, 1.0 - startNorm.height);
+                _cropNorm = Rect.fromLTWH(newL, newT, startNorm.width, startNorm.height);
+              } else if (_activeCropHandle != null) {
+                double l = startNorm.left, t = startNorm.top;
+                double r = startNorm.right, b = startNorm.bottom;
+                switch (_activeCropHandle!) {
+                  case _CropHandle.tl: l += dx; t += dy;
+                  case _CropHandle.tr: r += dx; t += dy;
+                  case _CropHandle.bl: l += dx; b += dy;
+                  case _CropHandle.br: r += dx; b += dy;
+                }
+                l = l.clamp(0.0, r - 0.05);
+                t = t.clamp(0.0, b - 0.05);
+                r = r.clamp(l + 0.05, 1.0);
+                b = b.clamp(t + 0.05, 1.0);
+                if (ratio != null) {
+                  // 비율 유지 (normRatio 기준)
+                  final srcSize = _sourceImageSize ?? const Size(1, 1);
+                  final normRatio = ratio / (srcSize.width / srcSize.height);
+                  double nw = r - l, nh = b - t;
+                  if (_activeCropHandle == _CropHandle.tl || _activeCropHandle == _CropHandle.br) {
+                    nh = nw / normRatio;
+                  } else {
+                    nw = nh * normRatio;
+                  }
+                  switch (_activeCropHandle!) {
+                    case _CropHandle.tl: t = b - nh; l = r - nw;
+                    case _CropHandle.tr: t = b - nh; r = l + nw;
+                    case _CropHandle.bl: b = t + nh; l = r - nw;
+                    case _CropHandle.br: b = t + nh; r = l + nw;
+                  }
+                  l = l.clamp(0.0, 1.0); t = t.clamp(0.0, 1.0);
+                  r = r.clamp(0.0, 1.0); b = b.clamp(0.0, 1.0);
+                }
+                _cropNorm = Rect.fromLTRB(l, t, r, b);
+              }
+            });
+          },
+          onPanEnd: (_) {
+            _activeCropHandle = null;
+            _draggingCropInterior = false;
+            _cropDragStart = null;
+            _cropDragStartNorm = null;
+          },
+          behavior: HitTestBehavior.opaque,
+          child: SizedBox(
+            width: widgetW,
+            height: widgetH,
+            child: CustomPaint(
+              painter: _CropPainter(cropDisplay, widgetW, widgetH),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCropSection() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 68,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _aspectOptions.length,
+            itemBuilder: (context, i) {
+              final opt = _aspectOptions[i];
+              final isActive = i == _aspectIndex;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _aspectIndex = i;
+                    if (opt.ratio != null) {
+                      final srcSize = _sourceImageSize ?? const Size(1, 1);
+                      final imgAspect = srcSize.width / srcSize.height;
+                      // normRatio: 정규화 공간에서의 가로/세로 비율
+                      final normRatio = opt.ratio! / imgAspect;
+                      final cx = (_cropNorm.left + _cropNorm.right) / 2;
+                      final cy = (_cropNorm.top + _cropNorm.bottom) / 2;
+                      // 이미지를 최대한 채우는 크기 계산
+                      double nw, nh;
+                      if (normRatio <= 1.0) {
+                        nh = 1.0; nw = nh * normRatio;
+                      } else {
+                        nw = 1.0; nh = nw / normRatio;
+                      }
+                      final l = (cx - nw / 2).clamp(0.0, 1.0 - nw);
+                      final t = (cy - nh / 2).clamp(0.0, 1.0 - nh);
+                      _cropNorm = Rect.fromLTWH(l, t, nw, nh);
+                    }
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isActive ? const Color(0xFF3D3531) : const Color(0xFFF5F2EF),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        opt.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? Colors.white : const Color(0xFF3D3531),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _cropNorm = const Rect.fromLTRB(0, 0, 1, 1);
+                  _aspectIndex = 0;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F2EF),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text('초기화', style: TextStyle(fontSize: 13, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: _applyCrop,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3D3531),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text('적용', style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _applyCrop() async {
+    final sourcePath = _croppedSourcePath ?? widget.imagePath;
+    if (sourcePath == null) return;
+
+    // 이미지 디코딩
+    final bytes = await File(sourcePath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+
+    final imgW = image.width.toDouble();
+    final imgH = image.height.toDouble();
+
+    final srcRect = Rect.fromLTWH(
+      _cropNorm.left * imgW,
+      _cropNorm.top * imgH,
+      _cropNorm.width * imgW,
+      _cropNorm.height * imgH,
+    );
+
+    final outW = srcRect.width.round();
+    final outH = srcRect.height.round();
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, outW.toDouble(), outH.toDouble()));
+    canvas.drawImageRect(image, srcRect, Rect.fromLTWH(0, 0, outW.toDouble(), outH.toDouble()), Paint());
+    final picture = recorder.endRecording();
+    final croppedImage = await picture.toImage(outW, outH);
+    final byteData = await croppedImage.toByteData(format: ui.ImageByteFormat.png);
+
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/crop_${DateTime.now().millisecondsSinceEpoch}.png';
+    await File(path).writeAsBytes(byteData!.buffer.asUint8List());
+
+    // 이미지 크기 업데이트
+    if (mounted) {
+      setState(() {
+        _croppedSourcePath = path;
+        _sourceImageSize = Size(outW.toDouble(), outH.toDouble());
+        _cropNorm = const Rect.fromLTRB(0, 0, 1, 1);
+        _aspectIndex = 0;
+        _filteredPreviewPath = null;
+        _activeTab = 'effect';
+      });
+      _generatePreview();
+    }
+  }
+
+  Future<void> _loadImageSize() async {
+    final sourcePath = _croppedSourcePath ?? widget.imagePath;
+    if (sourcePath == null || _sourceImageSize != null) return;
+    final bytes = await File(sourcePath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    if (mounted) {
+      setState(() => _sourceImageSize = Size(image.width.toDouble(), image.height.toDouble()));
+    }
   }
 
   // MARK: - 하단 탭 바
@@ -540,6 +839,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   Widget _buildBottomTabBar() {
     final hasFilterChange = !_editorNoFilter;
     final hasEffectChange = _hasChanges;
+    final hasCropChange = _croppedSourcePath != null;
     return Container(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       decoration: const BoxDecoration(
@@ -553,6 +853,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               hasDot: hasFilterChange),
           _buildTab('효과', Icons.flare_rounded, 'effect',
               hasDot: hasEffectChange),
+          _buildTab('자르기', Icons.crop_rounded, 'crop',
+              hasDot: hasCropChange),
         ],
       ),
     );
@@ -563,7 +865,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final isActive = _activeTab == tabId;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _activeTab = tabId),
+      onTap: () {
+        setState(() => _activeTab = tabId);
+        if (tabId == 'crop') _loadImageSize();
+      },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -608,6 +913,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   // MARK: - 프리뷰 생성
 
+  String get _effectiveSourcePath =>
+      _croppedSourcePath ?? widget.imagePath ?? '';
+
   Future<void> _generatePreview() async {
     if (widget.imagePath == null || _isGeneratingPreview) return;
 
@@ -620,7 +928,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
     setState(() => _isGeneratingPreview = true);
     final path = await FilterEngine.processImage(
-      sourcePath: widget.imagePath!,
+      sourcePath: _effectiveSourcePath,
       lutFileName:
           _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
       intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
@@ -666,7 +974,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     try {
       final camera = ref.read(cameraProvider);
       final outputPath = await FilterEngine.processImage(
-        sourcePath: widget.imagePath!,
+        sourcePath: _effectiveSourcePath,
         lutFileName:
             _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
         intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
@@ -723,11 +1031,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   Future<void> _shareImage() async {
     if (widget.imagePath == null) return;
 
-    // 필터/효과가 없으면 원본 바로 공유
+    // 필터/효과가 없으면 원본(또는 크롭본) 바로 공유
     final camera = ref.read(cameraProvider);
     final hasFilter = !_editorNoFilter && camera.activeFilter != null;
     if (!hasFilter && !_hasChanges) {
-      await Share.shareXFiles([XFile(widget.imagePath!)]);
+      await Share.shareXFiles([XFile(_effectiveSourcePath)]);
       return;
     }
 
@@ -741,7 +1049,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
     try {
       final path = await FilterEngine.processImage(
-        sourcePath: widget.imagePath!,
+        sourcePath: _effectiveSourcePath,
         lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
         intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
         adjustments: {
@@ -806,4 +1114,59 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     await PhotoManager.editor.deleteWithIds([widget.assetId!]);
     if (mounted) Navigator.of(context).pop();
   }
+}
+
+class _CropPainter extends CustomPainter {
+  final Rect cropRect;
+  final double w;
+  final double h;
+
+  const _CropPainter(this.cropRect, this.w, this.h);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final maskPaint = Paint()..color = Colors.black.withValues(alpha: 0.5);
+    // 크롭 영역 바깥 마스크 (4개 영역)
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, cropRect.top), maskPaint);
+    canvas.drawRect(Rect.fromLTWH(0, cropRect.bottom, w, h - cropRect.bottom), maskPaint);
+    canvas.drawRect(Rect.fromLTWH(0, cropRect.top, cropRect.left, cropRect.height), maskPaint);
+    canvas.drawRect(Rect.fromLTWH(cropRect.right, cropRect.top, w - cropRect.right, cropRect.height), maskPaint);
+
+    // 크롭 테두리
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRect(cropRect, borderPaint);
+
+    // 3x3 가이드 라인
+    final guidePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+    for (int i = 1; i <= 2; i++) {
+      final x = cropRect.left + cropRect.width * i / 3;
+      final y = cropRect.top + cropRect.height * i / 3;
+      canvas.drawLine(Offset(x, cropRect.top), Offset(x, cropRect.bottom), guidePaint);
+      canvas.drawLine(Offset(cropRect.left, y), Offset(cropRect.right, y), guidePaint);
+    }
+
+    // 코너 핸들
+    final cornerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    const cs = 14.0; // corner size
+    for (final corner in [cropRect.topLeft, cropRect.topRight, cropRect.bottomLeft, cropRect.bottomRight]) {
+      final dx = corner == cropRect.topLeft || corner == cropRect.bottomLeft ? cs : -cs;
+      final dy = corner == cropRect.topLeft || corner == cropRect.topRight ? cs : -cs;
+      canvas.drawLine(Offset(corner.dx + dx, corner.dy), corner, cornerPaint);
+      canvas.drawLine(corner, Offset(corner.dx, corner.dy + dy), cornerPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CropPainter old) =>
+      old.cropRect != cropRect || old.w != w || old.h != h;
 }

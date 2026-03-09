@@ -881,3 +881,40 @@ if let movURL = livePhotoMovieURL {
   - `_doCapturePhoto()`: 촬영 로직 분리 (스플릿 모드 포함)
   - 카운트다운 오버레이: 프리뷰 Stack 내 `IgnorePointer` 중앙 텍스트
   - `ShutterButton.isCapturing`: 카운트다운 중에도 눌림 상태로 표시
+
+---
+
+## 세션 20 (2026-03-09) — 에디터 자르기 기능 + UX 개선
+
+### 에디터 자르기(Crop) 기능 신규 추가
+- 에디터 하단 탭 바에 "자르기" 탭 추가 (필터/효과/자르기 3탭)
+- 비율 선택: 자유형 / 정방형(1:1) / 4:5 / 9:16 / 3:4 / 16:9 / 4:3
+- 인터랙티브 크롭 오버레이: 마스크 + 3×3 가이드라인 + 코너 핸들
+- 코너 핸들 드래그로 크롭 영역 조절 (비율 잠금 시 종횡비 유지)
+- 크롭 영역 내부 드래그로 위치 이동
+- 비율 선택 시 최대 크기로 중앙 자동 적용 (`normRatio = ratio / imgAspect`)
+- "적용" → `dart:ui` `Canvas.drawImageRect`로 크롭 후 PNG 임시 저장
+- 크롭 적용 후 `_croppedSourcePath` 업데이트, 이후 필터/효과는 크롭본에 적용
+
+### 에디터 UX 개선
+- **에디터 전체 초기화 버튼 제거**: 상단에 "초기화" 버튼 이미 있으므로 슬라이더 아래 "전체 초기화" 제거
+- **효과 슬라이더 위치 조정**: `padding.top` 12 → 24 (아이콘 행과 간격 증가)
+- **필터 강도 슬라이더 % 표시**: 슬라이더 오른쪽에 `xx%` 텍스트 추가
+
+### 필터 썸네일 교체 (dream 이미지)
+- `mocha`, `latte`, `peach` 썸네일을 dream 이미지(벚꽃 배경 여성) 기반으로 재생성
+  - mocha: 브라운 채도↓ + 어둡게
+  - latte: 밝고 크림빛 + 채도↓
+  - peach: 핑크 따뜻한 톤
+- `lavender`, `milk` 썸네일을 kodak_soft 이미지(서울 야경 여성) 기반으로 재생성
+  - lavender: 보라빛 tint (r×1.05, g×0.78, b×1.35)
+  - milk: 뿌연 화이트 (채도 45%로 낮춤, 밝기 +25%)
+
+### 필터 순서 재편
+- dream, peach, latte, mocha 그룹 (벚꽃 배경)
+- cream, lomo, retro_ccd 그룹 (컬리 웨이브 실내)
+- kodak_soft, butter, film98, mint, cloud 그룹 (단발 야외)
+- vivid, ice, sky, ocean, winter, dusty_blue 그룹 (블루셔츠 스튜디오)
+- mood, soft_pink, blossom 그룹 (오프숄더 보케)
+- honey, film03, pale 그룹 (베이지 스웨터 골든 보케)
+- kodak_soft, milk, lavender: mocha 오른쪽으로 이동 (서울 야경 그룹)
