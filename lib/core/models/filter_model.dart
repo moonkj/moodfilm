@@ -70,7 +70,7 @@ class FilterData {
   FilterData._();
 
   static final List<FilterModel> all = [
-    // ── Like it! 시그니처 (2종) ──────────────────────────────
+    // ── 상단 고정 6종 (순서 유지) ────────────────────────────
     FilterModel(
       id: 'mood',
       name: 'Mood',
@@ -89,22 +89,47 @@ class FilterData {
       isPro: false,
       isNew: true,
     ),
-
-    // Warm Tone (5종)
-    FilterModel(
-      id: 'milk',
-      name: 'Milk',
-      category: FilterCategory.warm,
-      lutFileName: 'milk.cube',
-      description: '부드러운 화이트 우유빛',
-      isPro: false,
-    ),
     FilterModel(
       id: 'cream',
       name: 'Cream',
       category: FilterCategory.warm,
       lutFileName: 'cream.cube',
       description: '크림색 따뜻한 오후',
+      isPro: false,
+    ),
+    FilterModel(
+      id: 'ice',
+      name: 'Ice',
+      category: FilterCategory.cool,
+      lutFileName: 'ice.cube',
+      description: '겨울 아침 깨끗함',
+      isPro: true,
+    ),
+    FilterModel(
+      id: 'kodak_soft',
+      name: 'Kodak Soft',
+      category: FilterCategory.film,
+      lutFileName: 'kodak_soft.cube',
+      description: '코닥 필름 부드러움',
+      isPro: true,
+    ),
+    FilterModel(
+      id: 'vivid',
+      name: 'Vivid',
+      category: FilterCategory.aesthetic,
+      lutFileName: 'vivid.cube',
+      description: '선명하고 진한 채도',
+      isPro: true,
+      isNew: true,
+    ),
+
+    // ── 나머지 20종 ──────────────────────────────────────────
+    FilterModel(
+      id: 'milk',
+      name: 'Milk',
+      category: FilterCategory.warm,
+      lutFileName: 'milk.cube',
+      description: '부드러운 화이트 우유빛',
       isPro: false,
     ),
     FilterModel(
@@ -131,8 +156,6 @@ class FilterData {
       description: '따뜻한 핑크톤 복숭아',
       isPro: true,
     ),
-
-    // Cool Tone (5종)
     FilterModel(
       id: 'sky',
       name: 'Sky',
@@ -166,16 +189,6 @@ class FilterData {
       isPro: false,
     ),
     FilterModel(
-      id: 'ice',
-      name: 'Ice',
-      category: FilterCategory.cool,
-      lutFileName: 'ice.cube',
-      description: '겨울 아침 깨끗함',
-      isPro: true,
-    ),
-
-    // Film Tone (5종)
-    FilterModel(
       id: 'film98',
       name: 'Film98',
       category: FilterCategory.film,
@@ -208,16 +221,6 @@ class FilterData {
       isPro: true,
     ),
     FilterModel(
-      id: 'kodak_soft',
-      name: 'Kodak Soft',
-      category: FilterCategory.film,
-      lutFileName: 'kodak_soft.cube',
-      description: '코닥 필름 부드러움',
-      isPro: true,
-    ),
-
-    // Aesthetic (5종)
-    FilterModel(
       id: 'soft_pink',
       name: 'Soft Pink',
       category: FilterCategory.aesthetic,
@@ -241,9 +244,6 @@ class FilterData {
       description: '먼지낀 파란색 빈티지',
       isPro: true,
     ),
-
-    // ── W11 추가 8종 ─────────────────────────────────────────
-    // Warm +2
     FilterModel(
       id: 'latte',
       name: 'Latte',
@@ -262,8 +262,6 @@ class FilterData {
       isPro: true,
       isNew: true,
     ),
-
-    // Cool +2
     FilterModel(
       id: 'pale',
       name: 'Pale',
@@ -282,23 +280,12 @@ class FilterData {
       isPro: true,
       isNew: true,
     ),
-
-    // Aesthetic +2
     FilterModel(
       id: 'blossom',
       name: 'Blossom',
       category: FilterCategory.aesthetic,
       lutFileName: 'blossom.cube',
       description: '벚꽃 핑크 봄 감성',
-      isPro: true,
-      isNew: true,
-    ),
-    FilterModel(
-      id: 'vivid',
-      name: 'Vivid',
-      category: FilterCategory.aesthetic,
-      lutFileName: 'vivid.cube',
-      description: '선명하고 진한 채도',
       isPro: true,
       isNew: true,
     ),
