@@ -856,3 +856,28 @@ if let movURL = livePhotoMovieURL {
 ### 갤러리 배치 필터 저장 버그 수정
 - 다중선택 → 필터 적용 후 갤러리에 저장 안 되는 버그
 - `FilterEngine.processImage()` 호출 시 `saveToGallery: true` 명시 (기본값 false였음)
+
+---
+
+## 세션 19 (2026-03-09) — 카메라 타이머 기능
+
+### 구현 내용
+- 카메라 우측 사이드 버튼에 타이머 버튼 추가 (강도 버튼 위)
+- 탭할 때마다 `off → 3초 → 5초 → 10초 → off` 순환
+- 버튼 내부에 설정된 초 숫자 표시 (`3s`, `5s`, `10s`) / off 시 아이콘 표시
+- 활성화 시 accent 색상으로 강조
+
+### 카운트다운 동작
+- 셔터 탭 → 프리뷰 중앙에 큰 숫자(110px) 카운트다운 표시
+- 매초 햅틱 피드백(`HapticUtils.filterChange`)
+- 카운트다운 중 셔터 재탭 → 즉시 취소
+- 0이 되면 자동 촬영 + 스플릿 모드 처리
+
+### 변경 파일
+- `lib/features/camera/presentation/camera_screen.dart`
+  - 상태변수: `_timerSeconds`, `_timerCountdown`, `_countdownTimer`, `_isCountingDown`
+  - `_timerSideBtn()`: 타이머 사이드 버튼 위젯
+  - `_handleShutterTap()`: 타이머 분기 + 카운트다운 로직
+  - `_doCapturePhoto()`: 촬영 로직 분리 (스플릿 모드 포함)
+  - 카운트다운 오버레이: 프리뷰 Stack 내 `IgnorePointer` 중앙 텍스트
+  - `ShutterButton.isCapturing`: 카운트다운 중에도 눌림 상태로 표시

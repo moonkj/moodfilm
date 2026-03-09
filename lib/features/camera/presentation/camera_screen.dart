@@ -64,6 +64,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     'glow':       0.0,
   };
 
+  // 타이머
+  int _timerSeconds = 0; // 0=off, 3, 5, 10
+  int _timerCountdown = 0;
+  Timer? _countdownTimer;
+  bool _isCountingDown = false;
+
   // 사이드 버튼 레이블 (클릭 시 2초 표시)
   String? _sideBtnLabel;
   Timer? _sideBtnLabelTimer;
@@ -106,6 +112,46 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     }
   }
 
+  Future<void> _doCapturePhoto(CameraState cameraState) async {
+    if (_isSplitMode) {
+      CameraEngine.setSplitMode(position: -1.0, isFrontCamera: cameraState.isFrontCamera);
+    }
+    await ref.read(cameraProvider.notifier).capturePhoto();
+    if (_isSplitMode && mounted) {
+      CameraEngine.setSplitMode(
+        position: _computeNativeSplitPos(_splitPosition, cameraState.isFrontCamera),
+        isFrontCamera: cameraState.isFrontCamera,
+      );
+    }
+  }
+
+  void _handleShutterTap(CameraState cameraState) {
+    if (_isCountingDown) {
+      // 카운트다운 중 셔터 재탭 → 취소
+      _countdownTimer?.cancel();
+      setState(() { _isCountingDown = false; _timerCountdown = 0; });
+      return;
+    }
+    if (_timerSeconds == 0) {
+      _doCapturePhoto(cameraState);
+      return;
+    }
+    // 카운트다운 시작
+    HapticUtils.filterChange();
+    setState(() { _isCountingDown = true; _timerCountdown = _timerSeconds; });
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (!mounted) { timer.cancel(); return; }
+      if (_timerCountdown <= 1) {
+        timer.cancel();
+        setState(() { _isCountingDown = false; _timerCountdown = 0; });
+        await _doCapturePhoto(cameraState);
+      } else {
+        setState(() => _timerCountdown--);
+        HapticUtils.filterChange();
+      }
+    });
+  }
+
   void _checkOnboardingHints() {
     final prefs = StorageService.prefs;
     if (!prefs.hasSeenSwipeHint) {
@@ -131,6 +177,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     routeObserver.unsubscribe(this);
     _splitAutoHideTimer?.cancel();
     _sideBtnLabelTimer?.cancel();
+    _countdownTimer?.cancel();
     _flipController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     ref.read(cameraProvider.notifier).disposeCamera();
@@ -358,6 +405,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           ),
         ),
         _buildPreviewSideButtons(cameraState),
+        // 타이머 카운트다운 오버레이
+        if (_isCountingDown)
+          IgnorePointer(
+            child: Center(
+              child: Text(
+                '$_timerCountdown',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 110,
+                  fontWeight: FontWeight.w700,
+                  shadows: [Shadow(blurRadius: 24, color: Colors.black54)],
+                ),
+              ),
+            ),
+          ),
         // 필터 전환 flash
         IgnorePointer(
           child: AnimatedOpacity(
@@ -440,6 +502,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             _buildRecordingTimer(cameraState.recordingSeconds),
             const SizedBox(height: 10),
           ],
+          _timerSideBtn(),
+          const SizedBox(height: 10),
           _sideLabeledBtn(
             label: '강도',
             icon: Icons.tune_rounded,
@@ -471,6 +535,70 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _timerSideBtn() {
+    final showLabel = _sideBtnLabel == '타이머';
+    final isActive = _timerSeconds > 0 || _isCountingDown;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedOpacity(
+          opacity: showLabel ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 150),
+          child: showLabel
+              ? Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    _timerSeconds > 0 ? '$_timerSeconds초' : '타이머',
+                    style: const TextStyle(color: Colors.white, fontSize: 12,
+                        fontWeight: FontWeight.w500),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        GestureDetector(
+          onTap: () {
+            if (_isCountingDown) return;
+            const options = [0, 3, 5, 10];
+            final idx = options.indexOf(_timerSeconds);
+            setState(() => _timerSeconds = options[(idx + 1) % options.length]);
+            HapticUtils.filterChange();
+            _showSideBtnLabel('타이머');
+          },
+          child: Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.15), width: 0.5),
+            ),
+            child: Center(
+              child: _timerSeconds > 0
+                  ? Text(
+                      '${_timerSeconds}s',
+                      style: TextStyle(
+                        color: isActive ? AppColors.accent : Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : Icon(
+                      Icons.timer_outlined,
+                      color: isActive ? AppColors.accent : Colors.white,
+                      size: 18,
+                    ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -600,24 +728,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 _buildVideoRecordButton(cameraState)
               else
                 ShutterButton(
-                  isCapturing: cameraState.isCapturing,
-                  onTap: () async {
-                    // 스플릿 모드 중 촬영 시 구분선 없이 필터 적용 사진으로 캡처
-                    if (_isSplitMode) {
-                      CameraEngine.setSplitMode(
-                        position: -1.0,
-                        isFrontCamera: cameraState.isFrontCamera,
-                      );
-                    }
-                    await ref.read(cameraProvider.notifier).capturePhoto();
-                    if (_isSplitMode && mounted) {
-                      CameraEngine.setSplitMode(
-                        position: _computeNativeSplitPos(
-                            _splitPosition, cameraState.isFrontCamera),
-                        isFrontCamera: cameraState.isFrontCamera,
-                      );
-                    }
-                  },
+                  isCapturing: cameraState.isCapturing || _isCountingDown,
+                  onTap: () => _handleShutterTap(cameraState),
                 ),
               // 우측: 색보정 효과 + 카메라전환
               Expanded(
