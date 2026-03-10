@@ -5,7 +5,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/models/filter_model.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';

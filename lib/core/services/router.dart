@@ -49,7 +49,7 @@ final GoRouter appRouter = GoRouter(
             assetId: extra['assetId'],
           );
         }
-        return EditorScreen(imagePath: extra as String?);
+        return EditorScreen(imagePath: extra is String ? extra : null);
       },
     ),
     GoRoute(

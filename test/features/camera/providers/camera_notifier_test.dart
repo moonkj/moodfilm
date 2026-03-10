@@ -1,10 +1,8 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:moodfilm/core/models/effect_model.dart';
 import 'package:moodfilm/core/models/filter_model.dart';
-import 'package:moodfilm/core/models/user_preferences.dart';
 import 'package:moodfilm/core/services/storage_service.dart';
 import 'package:moodfilm/features/camera/models/camera_state.dart';
 import 'package:moodfilm/features/camera/providers/camera_provider.dart';

@@ -316,7 +316,9 @@ extension CameraEnginePlugin: MFCameraSessionDelegate {
         PHPhotoLibrary.requestAuthorization { status in
             guard status == .authorized || status == .limited else {
                 DispatchQueue.main.async {
-                    self.pendingCapturResult?(path)
+                    self.pendingCapturResult?(
+                        FlutterError(code: "PERMISSION_DENIED", message: "사진 라이브러리 접근 권한이 없습니다.", details: nil)
+                    )
                     self.pendingCapturResult = nil
                 }
                 return

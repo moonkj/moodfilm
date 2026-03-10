@@ -6,18 +6,18 @@ void main() {
   // ────────────────────────────────────────────────────────
   // PolicyScreen 위젯 스모크 테스트
   // ────────────────────────────────────────────────────────
-  Widget _wrap(Widget child) {
+  Widget wrap(Widget child) {
     return MaterialApp(home: child);
   }
 
   group('PolicyScreen 렌더링', () {
     testWidgets('privacyPolicy — AppBar 타이틀이 개인정보처리방침이다', (tester) async {
-      await tester.pumpWidget(_wrap(PolicyScreen.privacyPolicy));
+      await tester.pumpWidget(wrap(PolicyScreen.privacyPolicy));
       expect(find.text('개인정보처리방침'), findsWidgets);
     });
 
     testWidgets('privacyPolicy — 섹션 heading이 화면에 표시된다', (tester) async {
-      await tester.pumpWidget(_wrap(PolicyScreen.privacyPolicy));
+      await tester.pumpWidget(wrap(PolicyScreen.privacyPolicy));
       await tester.pump();
       expect(find.text('1. 수집하는 정보'), findsOneWidget);
     });
@@ -29,18 +29,18 @@ void main() {
     });
 
     testWidgets('termsOfService — AppBar 타이틀이 이용약관이다', (tester) async {
-      await tester.pumpWidget(_wrap(PolicyScreen.termsOfService));
+      await tester.pumpWidget(wrap(PolicyScreen.termsOfService));
       expect(find.text('이용약관'), findsWidgets);
     });
 
     testWidgets('termsOfService — 첫 번째 섹션이 표시된다', (tester) async {
-      await tester.pumpWidget(_wrap(PolicyScreen.termsOfService));
+      await tester.pumpWidget(wrap(PolicyScreen.termsOfService));
       await tester.pump();
       expect(find.text('1. 서비스 이용'), findsOneWidget);
     });
 
     testWidgets('termsOfService — ListView가 스크롤 가능하다', (tester) async {
-      await tester.pumpWidget(_wrap(PolicyScreen.termsOfService));
+      await tester.pumpWidget(wrap(PolicyScreen.termsOfService));
       await tester.pump();
       expect(find.byType(ListView), findsOneWidget);
     });

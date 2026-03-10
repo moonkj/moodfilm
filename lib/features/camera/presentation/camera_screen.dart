@@ -157,9 +157,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     if (!prefs.hasSeenSwipeHint) {
       setState(() => _showSwipeHint = true);
       Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _showSwipeHint = false);
         prefs.hasSeenSwipeHint = true;
         prefs.save();
+        if (mounted) setState(() => _showSwipeHint = false);
       });
     }
   }
@@ -199,7 +199,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.read(cameraProvider.notifier).initialize().then((_) => _applyDefaultEffects());
+      ref.read(cameraProvider.notifier).initialize().then((_) {
+        if (mounted) _applyDefaultEffects();
+      });
     } else if (state == AppLifecycleState.inactive) {
       ref.read(cameraProvider.notifier).disposeCamera();
     }

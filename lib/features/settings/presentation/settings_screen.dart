@@ -3,7 +3,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/services/storage_service.dart';
-import '../../../native_plugins/camera_engine/camera_engine.dart';
 import 'policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {

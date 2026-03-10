@@ -504,7 +504,7 @@ class _FilterPickerSheet extends StatelessWidget {
                         width: 60,
                         height: 60,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, a, b) => Container(
                           width: 60,
                           height: 60,
                           color: AppColors.darkBg,

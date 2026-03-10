@@ -16,6 +16,10 @@ class CameraNotifier extends StateNotifier<CameraState> {
   // MARK: - 초기화
 
   Future<void> initialize({bool frontCamera = true}) async {
+    if (state.status == CameraStatus.initializing) {
+      debugPrint('[CameraProvider] initialize() 이미 진행 중 — 중복 호출 무시');
+      return;
+    }
     debugPrint('[CameraProvider] initialize() 시작 frontCamera=$frontCamera');
     state = state.copyWith(status: CameraStatus.initializing);
     try {
@@ -44,8 +48,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
       debugPrint('[CameraProvider] _applyCurrentFilter() 호출');
       await _applyCurrentFilter();
 
-      // 뽀샤시 기본 적용 (0.45 — 피부 보정 + 은은한 발광)
-      await CameraEngine.setEffect(effectType: 'beauty', intensity: 0.45);
       debugPrint('[CameraProvider] 초기화 완료 ✓');
 
       // 비율 동기화 (프리뷰와 사진 저장 크롭 일치)
@@ -218,10 +220,15 @@ class CameraNotifier extends StateNotifier<CameraState> {
   Future<void> startRecording() async {
     if (!state.isReady || state.isRecording) return;
     HapticUtils.shutter();
-    // 상태 먼저 업데이트 → UI 즉시 반응
     state = state.copyWith(isRecording: true, recordingSeconds: 0);
-    // 녹화 시작 (비동기, await 불필요)
-    CameraEngine.startRecording();
+
+    try {
+      await CameraEngine.startRecording();
+    } catch (e) {
+      debugPrint('[CameraProvider] ❌ 녹화 시작 실패: $e');
+      state = state.copyWith(isRecording: false, recordingSeconds: 0);
+      return;
+    }
 
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (state.isRecording) {

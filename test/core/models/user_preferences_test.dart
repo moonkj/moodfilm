@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:moodfilm/core/models/effect_model.dart';
 import 'package:moodfilm/core/models/filter_model.dart';
 import 'package:moodfilm/core/models/user_preferences.dart';

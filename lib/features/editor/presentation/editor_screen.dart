@@ -597,10 +597,15 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             final pos = d.localPosition;
             const r = 24.0;
             _CropHandle? hit;
-            if ((pos - cropDisplay.topLeft).distance < r)      hit = _CropHandle.tl;
-            else if ((pos - cropDisplay.topRight).distance < r)  hit = _CropHandle.tr;
-            else if ((pos - cropDisplay.bottomLeft).distance < r) hit = _CropHandle.bl;
-            else if ((pos - cropDisplay.bottomRight).distance < r) hit = _CropHandle.br;
+            if ((pos - cropDisplay.topLeft).distance < r) {
+              hit = _CropHandle.tl;
+            } else if ((pos - cropDisplay.topRight).distance < r) {
+              hit = _CropHandle.tr;
+            } else if ((pos - cropDisplay.bottomLeft).distance < r) {
+              hit = _CropHandle.bl;
+            } else if ((pos - cropDisplay.bottomRight).distance < r) {
+              hit = _CropHandle.br;
+            }
 
             _activeCropHandle = hit;
             _draggingCropInterior = hit == null && cropDisplay.contains(pos);
