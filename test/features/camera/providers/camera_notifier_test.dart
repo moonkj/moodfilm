@@ -417,4 +417,84 @@ void main() {
       expect(notifier.state.textureId, isNull);
     });
   });
+
+  // ────────────────────────────────────────────────────────
+  // Error 경로 (채널 예외 발생 시)
+  // ────────────────────────────────────────────────────────
+  group('CameraNotifier 에러 경로', () {
+    late CameraNotifier notifier;
+
+    setUp(() => notifier = CameraNotifier());
+    tearDown(() => notifier.dispose());
+
+    test('initialize 실패 — status가 error가 된다', () async {
+      // initialize 채널이 예외를 던지도록 재설정
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_cameraChannel, (call) async {
+        if (call.method == 'initialize') throw Exception('카메라 초기화 실패');
+        return null;
+      });
+
+      await notifier.initialize();
+      expect(notifier.state.status, CameraStatus.error);
+      expect(notifier.state.errorMessage, isNotNull);
+
+      // 원래 mock 복원
+      _setupMocks();
+    });
+
+    test('initialize 실패 — errorMessage가 설정된다', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_cameraChannel, (call) async {
+        if (call.method == 'initialize') throw Exception('init error');
+        return null;
+      });
+
+      await notifier.initialize();
+      expect(notifier.state.errorMessage, contains('init error'));
+
+      _setupMocks();
+    });
+
+    test('capturePhoto 실패 — status가 ready로 복구된다', () async {
+      // 먼저 ready 상태로 초기화
+      await notifier.initialize();
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_cameraChannel, (call) async {
+        if (call.method == 'capturePhoto') throw Exception('촬영 실패');
+        if (call.method == 'initialize') return 42;
+        return null;
+      });
+
+      await notifier.capturePhoto();
+      expect(notifier.state.status, CameraStatus.ready);
+      expect(notifier.state.errorMessage, isNotNull);
+
+      _setupMocks();
+    });
+
+    test('stopRecording 실패 — isRecording이 false로 복구된다', () async {
+      await notifier.initialize();
+
+      // startRecording은 정상, stopRecording만 실패
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_cameraChannel, (call) async {
+        if (call.method == 'stopRecording') throw Exception('녹화 종료 실패');
+        if (call.method == 'initialize') return 42;
+        if (call.method == 'startRecording') return '/tmp/test.mp4';
+        return null;
+      });
+
+      await notifier.startRecording();
+      expect(notifier.state.isRecording, true);
+
+      await notifier.stopRecording();
+      // catch 블록에서도 isRecording=false로 리셋
+      expect(notifier.state.isRecording, false);
+      expect(notifier.state.recordingSeconds, 0);
+
+      _setupMocks();
+    });
+  });
 }

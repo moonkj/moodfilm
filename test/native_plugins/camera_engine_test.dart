@@ -161,6 +161,29 @@ void main() {
   });
 
   // ────────────────────────────────────────────────────────
+  // 노출 / 줌
+  // ────────────────────────────────────────────────────────
+  group('CameraEngine 노출/줌', () {
+    test('setExposure — 채널에 ev 값이 전달된다', () async {
+      await CameraEngine.setExposure(1.5);
+      final call = _calls.firstWhere((c) => c.method == 'setExposure');
+      expect(call.arguments['ev'], 1.5);
+    });
+
+    test('setExposure — 음수 ev도 전달된다', () async {
+      await CameraEngine.setExposure(-1.0);
+      final call = _calls.lastWhere((c) => c.method == 'setExposure');
+      expect(call.arguments['ev'], -1.0);
+    });
+
+    test('setZoom — 채널에 zoom 값이 전달된다', () async {
+      await CameraEngine.setZoom(2.0);
+      final call = _calls.firstWhere((c) => c.method == 'setZoom');
+      expect(call.arguments['zoom'], 2.0);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
   // 동영상 녹화
   // ────────────────────────────────────────────────────────
   group('CameraEngine 녹화', () {
