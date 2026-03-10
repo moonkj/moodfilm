@@ -981,3 +981,27 @@ if let movURL = livePhotoMovieURL {
 | 8번 (4행 우) | blossom · honey · film03 · pale |
 
 - 필터별 색감 변환: warm(적색 채널 강화), cool(청색 채널 강화), film(대비+그레인), aesthetic(채도↓+밝기↑)
+
+---
+
+## 세션 24 (2026-03-10) — 카메라 UX 개선 + 비교 스플릿 방향 수정
+
+### 카메라 사이드 버튼 "강도" → "필터효과" 이름 변경
+- `_sideLabeledBtn` label + `_showSideBtnLabel` 호출 텍스트 변경
+
+### 비교 스플릿 라벨 위치: 원 아래 → 원과 수평
+- `_buildSplitOverlay`: `top: cy + 42` → `top: cy + 9`
+- 라벨을 원(36px) 너비 기준 좌우로 배치 (SizedBox로 원 건너뜀)
+- 왼쪽: "원본", 오른쪽: 필터이름
+
+### 비교 스플릿 방향 수정 (왼쪽=원본, 오른쪽=필터)
+- 기존: 왼쪽=필터, 오른쪽=원본 → 갤러리/에디터와 반대였음
+- **Swift `MFLUTEngine.applyBeforeAfterSplit` 수정:**
+  - 후면: `originalPart=[minY, splitY)` (저Y→회전후LEFT), `filteredPart=[splitY, maxY)` (고Y→회전후RIGHT)
+  - 전면: `originalPart=[splitY, maxY)` (고Y→회전+미러후LEFT), `filteredPart=[minY, splitY)` (저Y→회전+미러후RIGHT)
+- Flutter `_computeNativeSplitPos`: 원래대로 유지 (front: `1-pos`, back: `pos`)
+
+### 동영상 녹화 중 비교선 숨김
+- `_buildPreviewStack`: `if (_isSplitMode && !cameraState.isRecording)` 조건 추가
+- 동영상 녹화 시작 시 `CameraEngine.setSplitMode(position: -1.0)` → 전체 필터 적용
+- 동영상 녹화 종료 시 스플릿 위치 복원

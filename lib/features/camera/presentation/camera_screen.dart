@@ -398,8 +398,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           onDoubleTap: _handleCameraFlip,
           child: const SizedBox.expand(),
         ),
-        if (_isSplitMode) _buildSplitOverlay(cameraState),
-        if (_isSplitMode) _buildSplitDragLayer(cameraState, screenW),
+        if (_isSplitMode && !cameraState.isRecording) _buildSplitOverlay(cameraState),
+        if (_isSplitMode && !cameraState.isRecording) _buildSplitDragLayer(cameraState, screenW),
         Center(
           child: ExposureIndicator(
             ev: cameraState.exposureEV,
@@ -509,12 +509,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           _timerSideBtn(),
           const SizedBox(height: 10),
           _sideLabeledBtn(
-            label: '강도',
+            label: '필터효과',
             icon: Icons.tune_rounded,
             active: _showIntensitySlider,
             onTap: () {
               setState(() => _showIntensitySlider = !_showIntensitySlider);
-              _showSideBtnLabel('강도');
+              _showSideBtnLabel('필터효과');
             },
           ),
           const SizedBox(height: 10),
@@ -941,9 +941,24 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     final rec = cameraState.isRecording;
     final outerSize = AppDimensions.shutterButtonSize + 4; // 80px — layout 고정
     return GestureDetector(
-      onTap: () => rec
-          ? ref.read(cameraProvider.notifier).stopRecording()
-          : ref.read(cameraProvider.notifier).startRecording(),
+      onTap: () {
+        if (rec) {
+          ref.read(cameraProvider.notifier).stopRecording();
+          // 녹화 종료 시 스플릿 복원
+          if (_isSplitMode) {
+            CameraEngine.setSplitMode(
+              position: _computeNativeSplitPos(_splitPosition, cameraState.isFrontCamera),
+              isFrontCamera: cameraState.isFrontCamera,
+            );
+          }
+        } else {
+          // 녹화 시작 시 스플릿 숨김 (전체 필터 적용)
+          if (_isSplitMode) {
+            CameraEngine.setSplitMode(position: -1.0, isFrontCamera: cameraState.isFrontCamera);
+          }
+          ref.read(cameraProvider.notifier).startRecording();
+        }
+      },
       child: SizedBox(
         width: outerSize,
         height: outerSize,
@@ -1017,30 +1032,31 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   child: const Icon(Icons.compare_arrows_rounded, color: Colors.black54, size: 18),
                 ),
               ),
-              // 라벨: 선 기준 좌우 영역에 각각 배치 — 선을 절대 넘지 않음
+              // 라벨: 원(36×36)과 수평 — 원 중앙(cy+18)에 맞춤
               Positioned(
-                top: cy + 42,
+                top: cy + 9,
                 left: 0,
                 right: 0,
                 child: Row(
                   children: [
                     SizedBox(
-                      width: lineX,
+                      width: (lineX - 18).clamp(0.0, double.infinity),
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: _splitLabel(filterName),
+                          child: _splitLabel('원본'),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 36), // 원 너비만큼 건너뜀
                     SizedBox(
-                      width: constraints.maxWidth - lineX,
+                      width: (constraints.maxWidth - lineX - 18).clamp(0.0, double.infinity),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Padding(
                           padding: const EdgeInsets.only(left: 8),
-                          child: _splitLabel('원본'),
+                          child: _splitLabel(filterName),
                         ),
                       ),
                     ),

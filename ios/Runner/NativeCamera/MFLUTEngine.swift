@@ -395,21 +395,23 @@ class MFLUTEngine {
         let filteredPart: CIImage
 
         if isFrontCamera {
-            // front: 저Y → display 왼쪽(원본), 고Y → display 오른쪽(필터)
+            // front: RotatedBox(CW90°) + scale(-1,1) 미러
+            // 저Y→회전후LEFT→미러후RIGHT(필터), 고Y→회전후RIGHT→미러후LEFT(원본)
             originalPart = original.cropped(to: CGRect(
-                x: extent.minX, y: extent.minY,
-                width: extent.width, height: splitY - extent.minY))
-            filteredPart = filtered.cropped(to: CGRect(
                 x: extent.minX, y: splitY,
                 width: extent.width, height: extent.maxY - splitY))
+            filteredPart = filtered.cropped(to: CGRect(
+                x: extent.minX, y: extent.minY,
+                width: extent.width, height: splitY - extent.minY))
         } else {
-            // back: 고Y → display 왼쪽(원본), 저Y → display 오른쪽(필터)
+            // back: RotatedBox(CW90°)
+            // 저Y→회전후LEFT(원본), 고Y→회전후RIGHT(필터)
             originalPart = original.cropped(to: CGRect(
-                x: extent.minX, y: splitY,
-                width: extent.width, height: extent.maxY - splitY))
-            filteredPart = filtered.cropped(to: CGRect(
                 x: extent.minX, y: extent.minY,
                 width: extent.width, height: splitY - extent.minY))
+            filteredPart = filtered.cropped(to: CGRect(
+                x: extent.minX, y: splitY,
+                width: extent.width, height: extent.maxY - splitY))
         }
 
         guard let composite = CIFilter(name: "CISourceOverCompositing") else { return filtered }
