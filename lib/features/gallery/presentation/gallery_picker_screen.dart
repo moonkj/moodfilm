@@ -108,7 +108,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
     if (asset.type == AssetType.video) {
       Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(videoPath: file.path),
+        builder: (_) => VideoPlayerScreen(videoPath: file.path, assetId: asset.id),
       ));
       return;
     }

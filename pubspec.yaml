@@ -54,6 +54,7 @@ flutter:
   assets:
     - assets/luts/
     - assets/thumbnails/
+    - assets/images/
     # - assets/textures/    # v1.1에서 추가
 
   # fonts:  # Pretendard 파일 추가 후 활성화

@@ -353,10 +353,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             children: [
               SizedBox(height: safeTop),
               // 카메라 프리뷰 (상단 바 없이 바로 시작)
-              SizedBox(
-                width: screenW,
-                height: previewH,
-                child: _buildPreviewStack(cameraState, screenW),
+              ClipRect(
+                child: SizedBox(
+                  width: screenW,
+                  height: previewH,
+                  child: _buildPreviewStack(cameraState, screenW),
+                ),
               ),
               // 하단 컨트롤
               Expanded(
@@ -472,19 +474,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         child: SizedBox(width: 16, height: 9, child: Texture(textureId: cameraState.textureId!)),
       ),
     );
-    return AnimatedBuilder(
-      animation: _flipController,
-      builder: (_, child) {
-        final v = _flipController.value;
-        if (v == 0) return child!;
-        final angle = v <= 0.5 ? v * pi : (v - 1.0) * pi;
-        return Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY(angle),
-          child: child,
-        );
-      },
-      child: FittedBox(fit: BoxFit.cover, clipBehavior: Clip.hardEdge, child: textureWidget),
+    return ClipRect(
+      child: AnimatedBuilder(
+        animation: _flipController,
+        builder: (_, child) {
+          final v = _flipController.value;
+          if (v == 0) return child!;
+          final angle = v <= 0.5 ? v * pi : (v - 1.0) * pi;
+          return Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY(angle),
+            child: child,
+          );
+        },
+        child: FittedBox(fit: BoxFit.cover, clipBehavior: Clip.hardEdge, child: textureWidget),
+      ),
     );
   }
 

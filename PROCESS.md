@@ -950,3 +950,34 @@ if let movURL = livePhotoMovieURL {
 ### 카메라/에디터 효과 순서 변경
 - **카메라 화면** (`camera_screen.dart` `_effectItems`): 밝기→대비→채도→솜결→뽀얀→글로우 → **솜결→뽀얀→밝기→대비→채도→글로우**
 - **에디터 화면** (`editor_screen.dart` `_params`): 동일하게 변경 (`_getParamValue` / `_setParamValueDirectly` 인덱스 동기화)
+
+---
+
+## 세션 23 (2026-03-10) — 스플래시 화면 + 필터 썸네일 인물 교체
+
+### 스플래시 화면 신규 추가
+- `/splash` 라우트 추가 (`initialLocation: '/splash'`)
+- `SplashScreen` 위젯 신규 생성 (`lib/features/splash/presentation/splash_screen.dart`)
+  - `AnimationController` 3초 (fade-in 20% → hold 60% → fade-out 20%)
+  - 완료 시 `context.go('/')` → 카메라 화면으로 이동
+  - 카메라 화면 진입 시 `CustomTransitionPage` 600ms fade 트랜지션 적용
+- 스플래시 이미지: `assets/images/splash_logo.png` (카메라 렌즈 + "Like it!" + "감성 필터 카메라", `BoxFit.cover`)
+- 배경색: `#FBF5EE` (크림 화이트)
+
+### 필터 썸네일 전체 교체 (인물 사진 기반)
+- 소스: 8명 인물 그리드 이미지 (2×4, 704×1531px)
+- Python/PIL로 자동 처리: 인물 자르기 → 정방형 크롭(얼굴 위쪽 기준) → 180×180 리사이즈 → 필터 색감 적용 → JPEG 저장
+- **인물-필터 배정** (26종):
+
+| 인물 | 필터 |
+|------|------|
+| 1번 (1행 좌) | dream · peach · latte |
+| 2번 (1행 우) | mocha · kodak_soft · milk |
+| 3번 (2행 좌) | lavender · vivid · ice |
+| 4번 (2행 우) | cream · disposable · retro_ccd |
+| 5번 (3행 좌) | butter · film98 · mint |
+| 6번 (3행 우) | cloud · sky · ocean |
+| 7번 (4행 좌) | winter · dusty_blue · mood · soft_pink |
+| 8번 (4행 우) | blossom · honey · film03 · pale |
+
+- 필터별 색감 변환: warm(적색 채널 강화), cool(청색 채널 강화), film(대비+그레인), aesthetic(채도↓+밝기↑)
