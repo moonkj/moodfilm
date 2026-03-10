@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../native_plugins/camera_engine/camera_engine.dart';
+import 'policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -51,17 +53,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
                 title: const Text('개인정보처리방침'),
-                onTap: () {},
+                trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBB6B2)),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PolicyScreen.privacyPolicy),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.article_outlined),
                 title: const Text('이용약관'),
-                onTap: () {},
+                trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBB6B2)),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PolicyScreen.termsOfService),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.mail_outline_rounded),
                 title: const Text('문의하기'),
-                onTap: () {},
+                trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBB6B2)),
+                onTap: () => launchUrl(
+                  Uri.parse('mailto:imurmkj@gmail.com?subject=Like it! 문의'),
+                  mode: LaunchMode.externalApplication,
+                ),
               ),
             ],
           ),
