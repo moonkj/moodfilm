@@ -78,21 +78,21 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   // 효과 파라미터 목록
   static const _params = [
+    (label: '솜결',  icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
+    (label: '뽀얀',  icon: Icons.blur_circular_rounded,            min: 0.0,  max: 1.0),
     (label: '밝기',  icon: Icons.wb_sunny_outlined,               min: -1.0, max: 1.0),
     (label: '대비',  icon: Icons.contrast,                         min: -1.0, max: 1.0),
     (label: '채도',  icon: Icons.palette_outlined,                 min: -1.0, max: 1.0),
-    (label: '솜결',  icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
-    (label: '뽀얀',  icon: Icons.blur_circular_rounded,            min: 0.0,  max: 1.0),
     (label: '글로우', icon: Icons.flare_rounded,                    min: 0.0,  max: 1.0),
   ];
 
   double _getParamValue(int i) {
     switch (i) {
-      case 0: return _exposure;
-      case 1: return _contrast;
-      case 2: return _saturation;
-      case 3: return _beauty;
-      case 4: return _fade;
+      case 0: return _beauty;
+      case 1: return _fade;
+      case 2: return _exposure;
+      case 3: return _contrast;
+      case 4: return _saturation;
       case 5: return _dreamyGlow;
       default: return 0;
     }
@@ -488,11 +488,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   void _setParamValueDirectly(int i, double v) {
     switch (i) {
-      case 0: _exposure = v;
-      case 1: _contrast = v;
-      case 2: _saturation = v;
-      case 3: _beauty = v;
-      case 4: _fade = v;
+      case 0: _beauty = v;
+      case 1: _fade = v;
+      case 2: _exposure = v;
+      case 3: _contrast = v;
+      case 4: _saturation = v;
       case 5: _dreamyGlow = v;
     }
   }

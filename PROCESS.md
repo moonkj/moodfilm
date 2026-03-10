@@ -944,3 +944,9 @@ if let movURL = livePhotoMovieURL {
 - 파일 존재 확인 (`File(src).existsSync()`) 후 공유
 - 프리뷰(`_filteredPreviewPath`) 재사용 — 공유 시 불필요한 재처리 방지
 - `dart:math` 미사용 import 제거
+
+## 세션 22 (2026-03-10) — 효과 순서 변경 + 공유 버그 수정
+
+### 카메라/에디터 효과 순서 변경
+- **카메라 화면** (`camera_screen.dart` `_effectItems`): 밝기→대비→채도→솜결→뽀얀→글로우 → **솜결→뽀얀→밝기→대비→채도→글로우**
+- **에디터 화면** (`editor_screen.dart` `_params`): 동일하게 변경 (`_getParamValue` / `_setParamValueDirectly` 인덱스 동기화)

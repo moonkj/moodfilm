@@ -760,11 +760,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   // (key, label, icon, min, max)
   static const _effectItems = [
+    ('softness',   '솜결',   Icons.face_retouching_natural_rounded,  0.0, 1.0),
+    ('beauty',     '뽀얀',   Icons.blur_circular_rounded,            0.0, 1.0),
     ('brightness', '밝기',   Icons.wb_sunny_outlined,               -1.0, 1.0),
     ('contrast',   '대비',   Icons.contrast_rounded,                -1.0, 1.0),
     ('saturation', '채도',   Icons.palette_outlined,                -1.0, 1.0),
-    ('softness',   '솜결',   Icons.face_retouching_natural_rounded,  0.0, 1.0),
-    ('beauty',     '뽀얀',   Icons.blur_circular_rounded,            0.0, 1.0),
     ('glow',       '글로우', Icons.flare_rounded,                    0.0, 1.0),
   ];
 
