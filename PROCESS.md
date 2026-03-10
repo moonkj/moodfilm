@@ -1028,7 +1028,7 @@ if let movURL = livePhotoMovieURL {
 
 ---
 
-## 세션 26 (2026-03-10) — 6개국 현지화 + 스크린샷 생성기 + 아이패드 제거
+## 세션 26 (2026-03-10) — 6개국 현지화 + 아이패드 제거
 
 ### 6개 언어 현지화 (flutter_localizations + ARB)
 - **패키지 추가**: `intl: ^0.19.0`, `generate: true` in pubspec.yaml
@@ -1044,28 +1044,23 @@ if let movURL = livePhotoMovieURL {
 - ARB 파일에서 Pro 키 제거 (`likeItPro`, `proFeature1-5`, `proPurchaseNote`, `buyNow`, `restorePurchase`)
 - `paywall_screen.dart`: l10n 참조 → 하드코딩 영어 문자열로 교체
 
-### 앱스토어 스크린샷 생성기
-- **`lib/features/screenshots/presentation/screenshot_frame_screen.dart`** 신규 생성
-  - 4페이지 × 6언어 조합 (총 24장) 지원
-  - 언어 선택 드롭다운 (AppBar), 개별 저장 + "전체저장" 버튼
-  - `RepaintBoundary` + `toImage(pixelRatio: 1.0)` → 1320×2868px 출력
-  - `PhotoManager`로 갤러리 저장, 파일명: `likeit_{langCode}_0{n}.png`
-  - `_IPhoneMockup` 위젯: iPhone 16 Pro Max 프레임 + Dynamic Island
-- **`/screenshot`** 라우트 추가 (`router.dart`)
-- **설정 화면** 개발자 섹션에 스크린샷 메뉴 추가
-- **`pubspec.yaml`**: `assets/screenshots/` 폴더 선언 추가 (실제 기기 스크린샷 3장)
-
-### 카피 (4페이지)
-| 페이지 | 헤드라인 (KO) | 화면 |
-|--------|---------------|------|
-| 1 | 이미 예쁜데 더 예뻐지는 카메라예요 | screen2 (카메라+필터바) |
-| 2 | 26가지 필터 중에 내 필터를 찾아봐요 | screen2+3 |
-| 3 | 기본값부터 예쁜 건 이유가 있어요 | screen3 (이펙트) |
-| 4 | 좋았던 오늘을 예쁘게 남겨요 | screen1 (스플래시) |
-
 ### 아이패드 제거
 - `ios/Runner.xcodeproj/project.pbxproj`: `TARGETED_DEVICE_FAMILY = "1,2"` → `"1"` (3곳)
 
 ### 앱스토어 메타데이터 업데이트
 - `store_assets/app_store_metadata.md`: 6개 언어 앱 설명·부제목·키워드 전체 작성
+
+### 에디터 효과/자르기 이름 현지화 (버그 수정)
+- `_params` 레코드에서 `label` 필드 제거 → `_paramLabel(i, l10n)` 메서드로 현지화
+  (솜결→Softness/なめらか/柔嫩/Douceur/सॉफ्टनेस 등 6개 언어)
+- `_aspectOptions` → `_aspectRatios` + `_aspectLabels(l10n)` 분리
+  (자유형→Free/フリー/自由/Libre/फ्री, 정방형→Square/正方形 등)
+
+### 갤러리 화면 전체 현지화 (버그 수정)
+- `gallery_picker_screen.dart`: 한국어 하드코딩 전체 제거 → `AppLocalizations` 적용
+- ARB 6종에 신규 키 11개 추가:
+  `selectedCount`, `select`, `album`, `selectFilter`,
+  `galleryPermissionRequired`, `allowInSettings`, `noPhotos`,
+  `deleteCountTitle`, `deleteSelectedConfirm`, `deletedCount`,
+  `batchSavedCount`, `processingProgress`
 
