@@ -12,6 +12,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/utils/haptic_utils.dart';
 import '../../../core/services/router.dart' show routeObserver;
+import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/camera_engine/camera_engine.dart';
 import '../providers/camera_provider.dart';
 import '../models/camera_state.dart';
@@ -497,6 +498,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   // MARK: - 프리뷰 우측 사이드 버튼 (라이브포토 + 비교 + 강도 + 설정)
 
   Widget _buildPreviewSideButtons(CameraState cameraState) {
+    final l10n = AppLocalizations.of(context);
     return Positioned(
       right: 10,
       bottom: 68, // 강도 슬라이더(하단 52px) 위에 배치
@@ -508,34 +510,37 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             _buildRecordingTimer(cameraState.recordingSeconds),
             const SizedBox(height: 10),
           ],
-          _timerSideBtn(),
+          _timerSideBtn(l10n),
           const SizedBox(height: 10),
           _sideLabeledBtn(
-            label: '필터효과',
+            labelKey: 'filterEffect',
+            labelText: l10n.effectTab,
             icon: Icons.tune_rounded,
             active: _showIntensitySlider,
             onTap: () {
               setState(() => _showIntensitySlider = !_showIntensitySlider);
-              _showSideBtnLabel('필터효과');
+              _showSideBtnLabel('filterEffect');
             },
           ),
           const SizedBox(height: 10),
           _sideLabeledBtn(
-            label: '비교',
+            labelKey: 'compare',
+            labelText: l10n.original,
             icon: Icons.compare_rounded,
             active: _isSplitMode,
             onTap: () {
               _toggleSplitMode(cameraState.isFrontCamera);
-              _showSideBtnLabel('비교');
+              _showSideBtnLabel('compare');
             },
           ),
           const SizedBox(height: 10),
           _sideLabeledBtn(
-            label: '설정',
+            labelKey: 'settings',
+            labelText: l10n.settings,
             icon: Icons.settings_outlined,
             active: false,
             onTap: () {
-              _showSideBtnLabel('설정');
+              _showSideBtnLabel('settings');
               context.push('/settings');
             },
           ),
@@ -544,8 +549,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     );
   }
 
-  Widget _timerSideBtn() {
-    final showLabel = _sideBtnLabel == '타이머';
+  Widget _timerSideBtn(AppLocalizations l10n) {
+    final showLabel = _sideBtnLabel == 'timer';
     final isActive = _timerSeconds > 0 || _isCountingDown;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -562,7 +567,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
-                    _timerSeconds > 0 ? '$_timerSeconds초' : '타이머',
+                    _timerSeconds > 0 ? l10n.timerSeconds(_timerSeconds) : l10n.camera,
                     style: const TextStyle(color: Colors.white, fontSize: 12,
                         fontWeight: FontWeight.w500),
                   ),
@@ -576,7 +581,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             final idx = options.indexOf(_timerSeconds);
             setState(() => _timerSeconds = options[(idx + 1) % options.length]);
             HapticUtils.filterChange();
-            _showSideBtnLabel('타이머');
+            _showSideBtnLabel('timer');
           },
           child: Container(
             width: 38, height: 38,
@@ -589,7 +594,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             child: Center(
               child: _timerSeconds > 0
                   ? Text(
-                      '${_timerSeconds}s',
+                      l10n.timerSeconds(_timerSeconds),
                       style: TextStyle(
                         color: isActive ? AppColors.accent : Colors.white,
                         fontSize: 13,
@@ -609,12 +614,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Widget _sideLabeledBtn({
-    required String label,
+    required String labelKey,
+    required String labelText,
     required IconData icon,
     required bool active,
     required VoidCallback onTap,
   }) {
-    final showLabel = _sideBtnLabel == label;
+    final showLabel = _sideBtnLabel == labelKey;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -629,7 +635,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(100),
                   ),
-                  child: Text(label,
+                  child: Text(labelText,
                       style: const TextStyle(color: Colors.white, fontSize: 12,
                           fontWeight: FontWeight.w500)),
                 )
@@ -764,17 +770,19 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   // MARK: - 색보정 효과 패널
 
-  // (key, label, icon, min, max)
-  static const _effectItems = [
-    ('softness',   '솜결',   Icons.face_retouching_natural_rounded,  0.0, 1.0),
-    ('beauty',     '뽀얀',   Icons.blur_circular_rounded,            0.0, 1.0),
-    ('brightness', '밝기',   Icons.wb_sunny_outlined,               -1.0, 1.0),
-    ('contrast',   '대비',   Icons.contrast_rounded,                -1.0, 1.0),
-    ('saturation', '채도',   Icons.palette_outlined,                -1.0, 1.0),
-    ('glow',       '글로우', Icons.flare_rounded,                    0.0, 1.0),
+  // (key, label, icon, min, max) — labels resolved at build time via l10n
+  List<(String, String, IconData, double, double)> _effectItems(AppLocalizations l10n) => [
+    ('softness',   l10n.softness,   Icons.face_retouching_natural_rounded,  0.0, 1.0),
+    ('beauty',     l10n.beauty,     Icons.blur_circular_rounded,            0.0, 1.0),
+    ('brightness', l10n.brightness, Icons.wb_sunny_outlined,               -1.0, 1.0),
+    ('contrast',   l10n.contrast,   Icons.contrast_rounded,                -1.0, 1.0),
+    ('saturation', l10n.saturation, Icons.palette_outlined,                -1.0, 1.0),
+    ('glow',       l10n.glow,       Icons.flare_rounded,                    0.0, 1.0),
   ];
 
   Widget _buildEffectsPanel() {
+    final l10n = AppLocalizations.of(context);
+    final effectItems = _effectItems(l10n);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -783,8 +791,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           height: 68,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(_effectItems.length, (i) {
-              final (key, label, icon, _, _) = _effectItems[i];
+            children: List.generate(effectItems.length, (i) {
+              final (key, label, icon, _, _) = effectItems[i];
               final isActive = i == _selectedEffectIndex;
               final value = _adjustments[key]!;
               final n = (value * 100).round();
@@ -834,7 +842,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Builder(builder: (context) {
-            final (key, _, _, min, max) = _effectItems[_selectedEffectIndex];
+            final (key, _, _, min, max) = effectItems[_selectedEffectIndex];
             final value = _adjustments[key]!;
             return SliderTheme(
               data: SliderTheme.of(context).copyWith(
@@ -865,12 +873,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Widget _buildModeSelector(CameraState cameraState) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _modeTab('사진', !cameraState.isVideoMode, cameraState),
+        _modeTab(l10n.photo, !cameraState.isVideoMode, cameraState),
         const SizedBox(width: 24),
-        _modeTab('동영상', cameraState.isVideoMode, cameraState),
+        _modeTab(l10n.video, cameraState.isVideoMode, cameraState),
       ],
     );
   }
@@ -1047,7 +1056,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                         alignment: Alignment.centerRight,
                         child: Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: _splitLabel('원본'),
+                          child: _splitLabel(AppLocalizations.of(context).original),
                         ),
                       ),
                     ),
@@ -1098,12 +1107,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.swipe_rounded, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('스와이프하여 필터 변경', style: TextStyle(color: Colors.white, fontSize: 14)),
+                const Icon(Icons.swipe_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text(AppLocalizations.of(context).swipeToChangeFilter,
+                    style: const TextStyle(color: Colors.white, fontSize: 14)),
               ],
             ),
           ),

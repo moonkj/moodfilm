@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-10 (세션 21)
+> 마지막 업데이트: 2026-03-10 (세션 26)
 
 ---
 
@@ -1005,3 +1005,67 @@ if let movURL = livePhotoMovieURL {
 - `_buildPreviewStack`: `if (_isSplitMode && !cameraState.isRecording)` 조건 추가
 - 동영상 녹화 시작 시 `CameraEngine.setSplitMode(position: -1.0)` → 전체 필터 적용
 - 동영상 녹화 종료 시 스플릿 위치 복원
+
+---
+
+## 세션 25 (2026-03-10) — 전체 코드 디버깅 (7개 버그 수정 + analyze clean)
+
+### Critical 버그 수정
+- **camera_provider**: `beauty` 기본값 0.45 제거 → `camera_screen`의 `_applyDefaultEffects()`(0.25)와 충돌했던 이중 설정 해소
+
+### High 버그 수정
+- **CameraEnginePlugin.swift**: 갤러리 권한 거부 시 성공 반환 → `PERMISSION_DENIED` 에러 반환으로 수정
+- **camera_provider**: `initialize()` 중복 호출 가드 추가 → race condition 방지
+- **camera_provider**: `startRecording()` await 추가 + 실패 시 `isRecording` 리셋
+
+### Medium 버그 수정
+- **router.dart**: `extra` unsafe cast → `is String` 타입 체크로 변경
+- **camera_screen**: lifecycle resumed `.then()` 내부 `mounted` 체크 추가
+- **camera_screen**: `_checkOnboardingHints` Hive save를 `mounted` 체크 이전으로 이동
+
+### 정적 분석 clean
+- `flutter analyze`: 13개 이슈 → 0개 (unused import, curly braces, underscore naming 전부 수정)
+
+---
+
+## 세션 26 (2026-03-10) — 6개국 현지화 + 스크린샷 생성기 + 아이패드 제거
+
+### 6개 언어 현지화 (flutter_localizations + ARB)
+- **패키지 추가**: `intl: ^0.19.0`, `generate: true` in pubspec.yaml
+- **l10n.yaml** 신규 생성: `arb-dir: lib/l10n`, `nullable-getter: false`
+- **ARB 파일** 6종 생성: `app_en.arb` (57개 키, 템플릿) + `app_ko/ja/zh/fr/hi.arb`
+  - 지원 키: UI 레이블, 카메라/에디터/필터/설정/온보딩 전체 문자열
+  - Parameterized: `timerSeconds` (`{seconds}` int 플레이스홀더)
+- **`lib/app.dart`**: `localizationsDelegates` + `supportedLocales` 추가
+- **시스템 언어 자동 감지**: 한국어·영어·일본어·중국어·프랑스어·힌디어 지원
+- 적용 화면: `camera_screen`, `editor_screen`, `filter_library_screen`, `onboarding_screen`, `settings_screen`
+
+### Pro/페이월 관련 내용 전체 삭제
+- ARB 파일에서 Pro 키 제거 (`likeItPro`, `proFeature1-5`, `proPurchaseNote`, `buyNow`, `restorePurchase`)
+- `paywall_screen.dart`: l10n 참조 → 하드코딩 영어 문자열로 교체
+
+### 앱스토어 스크린샷 생성기
+- **`lib/features/screenshots/presentation/screenshot_frame_screen.dart`** 신규 생성
+  - 4페이지 × 6언어 조합 (총 24장) 지원
+  - 언어 선택 드롭다운 (AppBar), 개별 저장 + "전체저장" 버튼
+  - `RepaintBoundary` + `toImage(pixelRatio: 1.0)` → 1320×2868px 출력
+  - `PhotoManager`로 갤러리 저장, 파일명: `likeit_{langCode}_0{n}.png`
+  - `_IPhoneMockup` 위젯: iPhone 16 Pro Max 프레임 + Dynamic Island
+- **`/screenshot`** 라우트 추가 (`router.dart`)
+- **설정 화면** 개발자 섹션에 스크린샷 메뉴 추가
+- **`pubspec.yaml`**: `assets/screenshots/` 폴더 선언 추가 (실제 기기 스크린샷 3장)
+
+### 카피 (4페이지)
+| 페이지 | 헤드라인 (KO) | 화면 |
+|--------|---------------|------|
+| 1 | 이미 예쁜데 더 예뻐지는 카메라예요 | screen2 (카메라+필터바) |
+| 2 | 26가지 필터 중에 내 필터를 찾아봐요 | screen2+3 |
+| 3 | 기본값부터 예쁜 건 이유가 있어요 | screen3 (이펙트) |
+| 4 | 좋았던 오늘을 예쁘게 남겨요 | screen1 (스플래시) |
+
+### 아이패드 제거
+- `ios/Runner.xcodeproj/project.pbxproj`: `TARGETED_DEVICE_FAMILY = "1,2"` → `"1"` (3곳)
+
+### 앱스토어 메타데이터 업데이트
+- `store_assets/app_store_metadata.md`: 6개 언어 앱 설명·부제목·키워드 전체 작성
+

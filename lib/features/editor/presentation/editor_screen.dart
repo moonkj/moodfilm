@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';
@@ -200,8 +201,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
                 ),
-                child: const Text('초기화',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
+                child: Text(AppLocalizations.of(context).reset,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
               ),
             ),
             const SizedBox(width: 8),
@@ -761,7 +762,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   color: const Color(0xFFF5F2EF),
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Text('초기화', style: TextStyle(fontSize: 13, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
+                child: Text(AppLocalizations.of(context).reset, style: const TextStyle(fontSize: 13, color: Color(0xFF8A8480), fontWeight: FontWeight.w500)),
               ),
             ),
             const SizedBox(width: 12),
@@ -773,7 +774,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   color: const Color(0xFF3D3531),
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Text('적용', style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),
+                child: Text(AppLocalizations.of(context).apply, style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -857,11 +858,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildTab('필터', Icons.auto_awesome_rounded, 'filter',
+          _buildTab(AppLocalizations.of(context).filterTab, Icons.auto_awesome_rounded, 'filter',
               hasDot: hasFilterChange),
-          _buildTab('효과', Icons.flare_rounded, 'effect',
+          _buildTab(AppLocalizations.of(context).effectTab, Icons.flare_rounded, 'effect',
               hasDot: hasEffectChange),
-          _buildTab('자르기', Icons.crop_rounded, 'crop',
+          _buildTab(AppLocalizations.of(context).cropTab, Icons.crop_rounded, 'crop',
               hasDot: hasCropChange),
         ],
       ),
@@ -973,11 +974,12 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   Future<void> _saveImage() async {
     if (widget.imagePath == null) return;
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('저장 중...'),
-      backgroundColor: Color(0xFF3D3531),
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(l10n.saving),
+      backgroundColor: const Color(0xFF3D3531),
       behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 10),
+      duration: const Duration(seconds: 10),
     ));
     try {
       final camera = ref.read(cameraProvider);
@@ -1010,15 +1012,15 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       if (outputPath != null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('갤러리에 저장되었습니다'),
-          backgroundColor: Color(0xFF3D3531),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.savedToGallery),
+          backgroundColor: const Color(0xFF3D3531),
           behavior: SnackBarBehavior.floating,
         ));
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('저장에 실패했습니다'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.saveFailed),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ));
@@ -1027,7 +1029,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('오류: $e'),
+        content: Text('${AppLocalizations.of(context).saveFailed}: $e'),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ));
@@ -1056,7 +1058,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       if (!hasFilter && !_hasChanges) {
         final src = _effectiveSourcePath;
         if (!File(src).existsSync()) {
-          _showSnackBar('파일을 찾을 수 없습니다', isError: true);
+          _showSnackBar(AppLocalizations.of(context).fileNotFound, isError: true);
           return;
         }
         await Share.shareXFiles(
@@ -1080,7 +1082,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       }
 
       if (!mounted) return;
-      _showSnackBar('공유 준비 중...', duration: 30);
+      _showSnackBar(AppLocalizations.of(context).preparingShare, duration: 30);
 
       final path = await FilterEngine.processImage(
         sourcePath: _effectiveSourcePath,
@@ -1106,12 +1108,12 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           sharePositionOrigin: origin,
         );
       } else {
-        _showSnackBar('공유에 실패했습니다 (처리 오류)', isError: true);
+        _showSnackBar(AppLocalizations.of(context).shareFailed, isError: true);
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _showSnackBar('공유 실패: $e', isError: true);
+      _showSnackBar('${AppLocalizations.of(context).shareFailed}: $e', isError: true);
     }
   }
 
@@ -1144,23 +1146,23 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('사진 삭제',
-            style: TextStyle(
+        title: Text(AppLocalizations.of(context).deletePhoto,
+            style: const TextStyle(
                 color: Color(0xFF3D3531),
                 fontSize: 16,
                 fontWeight: FontWeight.w600)),
-        content: const Text('갤러리에서 이 사진을 삭제할까요?',
-            style: TextStyle(color: Color(0xFF8A8480), fontSize: 14)),
+        content: Text(AppLocalizations.of(context).deletePhotoConfirm,
+            style: const TextStyle(color: Color(0xFF8A8480), fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소',
-                style: TextStyle(color: Color(0xFF8A8480))),
+            child: Text(AppLocalizations.of(context).cancel,
+                style: const TextStyle(color: Color(0xFF8A8480))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('삭제',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            child: Text(AppLocalizations.of(context).delete,
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

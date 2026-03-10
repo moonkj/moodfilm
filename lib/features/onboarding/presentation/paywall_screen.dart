@@ -20,16 +20,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
   bool _isRestoring = false;
   String? _errorMessage;
 
-  static const _features = [
-    ('필터 20종 전체 해금', Icons.auto_awesome_rounded),
-    ('Dreamy Glow · Film Grain 이펙트', Icons.blur_on_rounded),
-    ('동영상 필터 녹화', Icons.videocam_rounded),
-    ('갤러리 일괄 필터 적용', Icons.photo_library_rounded),
-    ('향후 추가 필터 무료 업데이트', Icons.update_rounded),
+  static const _featureIcons = [
+    Icons.auto_awesome_rounded,
+    Icons.blur_on_rounded,
+    Icons.videocam_rounded,
+    Icons.photo_library_rounded,
+    Icons.update_rounded,
   ];
 
   @override
   Widget build(BuildContext context) {
+    final features = [
+      ('Unlock all filters', _featureIcons[0]),
+      ('Dreamy Glow · Film Grain effects', _featureIcons[1]),
+      ('Video filter recording', _featureIcons[2]),
+      ('Batch apply filters to gallery', _featureIcons[3]),
+      ('Free updates for new filters', _featureIcons[4]),
+    ];
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       body: SafeArea(
@@ -52,9 +59,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
             const Spacer(),
 
             // 타이틀
-            const Text(
+            Text(
               'Like it! Pro',
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 30,
                 fontWeight: FontWeight.w700,
@@ -63,7 +70,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '모든 필터 · 한 번만 구매',
+              'All filters · One-time purchase',
               style: AppTypography.body.copyWith(color: Colors.white60),
             ),
 
@@ -73,7 +80,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
-                children: _features
+                children: features
                     .map((f) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Row(
@@ -107,9 +114,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.accent, width: 1.5),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Text(
+                    const Text(
                       '₩29,900',
                       style: TextStyle(
                         color: Colors.white,
@@ -117,10 +124,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      '1회 구매 · 영구 사용',
-                      style: TextStyle(color: Colors.white54, fontSize: 13),
+                      'One-time purchase · Lifetime access',
+                      style: const TextStyle(color: Colors.white54, fontSize: 13),
                     ),
                   ],
                 ),
@@ -165,9 +172,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          '지금 구매하기',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      : Text(
+                          'Buy Now',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                 ),
               ),
@@ -184,9 +191,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         strokeWidth: 1.5,
                       ),
                     )
-                  : const Text(
-                      '구매 복원',
-                      style: TextStyle(color: Colors.white38, fontSize: 13),
+                  : Text(
+                      'Restore Purchase',
+                      style: const TextStyle(color: Colors.white38, fontSize: 13),
                     ),
             ),
             const SizedBox(height: 20),
@@ -206,10 +213,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
       }
     } on PurchasesErrorCode catch (e) {
       if (mounted && e != PurchasesErrorCode.purchaseCancelledError) {
-        setState(() => _errorMessage = '구매에 실패했습니다. 다시 시도해주세요.');
+        setState(() => _errorMessage = 'Purchase failed. Please try again.');
       }
     } catch (_) {
-      if (mounted) setState(() => _errorMessage = '구매에 실패했습니다. 다시 시도해주세요.');
+      if (mounted) setState(() => _errorMessage = 'Purchase failed. Please try again.');
     } finally {
       if (mounted) setState(() => _isPurchasing = false);
     }
@@ -223,10 +230,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
       if (success) {
         Navigator.of(context).pop(true);
       } else {
-        setState(() => _errorMessage = '복원할 구매 내역이 없습니다.');
+        setState(() => _errorMessage = 'No purchases to restore.');
       }
     } catch (_) {
-      if (mounted) setState(() => _errorMessage = '복원에 실패했습니다. 다시 시도해주세요.');
+      if (mounted) setState(() => _errorMessage = 'Restore failed. Please try again.');
     } finally {
       if (mounted) setState(() => _isRestoring = false);
     }

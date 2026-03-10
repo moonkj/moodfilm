@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../l10n/app_localizations.dart';
 import 'policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -16,19 +17,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final prefs = StorageService.prefs;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.primary,
-      appBar: AppBar(title: const Text('설정')),
+      appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
         children: [
           // 카메라 설정
           _SettingsSection(
-            title: '카메라',
+            title: l10n.camera,
             children: [
               SwitchListTile(
                 secondary: const Icon(Icons.volume_off_rounded),
-                title: const Text('무음 셔터'),
-                subtitle: const Text('촬영음 없이 사진 찍기 (1920×1080 저장)'),
+                title: Text(l10n.silentShutter),
+                subtitle: Text(l10n.silentShutterSubtitle),
                 value: prefs.isSilentShutter,
                 onChanged: (v) {
                   setState(() {
@@ -42,16 +44,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           // 앱 정보
           _SettingsSection(
-            title: '앱 정보',
+            title: l10n.appInfo,
             children: [
-              const ListTile(
-                leading: Icon(Icons.info_outline_rounded),
-                title: Text('버전'),
-                trailing: Text('1.0.0', style: AppTypography.caption),
+              ListTile(
+                leading: const Icon(Icons.info_outline_rounded),
+                title: Text(l10n.version),
+                trailing: const Text('1.0.0', style: AppTypography.caption),
               ),
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
-                title: const Text('개인정보처리방침'),
+                title: Text(l10n.privacyPolicy),
                 trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBB6B2)),
                 onTap: () => Navigator.push(
                   context,
@@ -60,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.article_outlined),
-                title: const Text('이용약관'),
+                title: Text(l10n.termsOfService),
                 trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBB6B2)),
                 onTap: () => Navigator.push(
                   context,
@@ -69,10 +71,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.mail_outline_rounded),
-                title: const Text('문의하기'),
+                title: Text(l10n.contactUs),
                 trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBB6B2)),
                 onTap: () => launchUrl(
-                  Uri.parse('mailto:imurmkj@gmail.com?subject=Like it! 문의'),
+                  Uri.parse('mailto:imurmkj@gmail.com?subject=${l10n.contactEmailSubject}'),
                   mode: LaunchMode.externalApplication,
                 ),
               ),

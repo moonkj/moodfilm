@@ -7,6 +7,7 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/utils/haptic_utils.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../camera/providers/camera_provider.dart';
 
 
@@ -71,7 +72,7 @@ class _FilterLibraryScreenState
     return Scaffold(
       backgroundColor: AppColors.primary,
       appBar: AppBar(
-        title: const Text('Filter Library'),
+        title: Text(AppLocalizations.of(context).filterLibrary),
         bottom: TabBar(
           controller: _tabController,
           tabs: _tabs
@@ -82,7 +83,9 @@ class _FilterLibraryScreenState
                         if (t == 'Favorites')
                           const Icon(Icons.favorite_rounded, size: 14),
                         if (t == 'Favorites') const SizedBox(width: 4),
-                        Text(t),
+                        t == 'Favorites'
+                            ? Text(AppLocalizations.of(context).favorites)
+                            : Text(t),
                       ],
                     ),
                   ))
@@ -125,8 +128,9 @@ class _FilterGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (filters.isEmpty) {
-      return const Center(
-        child: Text('즐겨찾기한 필터가 없습니다', style: AppTypography.body),
+      return Center(
+        child: Text(AppLocalizations.of(context).noFavoriteFilters,
+            style: AppTypography.body),
       );
     }
 

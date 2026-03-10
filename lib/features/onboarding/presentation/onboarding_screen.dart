@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
+import '../../../l10n/app_localizations.dart';
 
 
 /// 온보딩 화면 — Progressive Disclosure
@@ -13,6 +14,7 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
@@ -70,7 +72,7 @@ class OnboardingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '한 번의 탭으로,\n내 사진이 예뻐지는 경험',
+                l10n.onboardingTagline,
                 style: AppTypography.body.copyWith(
                     color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
@@ -89,8 +91,8 @@ class OnboardingScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text('시작하기',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  child: Text(l10n.getStarted,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
               const SizedBox(height: 16),
