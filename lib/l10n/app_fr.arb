@@ -44,5 +44,22 @@
   "shareFailed": "Échec du partage",
   "fileNotFound": "Fichier introuvable",
   "onboardingTagline": "Un tap.\nDes photos magnifiques.",
-  "getStarted": "Commencer"
+  "getStarted": "Commencer",
+  "selectedCount": "{count} sélectionné(s)",
+  "@selectedCount": { "placeholders": { "count": { "type": "int" } } },
+  "select": "Sélectionner",
+  "album": "Album",
+  "selectFilter": "Choisir un filtre",
+  "galleryPermissionRequired": "Accès à la galerie requis",
+  "allowInSettings": "Autoriser dans les réglages",
+  "noPhotos": "Aucune photo",
+  "deleteCountTitle": "Supprimer {count} éléments",
+  "@deleteCountTitle": { "placeholders": { "count": { "type": "int" } } },
+  "deleteSelectedConfirm": "Les éléments sélectionnés seront supprimés de votre galerie.\nCette action est irréversible.",
+  "deletedCount": "{count} éléments supprimés",
+  "@deletedCount": { "placeholders": { "count": { "type": "int" } } },
+  "batchSavedCount": "{count} photos enregistrées dans la galerie",
+  "@batchSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "processingProgress": "{processed} / {total} en cours...",
+  "@processingProgress": { "placeholders": { "processed": { "type": "int" }, "total": { "type": "int" } } }
 }

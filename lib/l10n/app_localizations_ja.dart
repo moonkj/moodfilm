@@ -141,4 +141,50 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get getStarted => 'はじめる';
+
+  @override
+  String selectedCount(int count) {
+    return '$count件選択済み';
+  }
+
+  @override
+  String get select => '選択';
+
+  @override
+  String get album => 'アルバム';
+
+  @override
+  String get selectFilter => 'フィルターを選択';
+
+  @override
+  String get galleryPermissionRequired => 'ギャラリーへのアクセス許可が必要です';
+
+  @override
+  String get allowInSettings => '設定で許可する';
+
+  @override
+  String get noPhotos => '写真がありません';
+
+  @override
+  String deleteCountTitle(int count) {
+    return '$count件を削除';
+  }
+
+  @override
+  String get deleteSelectedConfirm => '選択したアイテムをギャラリーから削除します。\nこの操作は取り消せません。';
+
+  @override
+  String deletedCount(int count) {
+    return '$count件を削除しました';
+  }
+
+  @override
+  String batchSavedCount(int count) {
+    return '$count枚をギャラリーに保存しました';
+  }
+
+  @override
+  String processingProgress(int processed, int total) {
+    return '$processed / $total 処理中...';
+  }
 }

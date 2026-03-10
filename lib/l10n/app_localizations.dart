@@ -369,6 +369,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Get Started'**
   String get getStarted;
+
+  /// No description provided for @selectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String selectedCount(int count);
+
+  /// No description provided for @select.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get select;
+
+  /// No description provided for @album.
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get album;
+
+  /// No description provided for @selectFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Filter'**
+  String get selectFilter;
+
+  /// No description provided for @galleryPermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery access required'**
+  String get galleryPermissionRequired;
+
+  /// No description provided for @allowInSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow in Settings'**
+  String get allowInSettings;
+
+  /// No description provided for @noPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'No photos'**
+  String get noPhotos;
+
+  /// No description provided for @deleteCountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} items'**
+  String deleteCountTitle(int count);
+
+  /// No description provided for @deleteSelectedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected items will be deleted from your gallery.\nThis action cannot be undone.'**
+  String get deleteSelectedConfirm;
+
+  /// No description provided for @deletedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {count} items'**
+  String deletedCount(int count);
+
+  /// No description provided for @batchSavedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {count} photos to gallery'**
+  String batchSavedCount(int count);
+
+  /// No description provided for @processingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{processed} / {total} processing...'**
+  String processingProgress(int processed, int total);
 }
 
 class _AppLocalizationsDelegate

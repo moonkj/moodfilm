@@ -44,5 +44,22 @@
   "shareFailed": "공유에 실패했습니다",
   "fileNotFound": "파일을 찾을 수 없습니다",
   "onboardingTagline": "한 번의 탭으로,\n내 사진이 예뻐지는 경험",
-  "getStarted": "시작하기"
+  "getStarted": "시작하기",
+  "selectedCount": "{count}장 선택됨",
+  "@selectedCount": { "placeholders": { "count": { "type": "int" } } },
+  "select": "선택",
+  "album": "앨범",
+  "selectFilter": "필터 선택",
+  "galleryPermissionRequired": "갤러리 접근 권한이 필요합니다",
+  "allowInSettings": "설정에서 허용하기",
+  "noPhotos": "사진이 없습니다",
+  "deleteCountTitle": "{count}개 삭제",
+  "@deleteCountTitle": { "placeholders": { "count": { "type": "int" } } },
+  "deleteSelectedConfirm": "선택한 항목을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.",
+  "deletedCount": "{count}개를 삭제했습니다",
+  "@deletedCount": { "placeholders": { "count": { "type": "int" } } },
+  "batchSavedCount": "{count}장을 갤러리에 저장했습니다",
+  "@batchSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "processingProgress": "{processed} / {total} 처리 중...",
+  "@processingProgress": { "placeholders": { "processed": { "type": "int" }, "total": { "type": "int" } } }
 }

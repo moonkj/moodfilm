@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import 'video_player_screen.dart';
 
@@ -130,22 +131,23 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     if (_selectedIds.isEmpty) return;
     final count = _selectedIds.length;
 
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.darkSurface,
-        title: Text('$count개 삭제',
+        title: Text(l10n.deleteCountTitle(count),
             style: const TextStyle(color: Colors.white, fontSize: 17)),
-        content: const Text('선택한 항목을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
-            style: TextStyle(color: Colors.white60, fontSize: 14)),
+        content: Text(l10n.deleteSelectedConfirm,
+            style: const TextStyle(color: Colors.white60, fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소', style: TextStyle(color: Colors.white60)),
+            child: Text(l10n.cancel, style: const TextStyle(color: Colors.white60)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -165,7 +167,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${ids.length}개를 삭제했습니다'),
+        content: Text(AppLocalizations.of(context).deletedCount(ids.length)),
         backgroundColor: AppColors.darkSurface,
         behavior: SnackBarBehavior.floating,
       ),
@@ -242,7 +244,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$successCount장을 갤러리에 저장했습니다'),
+        content: Text(AppLocalizations.of(context).batchSavedCount(successCount)),
         backgroundColor: AppColors.darkSurface,
         behavior: SnackBarBehavior.floating,
       ),
@@ -285,7 +287,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
           Expanded(
             child: _isMultiSelectMode
                 ? Text(
-                    '${_selectedIds.length}장 선택됨',
+                    AppLocalizations.of(context).selectedCount(_selectedIds.length),
                     style: const TextStyle(
                       color: Color(0xFF3D3531),
                       fontSize: 17,
@@ -319,7 +321,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
           if (!_isMultiSelectMode)
             TextButton(
               onPressed: _toggleMultiSelectMode,
-              child: const Text('선택', style: TextStyle(color: AppColors.accent, fontSize: 15)),
+              child: Text(AppLocalizations.of(context).select, style: const TextStyle(color: AppColors.accent, fontSize: 15)),
             ),
           if (_isMultiSelectMode && _selectedIds.isNotEmpty) ...[
             _topCircleBtn(Icons.ios_share_rounded, color: const Color(0xFF3D3531), onTap: _shareSelected),
@@ -328,7 +330,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
             const SizedBox(width: 8),
             TextButton(
               onPressed: _showBatchFilterPicker,
-              child: const Text('필터', style: TextStyle(color: AppColors.accent, fontSize: 15)),
+              child: Text(AppLocalizations.of(context).filterTab, style: const TextStyle(color: AppColors.accent, fontSize: 15)),
             ),
           ],
         ],
@@ -360,10 +362,10 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _bottomTab(Icons.photo_library_rounded, '앨범', selected: true),
+          _bottomTab(Icons.photo_library_rounded, AppLocalizations.of(context).album, selected: true),
           GestureDetector(
             onTap: () => context.pop(),
-            child: _bottomTab(Icons.camera_alt_rounded, '카메라', selected: false),
+            child: _bottomTab(Icons.camera_alt_rounded, AppLocalizations.of(context).camera, selected: false),
           ),
         ],
       ),
@@ -398,7 +400,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
             const CircularProgressIndicator(color: AppColors.accent),
             const SizedBox(height: 20),
             Text(
-              '$_processedCount / ${_selectedIds.length} 처리 중...',
+              AppLocalizations.of(context).processingProgress(_processedCount, _selectedIds.length),
               style: const TextStyle(color: Color(0xFF8A8480), fontSize: 16),
             ),
           ],
@@ -417,13 +419,13 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
           children: [
             const Icon(Icons.photo_library_outlined, color: Color(0xFFCCC8C4), size: 48),
             const SizedBox(height: 16),
-            const Text('갤러리 접근 권한이 필요합니다',
-                style: TextStyle(color: Color(0xFF8A8480), fontSize: 16)),
+            Text(AppLocalizations.of(context).galleryPermissionRequired,
+                style: const TextStyle(color: Color(0xFF8A8480), fontSize: 16)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => PhotoManager.openSetting(),
-              child: const Text('설정에서 허용하기',
-                  style: TextStyle(color: AppColors.accent)),
+              child: Text(AppLocalizations.of(context).allowInSettings,
+                  style: const TextStyle(color: AppColors.accent)),
             ),
           ],
         ),
@@ -431,8 +433,9 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
     }
 
     if (_assets.isEmpty) {
-      return const Center(
-        child: Text('사진이 없습니다', style: TextStyle(color: Color(0xFFCCC8C4))),
+      return Center(
+        child: Text(AppLocalizations.of(context).noPhotos,
+            style: const TextStyle(color: Color(0xFFCCC8C4))),
       );
     }
 
@@ -479,9 +482,9 @@ class _FilterPickerSheet extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text('필터 선택', style: AppTypography.h2),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(AppLocalizations.of(context).selectFilter, style: AppTypography.h2),
         ),
         SizedBox(
           height: 100,

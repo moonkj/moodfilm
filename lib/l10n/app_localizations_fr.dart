@@ -141,4 +141,51 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get getStarted => 'Commencer';
+
+  @override
+  String selectedCount(int count) {
+    return '$count sélectionné(s)';
+  }
+
+  @override
+  String get select => 'Sélectionner';
+
+  @override
+  String get album => 'Album';
+
+  @override
+  String get selectFilter => 'Choisir un filtre';
+
+  @override
+  String get galleryPermissionRequired => 'Accès à la galerie requis';
+
+  @override
+  String get allowInSettings => 'Autoriser dans les réglages';
+
+  @override
+  String get noPhotos => 'Aucune photo';
+
+  @override
+  String deleteCountTitle(int count) {
+    return 'Supprimer $count éléments';
+  }
+
+  @override
+  String get deleteSelectedConfirm =>
+      'Les éléments sélectionnés seront supprimés de votre galerie.\nCette action est irréversible.';
+
+  @override
+  String deletedCount(int count) {
+    return '$count éléments supprimés';
+  }
+
+  @override
+  String batchSavedCount(int count) {
+    return '$count photos enregistrées dans la galerie';
+  }
+
+  @override
+  String processingProgress(int processed, int total) {
+    return '$processed / $total en cours...';
+  }
 }

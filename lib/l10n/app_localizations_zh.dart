@@ -141,4 +141,50 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get getStarted => '开始使用';
+
+  @override
+  String selectedCount(int count) {
+    return '已选$count项';
+  }
+
+  @override
+  String get select => '选择';
+
+  @override
+  String get album => '相册';
+
+  @override
+  String get selectFilter => '选择滤镜';
+
+  @override
+  String get galleryPermissionRequired => '需要相册访问权限';
+
+  @override
+  String get allowInSettings => '在设置中允许';
+
+  @override
+  String get noPhotos => '没有照片';
+
+  @override
+  String deleteCountTitle(int count) {
+    return '删除$count项';
+  }
+
+  @override
+  String get deleteSelectedConfirm => '将从相册中删除所选项目。\n此操作无法撤销。';
+
+  @override
+  String deletedCount(int count) {
+    return '已删除$count项';
+  }
+
+  @override
+  String batchSavedCount(int count) {
+    return '已保存$count张到相册';
+  }
+
+  @override
+  String processingProgress(int processed, int total) {
+    return '$processed / $total 处理中...';
+  }
 }

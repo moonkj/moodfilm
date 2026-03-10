@@ -44,5 +44,22 @@
   "shareFailed": "Share failed",
   "fileNotFound": "File not found",
   "onboardingTagline": "One tap.\nBeautiful photos.",
-  "getStarted": "Get Started"
+  "getStarted": "Get Started",
+  "selectedCount": "{count} selected",
+  "@selectedCount": { "placeholders": { "count": { "type": "int" } } },
+  "select": "Select",
+  "album": "Album",
+  "selectFilter": "Select Filter",
+  "galleryPermissionRequired": "Gallery access required",
+  "allowInSettings": "Allow in Settings",
+  "noPhotos": "No photos",
+  "deleteCountTitle": "Delete {count} items",
+  "@deleteCountTitle": { "placeholders": { "count": { "type": "int" } } },
+  "deleteSelectedConfirm": "Selected items will be deleted from your gallery.\nThis action cannot be undone.",
+  "deletedCount": "Deleted {count} items",
+  "@deletedCount": { "placeholders": { "count": { "type": "int" } } },
+  "batchSavedCount": "Saved {count} photos to gallery",
+  "@batchSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "processingProgress": "{processed} / {total} processing...",
+  "@processingProgress": { "placeholders": { "processed": { "type": "int" }, "total": { "type": "int" } } }
 }

@@ -141,4 +141,50 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get getStarted => '시작하기';
+
+  @override
+  String selectedCount(int count) {
+    return '$count장 선택됨';
+  }
+
+  @override
+  String get select => '선택';
+
+  @override
+  String get album => '앨범';
+
+  @override
+  String get selectFilter => '필터 선택';
+
+  @override
+  String get galleryPermissionRequired => '갤러리 접근 권한이 필요합니다';
+
+  @override
+  String get allowInSettings => '설정에서 허용하기';
+
+  @override
+  String get noPhotos => '사진이 없습니다';
+
+  @override
+  String deleteCountTitle(int count) {
+    return '$count개 삭제';
+  }
+
+  @override
+  String get deleteSelectedConfirm => '선택한 항목을 갤러리에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.';
+
+  @override
+  String deletedCount(int count) {
+    return '$count개를 삭제했습니다';
+  }
+
+  @override
+  String batchSavedCount(int count) {
+    return '$count장을 갤러리에 저장했습니다';
+  }
+
+  @override
+  String processingProgress(int processed, int total) {
+    return '$processed / $total 처리 중...';
+  }
 }

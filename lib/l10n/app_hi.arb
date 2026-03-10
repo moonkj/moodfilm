@@ -44,5 +44,22 @@
   "shareFailed": "शेयर नहीं हुआ",
   "fileNotFound": "फ़ाइल नहीं मिली",
   "onboardingTagline": "एक टैप में\nखूबसूरत तस्वीरें।",
-  "getStarted": "शुरू करें"
+  "getStarted": "शुरू करें",
+  "selectedCount": "{count} चुने गए",
+  "@selectedCount": { "placeholders": { "count": { "type": "int" } } },
+  "select": "चुनें",
+  "album": "एल्बम",
+  "selectFilter": "फ़िल्टर चुनें",
+  "galleryPermissionRequired": "गैलरी एक्सेस की अनुमति चाहिए",
+  "allowInSettings": "सेटिंग में अनुमति दें",
+  "noPhotos": "कोई फ़ोटो नहीं",
+  "deleteCountTitle": "{count} आइटम हटाएं",
+  "@deleteCountTitle": { "placeholders": { "count": { "type": "int" } } },
+  "deleteSelectedConfirm": "चुने गए आइटम गैलरी से हटाए जाएंगे।\nयह क्रिया पूर्ववत नहीं होगी।",
+  "deletedCount": "{count} आइटम हटाए गए",
+  "@deletedCount": { "placeholders": { "count": { "type": "int" } } },
+  "batchSavedCount": "{count} फ़ोटो गैलरी में सेव की गईं",
+  "@batchSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "processingProgress": "{processed} / {total} प्रोसेस हो रहा है...",
+  "@processingProgress": { "placeholders": { "processed": { "type": "int" }, "total": { "type": "int" } } }
 }

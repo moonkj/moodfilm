@@ -44,5 +44,22 @@
   "shareFailed": "共有に失敗しました",
   "fileNotFound": "ファイルが見つかりません",
   "onboardingTagline": "ワンタップで\nキレイな写真に。",
-  "getStarted": "はじめる"
+  "getStarted": "はじめる",
+  "selectedCount": "{count}件選択済み",
+  "@selectedCount": { "placeholders": { "count": { "type": "int" } } },
+  "select": "選択",
+  "album": "アルバム",
+  "selectFilter": "フィルターを選択",
+  "galleryPermissionRequired": "ギャラリーへのアクセス許可が必要です",
+  "allowInSettings": "設定で許可する",
+  "noPhotos": "写真がありません",
+  "deleteCountTitle": "{count}件を削除",
+  "@deleteCountTitle": { "placeholders": { "count": { "type": "int" } } },
+  "deleteSelectedConfirm": "選択したアイテムをギャラリーから削除します。\nこの操作は取り消せません。",
+  "deletedCount": "{count}件を削除しました",
+  "@deletedCount": { "placeholders": { "count": { "type": "int" } } },
+  "batchSavedCount": "{count}枚をギャラリーに保存しました",
+  "@batchSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "processingProgress": "{processed} / {total} 処理中...",
+  "@processingProgress": { "placeholders": { "processed": { "type": "int" }, "total": { "type": "int" } } }
 }

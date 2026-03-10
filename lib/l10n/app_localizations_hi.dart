@@ -141,4 +141,51 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get getStarted => 'शुरू करें';
+
+  @override
+  String selectedCount(int count) {
+    return '$count चुने गए';
+  }
+
+  @override
+  String get select => 'चुनें';
+
+  @override
+  String get album => 'एल्बम';
+
+  @override
+  String get selectFilter => 'फ़िल्टर चुनें';
+
+  @override
+  String get galleryPermissionRequired => 'गैलरी एक्सेस की अनुमति चाहिए';
+
+  @override
+  String get allowInSettings => 'सेटिंग में अनुमति दें';
+
+  @override
+  String get noPhotos => 'कोई फ़ोटो नहीं';
+
+  @override
+  String deleteCountTitle(int count) {
+    return '$count आइटम हटाएं';
+  }
+
+  @override
+  String get deleteSelectedConfirm =>
+      'चुने गए आइटम गैलरी से हटाए जाएंगे।\nयह क्रिया पूर्ववत नहीं होगी।';
+
+  @override
+  String deletedCount(int count) {
+    return '$count आइटम हटाए गए';
+  }
+
+  @override
+  String batchSavedCount(int count) {
+    return '$count फ़ोटो गैलरी में सेव की गईं';
+  }
+
+  @override
+  String processingProgress(int processed, int total) {
+    return '$processed / $total प्रोसेस हो रहा है...';
+  }
 }

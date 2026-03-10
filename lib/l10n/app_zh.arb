@@ -44,5 +44,22 @@
   "shareFailed": "分享失败",
   "fileNotFound": "找不到文件",
   "onboardingTagline": "一键拍出\n好看的照片。",
-  "getStarted": "开始使用"
+  "getStarted": "开始使用",
+  "selectedCount": "已选{count}项",
+  "@selectedCount": { "placeholders": { "count": { "type": "int" } } },
+  "select": "选择",
+  "album": "相册",
+  "selectFilter": "选择滤镜",
+  "galleryPermissionRequired": "需要相册访问权限",
+  "allowInSettings": "在设置中允许",
+  "noPhotos": "没有照片",
+  "deleteCountTitle": "删除{count}项",
+  "@deleteCountTitle": { "placeholders": { "count": { "type": "int" } } },
+  "deleteSelectedConfirm": "将从相册中删除所选项目。\n此操作无法撤销。",
+  "deletedCount": "已删除{count}项",
+  "@deletedCount": { "placeholders": { "count": { "type": "int" } } },
+  "batchSavedCount": "已保存{count}张到相册",
+  "@batchSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "processingProgress": "{processed} / {total} 处理中...",
+  "@processingProgress": { "placeholders": { "processed": { "type": "int" }, "total": { "type": "int" } } }
 }
