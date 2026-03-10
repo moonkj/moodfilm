@@ -64,28 +64,44 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   Offset? _cropDragStart;
   Rect? _cropDragStartNorm;
 
-  static const _aspectOptions = [
-    (label: '자유형', ratio: null as double?),
-    (label: '정방형', ratio: 1.0),
-    (label: '4:5', ratio: 4.0 / 5),
-    (label: '9:16', ratio: 9.0 / 16),
-    (label: '3:4', ratio: 3.0 / 4),
-    (label: '16:9', ratio: 16.0 / 9),
-    (label: '4:3', ratio: 4.0 / 3),
+  static const _aspectRatios = [
+    null as double?,
+    1.0,
+    4.0 / 5,
+    9.0 / 16,
+    3.0 / 4,
+    16.0 / 9,
+    4.0 / 3,
+  ];
+
+  List<String> _aspectLabels(AppLocalizations l10n) => [
+    l10n.freeform, l10n.square, '4:5', '9:16', '3:4', '16:9', '4:3',
   ];
 
   // 효과 탭 선택된 파라미터 인덱스
   int _activeParamIndex = 0;
 
-  // 효과 파라미터 목록
+  // 효과 파라미터 목록 (label 제거 → _paramLabel로 현지화)
   static const _params = [
-    (label: '솜결',  icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
-    (label: '뽀얀',  icon: Icons.blur_circular_rounded,            min: 0.0,  max: 1.0),
-    (label: '밝기',  icon: Icons.wb_sunny_outlined,               min: -1.0, max: 1.0),
-    (label: '대비',  icon: Icons.contrast,                         min: -1.0, max: 1.0),
-    (label: '채도',  icon: Icons.palette_outlined,                 min: -1.0, max: 1.0),
-    (label: '글로우', icon: Icons.flare_rounded,                    min: 0.0,  max: 1.0),
+    (icon: Icons.face_retouching_natural_rounded, min: 0.0,  max: 1.0),
+    (icon: Icons.blur_circular_rounded,           min: 0.0,  max: 1.0),
+    (icon: Icons.wb_sunny_outlined,               min: -1.0, max: 1.0),
+    (icon: Icons.contrast,                        min: -1.0, max: 1.0),
+    (icon: Icons.palette_outlined,                min: -1.0, max: 1.0),
+    (icon: Icons.flare_rounded,                   min: 0.0,  max: 1.0),
   ];
+
+  String _paramLabel(int i, AppLocalizations l10n) {
+    switch (i) {
+      case 0: return l10n.softness;
+      case 1: return l10n.beauty;
+      case 2: return l10n.brightness;
+      case 3: return l10n.contrast;
+      case 4: return l10n.saturation;
+      case 5: return l10n.glow;
+      default: return '';
+    }
+  }
 
   double _getParamValue(int i) {
     switch (i) {
@@ -402,6 +418,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 효과 파라미터 행
 
   Widget _buildEffectRow() {
+    final l10n = AppLocalizations.of(context);
     return SizedBox(
       height: 68,
       child: Row(
@@ -439,7 +456,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  param.label,
+                  _paramLabel(i, l10n),
                   style: TextStyle(
                     color: isActive
                         ? const Color(0xFFB06878)
@@ -619,7 +636,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             final dx = delta.dx / iW;
             final dy = delta.dy / iH;
             final startNorm = _cropDragStartNorm!;
-            final ratio = _aspectOptions[_aspectIndex].ratio;
+            final ratio = _aspectRatios[_aspectIndex];
 
             setState(() {
               if (_draggingCropInterior) {
@@ -682,6 +699,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   Widget _buildCropSection() {
+    final l10n = AppLocalizations.of(context);
+    final aspectLabels = _aspectLabels(l10n);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -691,19 +710,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _aspectOptions.length,
+            itemCount: _aspectRatios.length,
             itemBuilder: (context, i) {
-              final opt = _aspectOptions[i];
+              final ratio = _aspectRatios[i];
               final isActive = i == _aspectIndex;
               return GestureDetector(
                 onTap: () {
                   setState(() {
                     _aspectIndex = i;
-                    if (opt.ratio != null) {
+                    if (ratio != null) {
                       final srcSize = _sourceImageSize ?? const Size(1, 1);
                       final imgAspect = srcSize.width / srcSize.height;
                       // normRatio: 정규화 공간에서의 가로/세로 비율
-                      final normRatio = opt.ratio! / imgAspect;
+                      final normRatio = ratio / imgAspect;
                       final cx = (_cropNorm.left + _cropNorm.right) / 2;
                       final cy = (_cropNorm.top + _cropNorm.bottom) / 2;
                       // 이미지를 최대한 채우는 크기 계산
@@ -731,7 +750,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        opt.label,
+                        aspectLabels[i],
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
