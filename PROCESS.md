@@ -1098,3 +1098,58 @@ if let movURL = livePhotoMovieURL {
 - Delivery UUID: `b5f41d63-6d83-4e1c-b72a-80b744f314ac`
 - 전송 속도: 1.3MB/s, 33초 소요
 - 상태: UPLOAD SUCCEEDED → App Store Connect 처리 중
+
+---
+
+## 세션 28 변경사항 (2026-03-11) — Android 카메라 엔진 구현
+
+### 목표
+iOS에서만 동작하던 앱을 Android에서도 실행 가능하게 네이티브 카메라 엔진 구현
+
+### 파이프라인 아키텍처
+```
+Camera (CameraX Preview)
+  ↓ Surface (GL 입력)
+MFGLRenderer (OpenGL ES 3.0, 전용 GL 스레드)
+  ├── External OES Texture (카메라 버퍼 수신)
+  ├── GLSL Fragment Shader (LUT 3D + 9가지 이펙트 단일 패스)
+  └── EGLWindowSurface → Flutter SurfaceTexture
+                              ↓ (eglSwapBuffers)
+                    Flutter Texture widget (textureId)
+```
+
+### 신규 파일 (android/app/src/main/kotlin/com/moodfilm/moodfilm/)
+
+| 파일 | iOS 대응 | 역할 |
+|------|----------|------|
+| `camera/MFGLRenderer.kt` | MFLUTEngine (GPU) | OpenGL ES 3.0 + EGL + GLSL |
+| `camera/MFLUTEngine.kt` | MFLUTEngine | .cube 파싱 + GL uniform + CPU trilinear |
+| `camera/MFCameraPreview.kt` | MFCameraPreview | FlutterTextureEntry 브릿지 |
+| `camera/MFCameraSession.kt` | MFCameraSession | CameraX + 사진캡처 + MediaStore 갤러리 저장 |
+| `camera/MFVideoRecorder.kt` | MFVideoRecorder | MediaCodec + MediaMuxer |
+| `camera/CameraEnginePlugin.kt` | CameraEnginePlugin | `com.moodfilm/camera_engine` Method Channel |
+| `filter/FilterEnginePlugin.kt` | FilterEnginePlugin | `com.moodfilm/filter_engine` Method Channel |
+
+### GLSL 이펙트 파이프라인 (단일 패스)
+LUT 3D(sampler3D) → Brightness → Contrast → Saturation → Softness → Glow(Overlay) → FilmGrain(hash noise) → Beauty(warm+bloom) → LightLeak(Screen blend) → BeforeAfterSplit
+
+### 주요 기술 결정
+- Camera: **CameraX** (Camera2 대신 — OEM 호환성, LifecycleOwner 관리)
+- GPU 필터: **OpenGL ES 3.0 + `GL_TEXTURE_3D`** (RenderScript deprecated, CPU는 30fps 불가)
+- LUT 정밀도: `GL_RGB16F` (half-float, ES 3.0에서 LINEAR 필터 지원)
+- 사진 캡처: CPU trilinear LUT (one-shot, 백그라운드 IO 스레드)
+- 갤러리 저장: MediaStore API (Android 10+) / DCIM/Likeit
+
+### 수정된 기존 파일
+- `android/app/build.gradle.kts`: minSdk=21, CameraX 1.4.1, coroutines-android 1.8.1, exifinterface 1.3.7
+- `android/app/src/main/AndroidManifest.xml`: CAMERA, RECORD_AUDIO, READ_MEDIA_IMAGES/VIDEO 권한
+- `android/app/src/main/kotlin/.../MainActivity.kt`: CameraEnginePlugin + FilterEnginePlugin 등록
+
+### 버그 수정 (TDD로 발견)
+- `FilterEnginePlugin.kt`: Dart가 `sourcePath` 키로 전달하는데 Kotlin이 `imagePath`로 읽던 불일치 수정
+- `FilterEnginePlugin.kt`: Dart가 `adjustments: Map`으로 전달하는데 Kotlin이 flat key로 읽던 구조 수정
+
+### TDD 테스트 추가
+- `test/native_plugins/filter_engine_test.dart`: FilterEngine 채널 계약 19개 테스트
+- `test/native_plugins/android_camera_compat_test.dart`: Android 플랫폼 호환성 33개 테스트
+- **전체 테스트: 235개 모두 통과** (기존 183개 + 신규 52개)

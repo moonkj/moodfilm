@@ -69,18 +69,21 @@ class FilterEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
      * Returns: 처리된 임시 파일 경로
      */
     private fun handleProcessImage(call: MethodCall, result: MethodChannel.Result) {
-        val imagePath = call.argument<String>("imagePath") ?: run {
-            result.error("INVALID_ARGS", "imagePath 필요", null)
+        // Dart FilterEngine.processImage 가 'sourcePath' 키로 전달 (imagePath 아님)
+        val imagePath = call.argument<String>("sourcePath") ?: run {
+            result.error("INVALID_ARGS", "sourcePath 필요", null)
             return
         }
         val lutFile = call.argument<String>("lutFile") ?: ""
         val intensity = (call.argument<Double>("intensity") ?: 1.0).toFloat()
         val saveToGallery = call.argument<Boolean>("saveToGallery") ?: false
 
-        // 이펙트 파라미터
-        val brightness = (call.argument<Double>("brightness") ?: 0.0).toFloat()
-        val contrast = (call.argument<Double>("contrast") ?: 0.0).toFloat()
-        val saturation = (call.argument<Double>("saturation") ?: 0.0).toFloat()
+        // Dart가 adjustments 맵으로 전달 {'brightness': 0.3, 'contrast': -0.2, ...}
+        @Suppress("UNCHECKED_CAST")
+        val adjustments = call.argument<Map<String, Any>>("adjustments") ?: emptyMap()
+        val brightness = (adjustments["brightness"] as? Double ?: 0.0).toFloat()
+        val contrast = (adjustments["contrast"] as? Double ?: 0.0).toFloat()
+        val saturation = (adjustments["saturation"] as? Double ?: 0.0).toFloat()
 
         CoroutineScope(Dispatchers.IO).launch {
             val outputPath = processImage(
@@ -104,8 +107,9 @@ class FilterEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
      * 에디터 썸네일 생성 (200×200 저해상도 처리)
      */
     private fun handleGenerateThumbnail(call: MethodCall, result: MethodChannel.Result) {
-        val imagePath = call.argument<String>("imagePath") ?: run {
-            result.error("INVALID_ARGS", "imagePath 필요", null)
+        // Dart FilterEngine.generateThumbnail 가 'sourcePath' 키로 전달
+        val imagePath = call.argument<String>("sourcePath") ?: run {
+            result.error("INVALID_ARGS", "sourcePath 필요", null)
             return
         }
         val lutFile = call.argument<String>("lutFile") ?: ""
