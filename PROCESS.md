@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-10 (세션 26)
+> 마지막 업데이트: 2026-03-11 (세션 27)
 
 ---
 
@@ -7,10 +7,12 @@
 
 ```
 Phase 1: Foundation      [██████████] W1-W3 완료
-Phase 2: Core Features   [░░░░░░░░░░] W4-6 예정
-Phase 3: Polish          [░░░░░░░░░░] W7-9 예정
-Phase 4: QA & Launch     [░░░░░░░░░░] W10-12 예정
+Phase 2: Core Features   [██████████] W4-W6 완료
+Phase 3: Polish          [██████████] W7-W9 완료
+Phase 4: QA & Launch     [█████████░] W10-W15 완료 / App Store 심사 대기 중
 ```
+
+> 마지막 작업 세션: 세션 27 (2026-03-11) — App Store 제출 완료 (빌드 업로드, GitHub Pages, 스크린샷)
 
 ---
 
@@ -158,9 +160,10 @@ flutter build ios --release --no-codesign
 - [x] 즐겨찾기 실시간 반영 (favoritesVersion 트리거)
 
 ### ✅ W9 — 수익 모델 확정
-- [x] **수익 모델: App Store 유료 앱 (IAP 없음)** — 앱 자체를 유료로 판매
-- [x] 앱 내 구매 기능 전체 제거 (PaywallScreen, IapService, Pro 잠금 제거)
-- [x] 모든 필터 20종 무제한 사용 (Pro 게이트 해제)
+- [x] **수익 모델: 1회 구매 ₩2,200 → 전체 26종 필터 영구 사용** (구독 없음, 무료 체험 없음)
+- [x] RevenueCat IAP 유지 (`lifetime` product, `pro` entitlement)
+- [x] PaywallScreen: 가격 ₩2,200 표시, 1회 구매 안내
+- [x] 모든 필터 26종 구매 후 무제한 사용
 - [x] Settings 구매 섹션 제거 → 앱 정보만 표시
 
 ---
@@ -228,30 +231,31 @@ flutter build ios --release --no-codesign
 
 ---
 
-### ⏳ W14 — App Store 준비 (세션 14)
+### ✅ W14 — App Store 준비 (세션 14~26)
 
-**가격:** ₩2,500 (Tier 2, 목표 ₩2,200에 가장 근접한 Apple 한국 티어)
+**가격:** ₩2,200 (RevenueCat `lifetime` 1회 구매, 전체 26종 영구 사용)
 
 **스크린샷 5장 구성 (6.5" + 5.5"):**
 
 | 순서 | 화면 | 메시지 |
 |------|------|--------|
 | 1 | 카메라 + 필터 적용 중 | "탭 한 번으로 감성 사진" |
-| 2 | 필터 바 30종 스크롤 | "30가지 감성 필터" |
+| 2 | 필터 바 26종 스크롤 | "26가지 감성 필터" |
 | 3 | Before/After Split View | "내 사진이 이렇게 달라져요" |
 | 4 | 에디터 슬라이더 | "세밀한 편집까지" |
 | 5 | 갤러리 완성본 | "갤러리 사진도 OK" |
 
 **메타데이터:**
-- 앱 이름: `MoodFilm - 감성 필터 카메라`
+- 앱 이름: `Like it! - 감성 필터 카메라`
 - 부제목: `뽀얗고 감성적인 사진`
 - 키워드: `필터카메라,감성필터,사진필터,셀카필터,필름감성,인스타감성,LUT필터,카메라앱,사진편집,무드필터`
 - 카테고리: 사진 및 비디오 (Photography)
 - 연령등급: 4+
+- 지원 언어: 한국어·영어·일본어·중국어·프랑스어·힌디어
 
 **App Store Connect 체크리스트:**
 - [ ] 앱 레코드 생성 (bundle ID: com.moodfilm.moodfilm)
-- [ ] 가격 Tier 2 (₩2,500) 설정
+- [ ] 가격 ₩2,200 설정
 - [ ] 앱 설명 (한국어 4000자)
 - [ ] 키워드 입력
 - [ ] 스크린샷 업로드 (6.5" × 5장, 5.5" × 5장)
@@ -259,21 +263,26 @@ flutter build ios --release --no-codesign
 - [ ] 아이콘 1024×1024 JPG (알파채널 없음)
 - [ ] 빌드 업로드 (Xcode Archive → Distribute → App Store Connect)
 
-### ⏳ W15 — TestFlight + App Store 제출 (세션 15)
+### ✅ W15 — App Store 제출 (세션 27, 2026-03-11)
 
 **심사 거절 위험 요소 사전 점검:**
 
 | 항목 | 대응 |
 |------|------|
 | 카메라 권한 설명 | Info.plist 구체적 설명 완료 |
-| 개인정보처리방침 URL | 생성 필요 |
+| 개인정보처리방침 URL | GitHub Pages 생성 완료 |
 | 미구현 탭/버튼 | PaywallScreen 등 제거 확인 |
 | 아이콘 알파채널 | 1024×1024 JPG 확인 |
 | 크래시 | TestFlight 내부 테스터 검증 |
 
-- [ ] TestFlight 내부 테스터 (본인 + 지인 5~10명)
-- [ ] 크래시 / 버그 수정
-- [ ] App Store 제출 → 심사 대기 (보통 24~48시간)
+- [x] GitHub Pages 생성 — `https://moonkj.github.io/likeit-support/`
+- [x] 개인정보처리방침 URL — `https://moonkj.github.io/likeit-support/privacy_policy.html`
+- [x] 지원 URL — `https://moonkj.github.io/likeit-support/support.html`
+- [x] 문의 이메일 — `imurmkj@gmail.com`
+- [x] App Store Connect 메타데이터 6개 언어 작성 (한/영/일/중/불/힌)
+- [x] 스크린샷 변환 — 1320×2868 JPG, 알파채널 제거 (`/Downloads/screenshots_fixed/`)
+- [x] IPA 빌드 업로드 — xcrun altool, 41MB, Delivery UUID: b5f41d63
+- [ ] App Store 심사 대기 (24~48시간)
 
 ---
 
@@ -309,12 +318,12 @@ flutter build ios --release --no-codesign
 | 2026-03-06 | build_runner 버전 | ^2.4.13 사용 (^2.4.14는 hive_generator와 충돌) |
 | 2026-03-08 | iOS 최소 버전 | 16.0 (W11에서 변경 완료) |
 | 2026-03-06 | Firebase 초기화 | main.dart에서 주석 처리. GoogleService-Info.plist 추가 후 활성화 필요 |
-| 2026-03-06 | 수익 모델 | 구독(월간/연간) 제거 → 1회 구매 ₩29,900 (`lifetime`)으로 단순화 |
-| 2026-03-07 | 수익 모델 재확정 | IAP 완전 제거 → App Store 유료 앱으로 전환. 모든 필터 무제한 제공 |
+| 2026-03-06 | 수익 모델 | 구독(월간/연간) 제거 → 1회 구매 방식으로 단순화 |
+| 2026-03-07 | 수익 모델 확정 | RevenueCat IAP `lifetime` 1회 구매 ₩2,200 → 전체 26종 영구 사용 (freemium 아님) |
 | 2026-03-07 | EditorScreen | 열릴 때/슬라이더 변경 시 자동 필터 프리뷰 생성 (이전: Long press만 가능) |
-| 2026-03-07 | 앱 가격 확정 | ₩2,500 (Tier 2, 목표 ₩2,200 → 가장 근접한 Apple KR 티어) |
-| 2026-03-07 | 필터 확장 계획 | 22종 → 30종 (W11), 매달 2~3종 업데이트 (런칭 후) |
-| 2026-03-07 | BerryFilm 벤치마킹 | 라이브포토(W12), Light Leak(W11), 필터 30종(W11), iOS 16 지원(W11) |
+| 2026-03-07 | 필터 수 확정 | 30종 → cafe_mood·seoul_night·bronze·noir 제거 → **26종** (세션 15) |
+| 2026-03-07 | BerryFilm 벤치마킹 | Light Leak(W11), 필터 확장(W11), iOS 16 지원(W11) / 라이브포토(W12→제거) |
+| 2026-03-10 | 현지화 | 6개국 언어 (한·영·일·중·불·힌) 지원, 아이패드 타겟 제거 |
 
 ---
 
@@ -619,14 +628,12 @@ try {
 
 ---
 
-## 다음 세션에서 할 일 (W14)
+## 다음 세션에서 할 일 (W16 — 심사 대응 및 출시)
 
-1. **App Store Connect 앱 레코드 생성** — Bundle ID: com.moodfilm.moodfilm, 가격 Tier 2 (₩2,500)
-2. **개인정보처리방침 URL** — GitHub Pages 또는 Notion으로 생성
-3. **앱 아이콘 1024×1024** — JPG, 알파채널 없음
-4. **스크린샷 5장** — 6.5" + 5.5" Simulator로 생성
-5. **메타데이터 입력** — 앱 이름, 설명, 키워드
-6. **Xcode Archive → App Store Connect 업로드**
+1. **App Store 심사 결과 확인** — 승인 또는 거절 사유 대응
+2. **거절 시 수정 후 재제출** — 심사관 피드백 기반
+3. **승인 후 출시** — 판매 가능 날짜 설정 또는 즉시 출시
+4. **출시 후 모니터링** — 크래시, 리뷰, 전환율 확인
 
 ---
 
@@ -1064,3 +1071,30 @@ if let movURL = livePhotoMovieURL {
   `deleteCountTitle`, `deleteSelectedConfirm`, `deletedCount`,
   `batchSavedCount`, `processingProgress`
 
+
+---
+
+## 세션 27 변경사항 (2026-03-11) — App Store 제출
+
+### GitHub Pages 생성
+- 레포지토리: `https://github.com/moonkj/likeit-support` (공개)
+- 지원 페이지: `https://moonkj.github.io/likeit-support/support.html`
+- 개인정보처리방침: `https://moonkj.github.io/likeit-support/privacy_policy.html`
+- 문의 이메일: `imurmkj@gmail.com`
+- 6개 언어 탭 전환 지원 (한/영/일/중/불/힌)
+
+### App Store Connect 메타데이터 (6개 언어)
+- 앱 이름: 라이크잇! - 감성 필터 카메라 / Like it! - Aesthetic Filter Camera 등
+- 프로모션 텍스트, 설명, 키워드 6개 언어 완성
+- 저작권: © 2026 Kyeongju Moon
+
+### 스크린샷 변환
+- 원본 PNG (1260×2736, 알파채널 있음) → JPG (1320×2868, 알파채널 없음)
+- 변환 경로: `/Downloads/screenshots_fixed/` (24장: en/ja/zh/fr/hi/store 각 4장)
+
+### IPA 빌드 업로드
+- 도구: `xcrun altool --upload-app`
+- 파일: `build/archive/export/Like it!.ipa` (41MB)
+- Delivery UUID: `b5f41d63-6d83-4e1c-b72a-80b744f314ac`
+- 전송 속도: 1.3MB/s, 33초 소요
+- 상태: UPLOAD SUCCEEDED → App Store Connect 처리 중
