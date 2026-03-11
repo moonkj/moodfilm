@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-11 (세션 27)
+> 마지막 업데이트: 2026-03-11 (세션 28)
 
 ---
 
@@ -12,7 +12,7 @@ Phase 3: Polish          [██████████] W7-W9 완료
 Phase 4: QA & Launch     [█████████░] W10-W15 완료 / App Store 심사 대기 중
 ```
 
-> 마지막 작업 세션: 세션 27 (2026-03-11) — App Store 제출 완료 (빌드 업로드, GitHub Pages, 스크린샷)
+> 마지막 작업 세션: 세션 28 (2026-03-11) — Android 카메라 엔진 전체 구현 + iOS 실기기 릴리즈 설치
 
 ---
 
@@ -1153,3 +1153,8 @@ LUT 3D(sampler3D) → Brightness → Contrast → Saturation → Softness → Gl
 - `test/native_plugins/filter_engine_test.dart`: FilterEngine 채널 계약 19개 테스트
 - `test/native_plugins/android_camera_compat_test.dart`: Android 플랫폼 호환성 33개 테스트
 - **전체 테스트: 235개 모두 통과** (기존 183개 + 신규 52개)
+
+### iOS 실기기 릴리즈 설치
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB)
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C`
+- Bundle ID `com.moodfilm.moodfilm` 설치 확인 ✅
