@@ -55,6 +55,16 @@ class FilterEngine {
     });
   }
 
+  /// 동영상 첫 번째 프레임을 이미지 파일로 추출
+  /// Returns: 추출된 프레임 이미지 경로
+  static Future<String?> extractVideoFrame({
+    required String sourcePath,
+  }) async {
+    return _channel.invokeMethod<String>('extractVideoFrame', {
+      'sourcePath': sourcePath,
+    });
+  }
+
   /// 이미지 썸네일 생성 (필터 미리보기용)
   /// Returns: 썸네일 바이트 데이터
   static Future<List<int>?> generateThumbnail({

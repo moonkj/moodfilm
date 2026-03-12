@@ -27,6 +27,8 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             handleProcessVideo(call: call, result: result)
         case "generateThumbnail":
             handleGenerateThumbnail(call: call, result: result)
+        case "extractVideoFrame":
+            handleExtractVideoFrame(call: call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -168,9 +170,13 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         } else {
             engine.intensity = 0.0
         }
-        engine.glowIntensity = Float(effects["dreamyGlow"] ?? 0)
-        engine.grainIntensity = Float(effects["filmGrain"] ?? 0)
+        engine.brightnessIntensity = Float(effects["brightness"] ?? 0)
+        engine.contrastIntensity = Float(effects["contrast"] ?? 0)
+        engine.saturationIntensity = Float(effects["saturation"] ?? 0)
+        engine.softnessIntensity = Float(effects["softness"] ?? 0)
         engine.beautyIntensity = Float(effects["beauty"] ?? 0)
+        engine.glowIntensity = Float(effects["dreamyGlow"] ?? effects["glow"] ?? 0)
+        engine.grainIntensity = Float(effects["filmGrain"] ?? 0)
         engine.lightLeakIntensity = Float(effects["lightLeak"] ?? 0)
 
         // AVVideoComposition으로 각 프레임에 CIFilter 적용
@@ -393,5 +399,37 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         }
 
         return result
+    }
+
+    // MARK: - extractVideoFrame
+
+    private func handleExtractVideoFrame(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let sourcePath = args["sourcePath"] as? String else {
+            result(FlutterError(code: "INVALID_ARGS", message: "sourcePath 필요", details: nil))
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let url = URL(fileURLWithPath: sourcePath)
+            let asset = AVURLAsset(url: url)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 1080, height: 1920)
+
+            do {
+                let cgImage = try generator.copyCGImage(at: .zero, actualTime: nil)
+                let uiImage = UIImage(cgImage: cgImage)
+                guard let data = uiImage.jpegData(compressionQuality: 0.92) else {
+                    DispatchQueue.main.async { result(nil) }
+                    return
+                }
+                let outputPath = NSTemporaryDirectory() + "vframe_\(Int(Date().timeIntervalSince1970)).jpg"
+                try data.write(to: URL(fileURLWithPath: outputPath))
+                DispatchQueue.main.async { result(outputPath) }
+            } catch {
+                DispatchQueue.main.async { result(nil) }
+            }
+        }
     }
 }
