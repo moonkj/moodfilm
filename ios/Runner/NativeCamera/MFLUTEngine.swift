@@ -202,18 +202,21 @@ class MFLUTEngine {
     // CIBloom + Gaussian Blur 조합으로 사진 전체에 몽환적인 빛번짐
 
     private func applyDreamyGlow(to image: CIImage, intensity: Float) -> CIImage {
-        // CIBloom: radius = intensity * 20, inputIntensity = intensity * 0.8
+        // 지수 곡선 적용: 낮은 값에서 부드럽게, 1.0에서 최대
+        // pow(x, 1.5): 0.3→0.16, 0.5→0.35, 0.7→0.59, 1.0→1.0
+        let eased = pow(intensity, 1.5)
+
         guard let bloomFilter = CIFilter(name: "CIBloom") else { return image }
         bloomFilter.setValue(image, forKey: kCIInputImageKey)
-        bloomFilter.setValue(intensity * 20.0, forKey: kCIInputRadiusKey)
-        bloomFilter.setValue(intensity * 0.8, forKey: kCIInputIntensityKey)
+        bloomFilter.setValue(eased * 14.0, forKey: kCIInputRadiusKey)
+        bloomFilter.setValue(eased * 0.75, forKey: kCIInputIntensityKey)
 
         guard let bloomed = bloomFilter.outputImage else { return image }
 
         // Gaussian Blur로 부드러운 빛번짐 강화
         guard let blurFilter = CIFilter(name: "CIGaussianBlur") else { return bloomed }
         blurFilter.setValue(bloomed, forKey: kCIInputImageKey)
-        blurFilter.setValue(intensity * 3.0, forKey: kCIInputRadiusKey)
+        blurFilter.setValue(eased * 2.5, forKey: kCIInputRadiusKey)
 
         guard let blurred = blurFilter.outputImage else { return bloomed }
 

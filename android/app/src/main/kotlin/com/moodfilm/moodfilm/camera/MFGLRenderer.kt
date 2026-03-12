@@ -180,6 +180,8 @@ class MFGLRenderer(private val outputSurfaceTexture: SurfaceTexture) {
             // 6. Glow 드리미글로우 (iOS: CIBloom + Gaussian + Overlay)
             //    밝은 영역 추출 후 overlay blend 근사
             if (uGlowIntensity > 0.0) {
+                // 지수 곡선(x^1.5): 낮은 값 부드럽게, 1.0에서 최대
+                float easedGlow = uGlowIntensity * sqrt(uGlowIntensity);
                 vec3 bright = max(rgb - 0.5, 0.0) * 2.0;
                 // Overlay blend
                 vec3 overlay = mix(
@@ -187,7 +189,7 @@ class MFGLRenderer(private val outputSurfaceTexture: SurfaceTexture) {
                     1.0 - 2.0 * (1.0 - rgb) * (1.0 - bright),
                     step(0.5, bright)
                 );
-                rgb = mix(rgb, overlay, uGlowIntensity * 0.6);
+                rgb = mix(rgb, overlay, easedGlow * 0.5);
             }
 
             // 7. Film Grain (iOS: CIRandomGenerator + Soft Light blend)
