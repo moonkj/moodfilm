@@ -5,7 +5,7 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/services/iap_service.dart';
 
 /// Paywall 화면
-/// 1회 구매 → 모든 필터 무제한 (₩29,900)
+/// 1회 구매 → 모든 필터 무제한 (₩2,200)
 /// RevenueCat product ID: 'lifetime'
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key, required this.source});
@@ -117,7 +117,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      '₩29,900',
+                      '₩2,200',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 36,
