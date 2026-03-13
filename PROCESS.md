@@ -1458,6 +1458,10 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
 - 기존: `stored < entry.value` 이면 삭제 (기본값을 올렸을 때를 위한 로직)
 - 변경: `stored > entry.value` 이면 삭제 → 기본값을 낮춘 이번 변경에서 이전 1.0 저장값을 새 기본값으로 초기화
 
+### iOS 실기기 설치
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
+
 ---
 
 ## 세션 35 변경사항 (2026-03-13) — 실기기 설치
