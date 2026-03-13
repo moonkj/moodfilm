@@ -338,8 +338,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     _buildSplitView(constraints.maxWidth, constraints.maxHeight),
               ),
             )
-          : Image.file(File(displayPath), fit: BoxFit.contain,
-              gaplessPlayback: true, width: double.infinity, height: double.infinity),
+          : Image.file(
+              File(displayPath),
+              fit: BoxFit.contain,
+              gaplessPlayback: true,
+              width: double.infinity,
+              height: double.infinity,
+            ),
         ),
         // 자르기 오버레이
         if (_activeTab == 'crop')
@@ -997,7 +1002,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         return;
       }
       if (_quickPreviewThrottle?.isActive == true) return;
-      _quickPreviewThrottle = Timer(const Duration(milliseconds: 16), () async {
+      _quickPreviewThrottle = Timer(const Duration(milliseconds: 8), () async {
         if (!mounted) return;
         final token = ++_previewToken;
         final cam = ref.read(cameraProvider);

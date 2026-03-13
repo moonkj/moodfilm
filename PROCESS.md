@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 29)
+> 마지막 업데이트: 2026-03-13 (세션 30)
 
 ---
 
@@ -12,7 +12,7 @@ Phase 3: Polish          [██████████] W7-W9 완료
 Phase 4: QA & Launch     [█████████░] W10-W15 완료 / App Store 심사 대기 중
 ```
 
-> 마지막 작업 세션: 세션 29 (2026-03-13) — 에디터/동영상 실시간 슬라이더 + 카메라 UI 개선
+> 마지막 작업 세션: 세션 30 (2026-03-13) — 에디터 프리뷰 부드러운 전환 + 동영상 split 적용
 
 ---
 
@@ -1225,5 +1225,30 @@ LUT 3D(sampler3D) → Brightness → Contrast → Saturation → Softness → Gl
 
 ### iOS 실기기 릴리즈 설치
 - 기기 ID: `835A5E84-05B4-520C-B52C-E69BBEE38FED` (iPhone Air)
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.2MB)
+- `xcrun devicectl device install app --device 835A5E84-05B4-520C-B52C-E69BBEE38FED` ✅
+
+---
+
+## 세션 30 변경사항 (2026-03-13) — 에디터 프리뷰 부드러운 전환
+
+### 에디터 슬라이더 quickMode 스로틀 단축
+
+- 16ms → **8ms** 스로틀로 프리뷰 업데이트 빈도 증가
+
+### 에디터/동영상 프리뷰 이미지 플리커 수정
+
+**시도 1 (실패):** `AnimatedSwitcher(80ms)` + `ValueKey(displayPath)` 적용
+- 문제: 구 이미지 페이드아웃 + 신 이미지 페이드인이 동시에 일어나 반투명 겹침 → 화면 깜빡임
+
+**최종 해결:** `AnimatedSwitcher` 제거, `Image.file(gaplessPlayback: true)` 단독 사용
+- `gaplessPlayback: true`: 동일 위젯 rebuild 시 이전 이미지를 유지하다 새 이미지 준비 완료 시 교체 → 플리커 없음
+- `ValueKey` 제거 필수 (Flutter가 동일 위젯으로 인식해야 gaplessPlayback 효과 발휘)
+
+**수정 파일:**
+- `lib/features/editor/presentation/editor_screen.dart` — 일반 프리뷰 이미지
+- `lib/features/gallery/presentation/video_player_screen.dart` — split view 필터 이미지
+
+### iOS 실기기 릴리즈 설치
 - `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.2MB)
 - `xcrun devicectl device install app --device 835A5E84-05B4-520C-B52C-E69BBEE38FED` ✅
