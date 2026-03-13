@@ -19,6 +19,7 @@ import '../models/camera_state.dart';
 import 'widgets/shutter_button.dart';
 import 'widgets/filter_scroll_bar.dart';
 import 'widgets/exposure_indicator.dart';
+import '../../gallery/presentation/video_player_screen.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
   const CameraScreen({super.key});
@@ -908,8 +909,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     return GestureDetector(
       onTap: () => context.push('/gallery'),
       onLongPress: () {
-        if (cameraState.lastCapturedPath != null) {
-          context.push('/editor', extra: cameraState.lastCapturedPath);
+        final path = cameraState.lastCapturedPath;
+        if (path == null) return;
+        if (_isVideoFile(path)) {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => VideoPlayerScreen(videoPath: path),
+          ));
+        } else {
+          context.push('/editor', extra: path);
         }
       },
       child: Container(
