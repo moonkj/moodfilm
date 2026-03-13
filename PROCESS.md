@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 33)
+> 마지막 업데이트: 2026-03-13 (세션 34)
 
 ---
 
@@ -1423,3 +1423,16 @@ onDoubleTap: _showIntensitySlider ? null : _handleCameraFlip,
 ```dart
 overlayColor: Colors.transparent,  // noOverlay 대신 사용
 ```
+
+---
+
+## 세션 34 변경사항 (2026-03-13) — 필수 워크플로우 CLAUDE.md 상단 명시
+
+### 문제
+세션마다 PROCESS.md 업데이트 + git commit을 사용자가 명시적으로 요청해야만 실행함.
+
+### 해결
+- `CLAUDE.md` 최상단에 `⚠️ 필수 워크플로우` 섹션 추가
+  - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
+  - "사용자 요청 없이 자동으로 실행한다" 명시
+- Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
