@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 35)
+> 마지막 업데이트: 2026-03-13 (세션 36)
 
 ---
 
@@ -1436,6 +1436,27 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 36 변경사항 (2026-03-13) — 필터 기본 강도 조정
+
+### 변경 파일
+- `lib/core/models/filter_model.dart` — defaultIntensities 26종 전체 조정
+- `lib/core/services/storage_service.dart` — 마이그레이션 로직 수정
+
+### 필터 기본 강도 조정
+- 기존: 전 필터 1.0 (100%)
+- 변경: 각 필터 특성에 맞게 55~75% 범위로 조정
+  - Film 계열 (film98/film03/disposable/retro_ccd): 0.75 — 필름감 살아야 함
+  - 시그니처 mood/honey/ocean: 0.70 — 선명하게
+  - 일반 warm/cool/aesthetic 계열: 0.65 — 자연스러운 감성
+  - 연한 효과 (milk/pale/soft_pink/cloud): 0.55~0.60 — 너무 강하면 날아감
+  - vivid: 0.70 — 과하면 인공적으로 보임
+
+### Hive 마이그레이션 로직 수정
+- 기존: `stored < entry.value` 이면 삭제 (기본값을 올렸을 때를 위한 로직)
+- 변경: `stored > entry.value` 이면 삭제 → 기본값을 낮춘 이번 변경에서 이전 1.0 저장값을 새 기본값으로 초기화
 
 ---
 

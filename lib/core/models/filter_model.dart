@@ -303,32 +303,36 @@ class FilterData {
   /// intensity 1.0 = LUT 2회 적용(2배 강도), 0.5 = LUT 1회
   /// 사용자가 슬라이더로 조정 시 이 값이 덮어씌워짐
   static const Map<String, double> defaultIntensities = {
-    'mood':        1.0,
-    'dream':       1.0,
-    'milk':        1.0,
-    'cream':       1.0,
-    'butter':      1.0,
-    'honey':       1.0,
-    'peach':       1.0,
-    'sky':         1.0,
-    'ocean':       1.0,
-    'mint':        1.0,
-    'cloud':       1.0,
-    'ice':         1.0,
-    'film98':      1.0,
-    'film03':      1.0,
-    'disposable':  1.0,
-    'retro_ccd':   1.0,
-    'kodak_soft':  1.0,
-    'soft_pink':   1.0,
-    'lavender':    1.0,
-    'dusty_blue':  1.0,
-    'latte':       1.0,
-    'mocha':       1.0,
-    'pale':        1.0,
-    'winter':      1.0,
-    'blossom':     1.0,
-    'vivid':       1.0,
+    // Warm — 따뜻한 계열
+    'mood':        0.70, // 시그니처 드리미 필름 — 자연스러운 따뜻함
+    'milk':        0.55, // 부드러운 우유빛 — 너무 강하면 하얗게 날림
+    'cream':       0.65, // 크림 따뜻한 오후 — 은은한 베이지
+    'butter':      0.65, // 노란빛 포근함 — 과하면 노란색 캐스트
+    'honey':       0.70, // 골든아워 꿀빛 — 선명한 골든톤
+    'peach':       0.65, // 핑크톤 복숭아 — 자연스러운 핑크
+    'latte':       0.65, // 카페라떼 브라운 — 따뜻한 브라운톤
+    'mocha':       0.65, // 모카 브라운 — 진한 브라운
+    // Cool — 쿨톤 계열
+    'sky':         0.65, // 맑은 하늘 청량 — 은은한 블루
+    'ocean':       0.70, // 깊은 바다 차가움 — 선명한 딥블루
+    'mint':        0.65, // 민트초코 시원함 — 쿨한 민트
+    'cloud':       0.60, // 하얀 구름 부드러움 — 너무 강하면 탁해짐
+    'ice':         0.65, // 겨울 아침 깨끗함 — 선명한 쿨화이트
+    'pale':        0.55, // 창백한 쿨톤 — 연하게 써야 자연스러움
+    'winter':      0.65, // 겨울 아침 청량함 — 맑은 쿨톤
+    // Film — 필름 계열 (효과가 뚜렷해야 필름느낌)
+    'film98':      0.75, // 90년대 필름 — 강하게 써야 감성 살아남
+    'film03':      0.75, // Y2K 2003년 — 선명한 Y2K 색감
+    'disposable':  0.75, // 일회용 카메라 — 특유의 채도/그레인
+    'retro_ccd':   0.75, // 구형 디카 색감 — 진한 레트로
+    'kodak_soft':  0.70, // 코닥 필름 부드러움 — 부드럽지만 필름감
+    // Aesthetic — 감성 계열
+    'dream':       0.65, // 몽환적 보랏빛 안개 — 너무 강하면 보라로 뭉침
+    'lavender':    0.65, // 라벤더 보라빛 — 은은한 라벤더
+    'soft_pink':   0.60, // 인스타 핑크 — 연하게 써야 자연스러움
+    'dusty_blue':  0.65, // 먼지낀 파란색 빈티지 — 빈티지 블루
+    'blossom':     0.65, // 벚꽃 핑크 봄 — 은은한 벚꽃빛
+    'vivid':       0.70, // 선명하고 진한 채도 — 너무 강하면 인공적으로 보임
   };
 
   static List<FilterModel> byCategory(FilterCategory category) =>
