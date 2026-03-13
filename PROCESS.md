@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 34)
+> 마지막 업데이트: 2026-03-13 (세션 35)
 
 ---
 
@@ -1436,3 +1436,12 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 35 변경사항 (2026-03-13) — 실기기 설치
+
+### iOS 실기기 릴리즈 설치
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
+- 포함 변경사항: 세션 33 (필터 메뉴 기본 표시, 슬라이더 터치 개선) + 세션 34 (워크플로우 CLAUDE.md 명시)
