@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -47,6 +48,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   bool _editorNoFilter = true;
   String? _filteredPreviewPath;
   bool _isGeneratingPreview = false;
+  bool _needsPreviewRegenerate = false; // 처리 중 파라미터가 변경됐을 때 재생성 플래그
+  bool _quickModeQueued = false; // 큰 처리 중에 빠른 모드 재생성 필요 여부
+  int _previewToken = 0; // 드래그 중 stale 결과 무시용
+  Timer? _quickPreviewThrottle; // 빠른 프리뷰 스로틀 (16ms)
 
   bool _showSplit = false;
   double _splitPosition = 0.5;
@@ -126,6 +131,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       _dreamyGlow != 0 || _lightLeak != 0 || _filmGrain != 0 ||
       _highlights != 0 || _shadows != 0 || _temperature != 0 ||
       _tint != 0 || _sharpness != 0 || _fade != 0 || _vignette != 0 || _skinTone != 0;
+
+  @override
+  void dispose() {
+    _previewToken++; // 진행 중인 빠른 프리뷰 무효화
+    _quickPreviewThrottle?.cancel();
+    super.dispose();
+  }
 
   // MARK: - Build
 
@@ -427,6 +439,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           final isActive = i == _activeParamIndex;
           final param = _params[i];
           return GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _activeParamIndex = i),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -497,6 +510,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           divisions: 200,
           onChanged: (v) {
             setState(() => _setParamValueDirectly(_activeParamIndex, v));
+            _generatePreview(quickMode: true);
           },
           onChangeEnd: (_) => _generatePreview(),
         ),
@@ -558,6 +572,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       max: 1.0,
                       onChanged: (v) {
                         ref.read(cameraProvider.notifier).setFilterIntensity(v);
+                        _generatePreview(quickMode: true);
                       },
                       onChangeEnd: (_) => _generatePreview(),
                     ),
@@ -944,8 +959,29 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   String get _effectiveSourcePath =>
       _croppedSourcePath ?? widget.imagePath ?? '';
 
-  Future<void> _generatePreview() async {
-    if (widget.imagePath == null || _isGeneratingPreview) return;
+  Map<String, double> get _adjustmentsMap => {
+    'exposure': _exposure,
+    'contrast': _contrast,
+    'highlights': _highlights,
+    'shadows': _shadows,
+    'saturation': _saturation,
+    'temperature': _temperature,
+    'tint': _tint,
+    'sharpness': _sharpness,
+    'fade': _fade,
+    'vignette': _vignette,
+    'skinTone': _skinTone,
+  };
+
+  Map<String, double> get _effectsMap => {
+    'filmGrain': _filmGrain,
+    'dreamyGlow': _dreamyGlow,
+    'beauty': _beauty,
+    'lightLeak': _lightLeak,
+  };
+
+  Future<void> _generatePreview({bool quickMode = false}) async {
+    if (widget.imagePath == null) return;
 
     final camera = ref.read(cameraProvider);
     final hasFilter = !_editorNoFilter && camera.activeFilter != null;
@@ -954,38 +990,51 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       return;
     }
 
-    setState(() => _isGeneratingPreview = true);
+    if (quickMode) {
+      // 빠른 프리뷰: 스로틀(16ms)로 네이티브 호출 제한
+      if (_isGeneratingPreview) {
+        _quickModeQueued = true;
+        return;
+      }
+      if (_quickPreviewThrottle?.isActive == true) return;
+      _quickPreviewThrottle = Timer(const Duration(milliseconds: 16), () async {
+        if (!mounted) return;
+        final token = ++_previewToken;
+        final cam = ref.read(cameraProvider);
+        final path = await FilterEngine.processImage(
+          sourcePath: _effectiveSourcePath,
+          lutFileName: _editorNoFilter ? '' : (cam.activeFilter?.lutFileName ?? ''),
+          intensity: _editorNoFilter ? 0.0 : cam.filterIntensity,
+          adjustments: _adjustmentsMap,
+          effects: _effectsMap,
+          maxSize: 480,
+        );
+        if (!mounted || _previewToken != token) return;
+        setState(() => _filteredPreviewPath = path);
+      });
+      return;
+    }
+
+    // 풀해상도 처리
+    if (_isGeneratingPreview) {
+      _needsPreviewRegenerate = true;
+      return;
+    }
+
+    setState(() { _isGeneratingPreview = true; _needsPreviewRegenerate = false; _quickModeQueued = false; });
     final path = await FilterEngine.processImage(
       sourcePath: _effectiveSourcePath,
-      lutFileName:
-          _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
+      lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
       intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
-      adjustments: {
-        'exposure': _exposure,
-        'contrast': _contrast,
-        'highlights': _highlights,
-        'shadows': _shadows,
-        'saturation': _saturation,
-        'temperature': _temperature,
-        'tint': _tint,
-        'sharpness': _sharpness,
-        'fade': _fade,
-        'vignette': _vignette,
-        'skinTone': _skinTone,
-      },
-      effects: {
-        'filmGrain': _filmGrain,
-        'dreamyGlow': _dreamyGlow,
-        'beauty': _beauty,
-        'lightLeak': _lightLeak,
-      },
+      adjustments: _adjustmentsMap,
+      effects: _effectsMap,
     );
-    if (mounted) {
-      setState(() {
-        _filteredPreviewPath = path;
-        _isGeneratingPreview = false;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _filteredPreviewPath = path;
+      _isGeneratingPreview = false;
+    });
+    if (_needsPreviewRegenerate) _generatePreview();
   }
 
   // MARK: - 저장

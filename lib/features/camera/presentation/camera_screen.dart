@@ -76,6 +76,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   String? _sideBtnLabel;
   Timer? _sideBtnLabelTimer;
 
+  // 사이드 버튼 자동숨김 (5초 후)
+  bool _showSideButtons = true;
+  Timer? _sideButtonsHideTimer;
+
   @override
   void initState() {
     super.initState();
@@ -92,6 +96,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       await ref.read(cameraProvider.notifier).initialize();
       _applyDefaultEffects();
       _checkOnboardingHints();
+      _resetSideButtonsTimer();
     });
   }
 
@@ -174,11 +179,26 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     });
   }
 
+  void _resetSideButtonsTimer() {
+    _sideButtonsHideTimer?.cancel();
+    if (!_showSideButtons) setState(() => _showSideButtons = true);
+    _sideButtonsHideTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() { _showSideButtons = false; _showIntensitySlider = false; });
+    });
+  }
+
+  // 슬라이더 드래그 중: 타이머 정지만 (숨김 방지)
+  void _pauseSideButtonsTimer() {
+    _sideButtonsHideTimer?.cancel();
+    if (!_showSideButtons) setState(() => _showSideButtons = true);
+  }
+
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
     _splitAutoHideTimer?.cancel();
     _sideBtnLabelTimer?.cancel();
+    _sideButtonsHideTimer?.cancel();
     _countdownTimer?.cancel();
     _flipController.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -231,6 +251,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   // MARK: - 제스처
 
   void _onScaleStart(ScaleStartDetails d) {
+    _resetSideButtonsTimer();
     _scaleStartFocalPoint = d.focalPoint;
     _gestureDirectionLocked = false;
     _isVerticalDrag = false;
@@ -370,6 +391,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
             ],
           ),
+          // 밝기 인디케이터 (강도 슬라이더 위)
+          Positioned(
+            top: safeTop + previewH - 52 - 48,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: ExposureIndicator(
+                ev: cameraState.exposureEV,
+                isVisible: _showExposureIndicator,
+              ),
+            ),
+          ),
           // 강도 슬라이더 (프리뷰 위 오버레이 — 레이아웃 영향 없음)
           if (_showIntensitySlider)
             Positioned(
@@ -396,6 +429,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _buildCameraPreview(cameraState),
         GestureDetector(
           behavior: HitTestBehavior.translucent,
+          onTap: _resetSideButtonsTimer,
           onScaleStart: _onScaleStart,
           onScaleUpdate: _onScaleUpdate,
           onScaleEnd: _onScaleEnd,
@@ -404,12 +438,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         ),
         if (_isSplitMode && !cameraState.isRecording) _buildSplitOverlay(cameraState),
         if (_isSplitMode && !cameraState.isRecording) _buildSplitDragLayer(cameraState, screenW),
-        Center(
-          child: ExposureIndicator(
-            ev: cameraState.exposureEV,
-            isVisible: _showExposureIndicator,
-          ),
-        ),
         _buildPreviewSideButtons(cameraState),
         // 타이머 카운트다운 오버레이
         if (_isCountingDown)
@@ -503,7 +531,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     return Positioned(
       right: 10,
       bottom: 68, // 강도 슬라이더(하단 52px) 위에 배치
-      child: Column(
+      child: AnimatedOpacity(
+        opacity: _showSideButtons ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 300),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -519,6 +550,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             icon: Icons.tune_rounded,
             active: _showIntensitySlider,
             onTap: () {
+              _resetSideButtonsTimer();
               setState(() => _showIntensitySlider = !_showIntensitySlider);
               _showSideBtnLabel('filterEffect');
             },
@@ -530,6 +562,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             icon: Icons.compare_rounded,
             active: _isSplitMode,
             onTap: () {
+              _resetSideButtonsTimer();
               _toggleSplitMode(cameraState.isFrontCamera);
               _showSideBtnLabel('compare');
             },
@@ -541,11 +574,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             icon: Icons.settings_outlined,
             active: false,
             onTap: () {
+              _resetSideButtonsTimer();
               _showSideBtnLabel('settings');
               context.push('/settings');
             },
           ),
         ],
+        ),
       ),
     );
   }
@@ -578,6 +613,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         GestureDetector(
           onTap: () {
             if (_isCountingDown) return;
+            _resetSideButtonsTimer();
             const options = [0, 3, 5, 10];
             final idx = options.indexOf(_timerSeconds);
             setState(() => _timerSeconds = options[(idx + 1) % options.length]);
@@ -671,7 +707,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 value: cameraState.filterIntensity,
                 min: 0,
                 max: 1,
-                onChanged: (v) => ref.read(cameraProvider.notifier).setFilterIntensity(v),
+                onChanged: (v) {
+                  _pauseSideButtonsTimer();
+                  ref.read(cameraProvider.notifier).setFilterIntensity(v);
+                },
+                onChangeEnd: (_) => _resetSideButtonsTimer(),
                 activeColor: Colors.white,
                 inactiveColor: Colors.white30,
               ),
@@ -861,9 +901,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 max: max,
                 divisions: 200,
                 onChanged: (v) {
+                  _pauseSideButtonsTimer();
                   setState(() => _adjustments[key] = v);
                   CameraEngine.setEffect(effectType: key, intensity: v);
                 },
+                onChangeEnd: (_) => _resetSideButtonsTimer(),
               ),
             );
           }),

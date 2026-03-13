@@ -4,11 +4,30 @@ import CoreImage
 import AVFoundation
 import Photos
 
+// UIImage.Orientation → CGImagePropertyOrientation 변환 (rawValue가 다름)
+private extension CGImagePropertyOrientation {
+    init(_ uiOrientation: UIImage.Orientation) {
+        switch uiOrientation {
+        case .up:            self = .up
+        case .upMirrored:    self = .upMirrored
+        case .down:          self = .down
+        case .downMirrored:  self = .downMirrored
+        case .left:          self = .left
+        case .leftMirrored:  self = .leftMirrored
+        case .right:         self = .right
+        case .rightMirrored: self = .rightMirrored
+        @unknown default:    self = .up
+        }
+    }
+}
+
 /// 갤러리 이미지 필터 처리 플러그인
 /// Full-resolution 이미지에 LUT + CIFilter 조정값 적용 후 저장
 class FilterEnginePlugin: NSObject, FlutterPlugin {
 
     private let lutEngine = MFLUTEngine()
+    private var textureRegistry: FlutterTextureRegistry?
+    private var videoPlayer: MFVideoFilterPlayer?
 
     static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
@@ -16,6 +35,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             binaryMessenger: registrar.messenger()
         )
         let instance = FilterEnginePlugin()
+        instance.textureRegistry = registrar.textures()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
 
@@ -29,9 +49,82 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             handleGenerateThumbnail(call: call, result: result)
         case "extractVideoFrame":
             handleExtractVideoFrame(call: call, result: result)
+        case "startVideoPreview":
+            handleStartVideoPreview(call: call, result: result)
+        case "stopVideoPreview":
+            videoPlayer?.dispose(); videoPlayer = nil; result(nil)
+        case "setVideoPreviewFilter":
+            handleSetVideoPreviewFilter(call: call, result: result)
+        case "setVideoPreviewEffects":
+            handleSetVideoPreviewEffects(call: call, result: result)
+        case "playVideoPreview":
+            videoPlayer?.play(); result(nil)
+        case "pauseVideoPreview":
+            videoPlayer?.pause(); result(nil)
+        case "seekVideoPreview":
+            if let args = call.arguments as? [String: Any],
+               let seconds = args["seconds"] as? Double {
+                videoPlayer?.seek(to: seconds)
+            }
+            result(nil)
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+
+    // MARK: - Video Preview
+
+    private func handleStartVideoPreview(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let videoPath = args["videoPath"] as? String else {
+            result(FlutterError(code: "INVALID_ARGS", message: "videoPath 필요", details: nil))
+            return
+        }
+        guard let registry = textureRegistry else {
+            result(FlutterError(code: "NO_REGISTRY", message: "TextureRegistry 없음", details: nil))
+            return
+        }
+
+        videoPlayer?.dispose()
+
+        let url = URL(fileURLWithPath: videoPath)
+        let player = MFVideoFilterPlayer(url: url)
+
+        let lutFile  = args["lutFile"]   as? String ?? ""
+        let intensity = Float(args["intensity"] as? Double ?? 1.0)
+        let effects  = args["effects"]  as? [String: Double] ?? [:]
+        player.updateFilter(lutFile: lutFile, intensity: intensity)
+        player.updateEffects(effects)
+
+        let textureId = player.start(registry: registry)
+        videoPlayer = player
+
+        // 백그라운드에서 모든 LUT 파일 캐시 선점 — 첫 필터 전환 시 버벅임 방지
+        let preloadLuts = args["preloadLuts"] as? [String] ?? []
+        if !preloadLuts.isEmpty {
+            player.preloadLUTs(preloadLuts)
+        }
+
+        let size = player.videoSize
+        result([
+            "textureId": textureId,
+            "width":     Int(size.width),
+            "height":    Int(size.height),
+        ])
+    }
+
+    private func handleSetVideoPreviewFilter(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any] else { result(nil); return }
+        let lutFile   = args["lutFile"]   as? String ?? ""
+        let intensity = Float(args["intensity"] as? Double ?? 1.0)
+        videoPlayer?.updateFilter(lutFile: lutFile, intensity: intensity)
+        result(nil)
+    }
+
+    private func handleSetVideoPreviewEffects(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        let effects = (call.arguments as? [String: Any])?.compactMapValues { $0 as? Double } ?? [:]
+        videoPlayer?.updateEffects(effects)
+        result(nil)
     }
 
     // MARK: - processImage
@@ -48,6 +141,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         let adjustments = args["adjustments"] as? [String: Double] ?? [:]
         let effects = args["effects"] as? [String: Double] ?? [:]
         let saveToGallery = args["saveToGallery"] as? Bool ?? false
+        let maxSize = args["maxSize"] as? Int  // nil = 풀해상도, 정수 = 빠른 프리뷰용 다운스케일
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -57,7 +151,8 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
                 lutFile: lutFile,
                 intensity: Float(intensity),
                 adjustments: adjustments,
-                effects: effects
+                effects: effects,
+                maxSize: maxSize
             ) else {
                 DispatchQueue.main.async {
                     result(FlutterError(code: "PROCESS_FAILED", message: "이미지 처리 실패", details: nil))
@@ -92,12 +187,40 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         lutFile: String,
         intensity: Float,
         adjustments: [String: Double],
-        effects: [String: Double]
+        effects: [String: Double],
+        maxSize: Int? = nil
     ) -> String? {
-        guard let uiImage = UIImage(contentsOfFile: sourcePath) else { return nil }
+        guard var uiImage = UIImage(contentsOfFile: sourcePath) else { return nil }
+
+        // 빠른 프리뷰용 다운스케일 — maxSize가 있으면 longest edge를 제한
+        if let maxSize = maxSize {
+            let longest = max(uiImage.size.width, uiImage.size.height)
+            let scale = CGFloat(maxSize) / longest
+            if scale < 1.0 {
+                let newSize = CGSize(
+                    width: (uiImage.size.width * scale).rounded(),
+                    height: (uiImage.size.height * scale).rounded()
+                )
+                UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                if let scaled = UIGraphicsGetImageFromCurrentImageContext() {
+                    uiImage = scaled
+                }
+                UIGraphicsEndImageContext()
+            }
+        }
+
         // Device RGB로 고정 — 카메라 CVPixelBuffer 파이프라인과 컬러 스페이스 통일
         let ciOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpaceCreateDeviceRGB()]
         guard var ciImage = CIImage(image: uiImage, options: ciOptions) else { return nil }
+
+        // UIImage orientation 보정: CIImage는 픽셀 기준이므로 orientation을 무시함.
+        // 세로 사진(orientation=.right 등)이 landscape CIImage로 처리되면 이펙트 위치가 틀림.
+        // oriented()를 적용하면 이후 모든 이펙트가 올바른(portrait) 방향으로 적용됨.
+        let ciOrientation = CGImagePropertyOrientation(uiImage.imageOrientation)
+        if ciOrientation != .up {
+            ciImage = ciImage.oriented(ciOrientation)
+        }
 
         // 1. 조정값 적용 (CIFilters)
         ciImage = applyAdjustments(to: ciImage, adjustments: adjustments)
@@ -109,16 +232,24 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         } else {
             lutEngine.intensity = 0.0
         }
-        lutEngine.glowIntensity = Float(effects["dreamyGlow"] ?? 0)
-        lutEngine.grainIntensity = Float(effects["filmGrain"] ?? 0)
-        lutEngine.beautyIntensity = Float(effects["beauty"] ?? 0)
-        lutEngine.lightLeakIntensity = Float(effects["lightLeak"] ?? 0)
+        lutEngine.glowIntensity        = Float(effects["dreamyGlow"] ?? effects["glow"] ?? 0)
+        lutEngine.grainIntensity       = Float(effects["filmGrain"] ?? 0)
+        lutEngine.beautyIntensity      = Float(effects["beauty"] ?? 0)
+        lutEngine.lightLeakIntensity   = Float(effects["lightLeak"] ?? 0)
+        lutEngine.softnessIntensity    = Float(effects["softness"] ?? 0)
+        lutEngine.brightnessIntensity  = Float(effects["brightness"] ?? 0)
+        lutEngine.contrastIntensity    = Float(effects["contrast"] ?? 0)
+        lutEngine.saturationIntensity  = Float(effects["saturation"] ?? 0)
 
         let hasEffect = (intensity > 0 && !lutFile.isEmpty)
             || lutEngine.glowIntensity > 0
             || lutEngine.grainIntensity > 0
             || lutEngine.beautyIntensity > 0
             || lutEngine.lightLeakIntensity > 0
+            || lutEngine.softnessIntensity > 0
+            || lutEngine.brightnessIntensity != 0
+            || lutEngine.contrastIntensity != 0
+            || lutEngine.saturationIntensity != 0
         if hasEffect {
             ciImage = lutEngine.apply(to: ciImage)
         }
@@ -132,7 +263,8 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             return nil
         }
 
-        let outputImage = UIImage(cgImage: cgImage, scale: uiImage.scale, orientation: uiImage.imageOrientation)
+        // CIImage.oriented()로 이미 방향 보정됨 → orientation은 .up
+        let outputImage = UIImage(cgImage: cgImage, scale: uiImage.scale, orientation: .up)
         guard let jpegData = outputImage.jpegData(compressionQuality: 0.95) else { return nil }
 
         let outputPath = NSTemporaryDirectory() + "moodfilm_\(Int(Date().timeIntervalSince1970)).jpg"

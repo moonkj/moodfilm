@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-11 (세션 28)
+> 마지막 업데이트: 2026-03-13 (세션 29)
 
 ---
 
@@ -12,7 +12,7 @@ Phase 3: Polish          [██████████] W7-W9 완료
 Phase 4: QA & Launch     [█████████░] W10-W15 완료 / App Store 심사 대기 중
 ```
 
-> 마지막 작업 세션: 세션 28 (2026-03-11) — Android 카메라 엔진 전체 구현 + iOS 실기기 릴리즈 설치
+> 마지막 작업 세션: 세션 29 (2026-03-13) — 에디터/동영상 실시간 슬라이더 + 카메라 UI 개선
 
 ---
 
@@ -1158,3 +1158,72 @@ LUT 3D(sampler3D) → Brightness → Contrast → Saturation → Softness → Gl
 - `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB)
 - `xcrun devicectl device install app --device 00008150-001128391EF0401C`
 - Bundle ID `com.moodfilm.moodfilm` 설치 확인 ✅
+
+---
+
+## 세션 29 변경사항 (2026-03-13) — 에디터/동영상 실시간 슬라이더 + 카메라 UI 개선
+
+### 에디터 효과 슬라이더 실시간 프리뷰
+
+**문제:** 슬라이더 드래그 종료 후에만 미리보기가 업데이트됨
+
+**해결 아키텍처:**
+- `FilterEngine.processImage()`에 `maxSize: Int?` 파라미터 추가 (Swift `FilterEnginePlugin.swift`)
+  - `maxSize` 지정 시 `UIGraphicsBeginImageContextWithOptions`로 다운스케일 후 처리 (~30-80ms)
+  - `maxSize` 미지정 시 기존 풀해상도 처리
+- `filter_engine.dart`에 `maxSize` 파라미터 노출
+- 에디터 `_generatePreview({bool quickMode = false})` 분기:
+  - `quickMode: true` → `maxSize: 480` + 16ms 스로틀 (`_quickPreviewThrottle`) + 토큰 패턴 (`_previewToken`)
+  - `quickMode: false` → 풀해상도 + `_isGeneratingPreview` 플래그 + `_needsPreviewRegenerate` 큐
+- 효과 슬라이더 `onChanged` → `_generatePreview(quickMode: true)`, `onChangeEnd` → `_generatePreview()`
+- 필터 강도 슬라이더 동일 적용
+
+**스로틀링:** `onChanged`마다 네이티브 호출이 폭발적으로 쌓이는 문제 → `Timer(16ms)` 스로틀로 해결
+
+### FilterEnginePlugin.swift 이펙트 누락 버그 수정
+
+**문제:** `processImage` 호출 시 `softness`, `brightness`, `contrast`, `saturation` 4개 이펙트가 적용 안 됨
+
+**원인:** `lutEngine` 프로퍼티 리셋 코드 누락
+
+**수정:** `handleProcessImage`에 4개 프로퍼티 리셋 추가 + `hasEffect` 조건에 포함
+
+### 동영상 플레이어 실시간 비교(Split) 프리뷰
+
+- `_generateCompare({bool quickMode = false})` 분기 추가
+- 효과/필터 강도 슬라이더 드래그 중 Split 모드 → `_generateCompare(quickMode: true)` 호출
+- 드래그 종료 시 풀해상도 `_generateCompare()` 호출
+- `_compareToken` 토큰 패턴으로 stale 결과 무시
+
+### 카메라 앱 시작 시 필터 기본값 변경
+
+**변경:** `camera_provider.dart` `initialize()` — `lastFilter ??= FilterData.all.first` 제거
+- `lastUsedFilterId` 없으면 → 필터 없음(효과 없음)으로 시작
+- `lastUsedFilterId` 있으면 → 마지막 사용 필터 복원 (기존 동작 유지)
+- 필터 없을 때 `CameraEngine.setFilter(lutFileName: '', intensity: 0.0)` 명시 호출
+
+### 카메라 사이드 버튼 자동숨김 (5초)
+
+**동작:**
+- 앱 시작 / 화면 탭 / 버튼 탭 → 5초 카운트 시작
+- 5초 후 사이드 버튼 + 강도 슬라이더 동시 `AnimatedOpacity(0)` 페이드아웃
+- 슬라이더 드래그 중 → `_pauseSideButtonsTimer()` (타이머 취소, 숨김 방지)
+- 드래그 종료 → `_resetSideButtonsTimer()` (5초 재시작)
+- 카메라 프리뷰 탭 → `_resetSideButtonsTimer()` (버튼 재표시)
+
+**구현:**
+- `_showSideButtons: bool`, `_sideButtonsHideTimer: Timer?` 상태 변수 추가
+- `_resetSideButtonsTimer()` / `_pauseSideButtonsTimer()` 헬퍼 메서드
+- `_buildPreviewSideButtons` → `Positioned > AnimatedOpacity > Column` 구조
+- 강도/효과 슬라이더 `onChanged: _pauseSideButtonsTimer`, `onChangeEnd: _resetSideButtonsTimer`
+- 각 사이드 버튼 `onTap`에 `_resetSideButtonsTimer()` 추가
+
+### 밝기 인디케이터 위치 변경
+
+- 기존: 프리뷰 `Stack` 내 `Center` (화면 정중앙)
+- 변경: 외부 `Stack` `Positioned(top: safeTop + previewH - 52 - 48)` — 강도 슬라이더 바로 위
+
+### iOS 실기기 릴리즈 설치
+- 기기 ID: `835A5E84-05B4-520C-B52C-E69BBEE38FED` (iPhone Air)
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.2MB)
+- `xcrun devicectl device install app --device 835A5E84-05B4-520C-B52C-E69BBEE38FED` ✅

@@ -27,26 +27,29 @@ class CameraNotifier extends StateNotifier<CameraState> {
       final textureId = await CameraEngine.initialize(frontCamera: frontCamera);
       debugPrint('[CameraProvider] textureId=$textureId 반환됨');
 
-      // 마지막 사용 필터 복원
+      // 마지막 사용 필터 복원 (없으면 효과 없음)
       final prefs = StorageService.prefs;
       FilterModel? lastFilter;
       if (prefs.lastUsedFilterId != null) {
         lastFilter = FilterData.byId(prefs.lastUsedFilterId!);
       }
-      lastFilter ??= FilterData.all.first; // 기본: Milk
-      debugPrint('[CameraProvider] 초기 필터: ${lastFilter.id}');
+      debugPrint('[CameraProvider] 초기 필터: ${lastFilter?.id ?? '없음'}');
 
       state = state.copyWith(
         status: CameraStatus.ready,
         textureId: textureId,
         isFrontCamera: frontCamera,
         activeFilter: lastFilter,
-        filterIntensity: prefs.intensityFor(lastFilter.id),
+        filterIntensity: lastFilter != null ? prefs.intensityFor(lastFilter.id) : 1.0,
       );
 
-      // 필터 바로 적용
+      // 필터 바로 적용 (초기 필터 없으면 효과 없음)
       debugPrint('[CameraProvider] _applyCurrentFilter() 호출');
-      await _applyCurrentFilter();
+      if (lastFilter == null) {
+        await CameraEngine.setFilter(lutFileName: '', intensity: 0.0);
+      } else {
+        await _applyCurrentFilter();
+      }
 
       debugPrint('[CameraProvider] 초기화 완료 ✓');
 

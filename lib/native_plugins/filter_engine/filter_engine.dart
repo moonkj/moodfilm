@@ -22,6 +22,7 @@ class FilterEngine {
     Map<String, double>? adjustments,
     Map<String, double>? effects,
     bool saveToGallery = false,
+    int? maxSize, // 빠른 프리뷰용 다운스케일 (null = 풀해상도)
   }) async {
     return _channel.invokeMethod<String>('processImage', {
       'sourcePath': sourcePath,
@@ -30,6 +31,7 @@ class FilterEngine {
       'adjustments': adjustments ?? {},
       'effects': effects ?? {},
       'saveToGallery': saveToGallery,
+      if (maxSize != null) 'maxSize': maxSize,
     });
   }
 
@@ -63,6 +65,62 @@ class FilterEngine {
     return _channel.invokeMethod<String>('extractVideoFrame', {
       'sourcePath': sourcePath,
     });
+  }
+
+  // ─── 실시간 동영상 필터 프리뷰 ───────────────────────────────────────────
+
+  /// 동영상 필터 프리뷰 시작 (FlutterTexture 기반)
+  /// Returns: {'textureId': int, 'width': int, 'height': int}
+  static Future<Map<Object?, Object?>?> startVideoPreview({
+    required String videoPath,
+    required String lutFileName,
+    required double intensity,
+    Map<String, double>? effects,
+    List<String> preloadLuts = const [],
+  }) async {
+    return _channel.invokeMapMethod('startVideoPreview', {
+      'videoPath': videoPath,
+      'lutFile': lutFileName,
+      'intensity': intensity,
+      'effects': effects ?? {},
+      'preloadLuts': preloadLuts,
+    });
+  }
+
+  /// 동영상 필터 프리뷰 중지 및 리소스 해제
+  static Future<void> stopVideoPreview() async {
+    await _channel.invokeMethod('stopVideoPreview');
+  }
+
+  /// 프리뷰 LUT 필터 변경 (실시간 반영)
+  static Future<void> setVideoPreviewFilter({
+    required String lutFileName,
+    required double intensity,
+  }) async {
+    await _channel.invokeMethod('setVideoPreviewFilter', {
+      'lutFile': lutFileName,
+      'intensity': intensity,
+    });
+  }
+
+  /// 프리뷰 이펙트 변경 (실시간 반영)
+  static Future<void> setVideoPreviewEffects(Map<String, double> effects) async {
+    await _channel.invokeMethod('setVideoPreviewEffects', effects);
+  }
+
+  /// 프리뷰 재생
+  static Future<void> playVideoPreview() async {
+    await _channel.invokeMethod('playVideoPreview');
+  }
+
+  /// 프리뷰 일시정지
+  static Future<void> pauseVideoPreview() async {
+    await _channel.invokeMethod('pauseVideoPreview');
+  }
+
+  /// 프리뷰 탐색 (초 단위)
+  static Future<void> seekVideoPreview(double seconds) async {
+    await _channel.invokeMethod('seekVideoPreview', {'seconds': seconds});
   }
 
   /// 이미지 썸네일 생성 (필터 미리보기용)
