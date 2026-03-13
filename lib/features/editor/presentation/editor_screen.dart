@@ -46,15 +46,12 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   double _filmGrain = 0;
 
   bool _editorNoFilter = true;
-  String? _filteredPreviewPath;
-  bool _isGeneratingPreview = false;
-  bool _needsPreviewRegenerate = false; // 처리 중 파라미터가 변경됐을 때 재생성 플래그
-  bool _quickModeQueued = false; // 큰 처리 중에 빠른 모드 재생성 필요 여부
-  int _previewToken = 0; // 드래그 중 stale 결과 무시용
-  Timer? _quickPreviewThrottle; // 빠른 프리뷰 스로틀 (16ms)
+  ProviderSubscription<dynamic>? _filterSubscription;
 
-  bool _showSplit = false;
-  double _splitPosition = 0.5;
+  // 실시간 이미지 프리뷰 텍스처
+  int? _imageTextureId;
+  int _imageTextureW = 1;
+  int _imageTextureH = 1;
 
   // 하단 탭: 'filter' | 'effect' | 'crop'
   String _activeTab = 'effect';
@@ -133,29 +130,66 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       _tint != 0 || _sharpness != 0 || _fade != 0 || _vignette != 0 || _skinTone != 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initImagePreview());
+    _filterSubscription = ref.listenManual(cameraProvider, (prev, next) {
+      final prevId = prev?.activeFilter?.id;
+      final nextId = next.activeFilter?.id;
+      if (prevId != nextId) {
+        if (nextId == null) {
+          setState(() => _editorNoFilter = true);
+        } else {
+          setState(() => _editorNoFilter = false);
+        }
+        _updateImagePreview();
+      }
+    });
+  }
+
+  @override
   void dispose() {
-    _previewToken++; // 진행 중인 빠른 프리뷰 무효화
-    _quickPreviewThrottle?.cancel();
+    _filterSubscription?.close();
+    FilterEngine.disposeImagePreview();
     super.dispose();
+  }
+
+  // MARK: - 이미지 프리뷰 텍스처
+
+  Future<void> _initImagePreview() async {
+    if (widget.imagePath == null) return;
+    await FilterEngine.disposeImagePreview();
+    final cam = ref.read(cameraProvider);
+    final result = await FilterEngine.initImagePreview(
+      sourcePath: _effectiveSourcePath,
+      lutFileName: _editorNoFilter ? '' : (cam.activeFilter?.lutFileName ?? ''),
+      intensity: _editorNoFilter ? 0.0 : cam.filterIntensity,
+      adjustments: _adjustmentsMap,
+      effects: _effectsMap,
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      _imageTextureId = result['textureId'] as int?;
+      _imageTextureW  = result['width']     as int? ?? 1;
+      _imageTextureH  = result['height']    as int? ?? 1;
+    });
+  }
+
+  void _updateImagePreview() {
+    if (_imageTextureId == null) return;
+    final cam = ref.read(cameraProvider);
+    FilterEngine.updateImagePreview(
+      lutFileName: _editorNoFilter ? '' : (cam.activeFilter?.lutFileName ?? ''),
+      intensity: _editorNoFilter ? 0.0 : cam.filterIntensity,
+      adjustments: _adjustmentsMap,
+      effects: _effectsMap,
+    );
   }
 
   // MARK: - Build
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(cameraProvider, (prev, next) {
-      final prevId = prev?.activeFilter?.id;
-      final nextId = next.activeFilter?.id;
-      if (prevId != nextId) {
-        if (nextId == null) {
-          setState(() { _editorNoFilter = true; _filteredPreviewPath = null; });
-        } else {
-          setState(() => _editorNoFilter = false);
-          _generatePreview();
-        }
-      }
-    });
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -214,13 +248,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ref.read(cameraProvider.notifier).clearFilter();
                 setState(() {
                   _editorNoFilter = true;
-                  _filteredPreviewPath = null;
                   _exposure = 0; _contrast = 0; _saturation = 0;
                   _beauty = 0; _fade = 0; _dreamyGlow = 0;
                   _lightLeak = 0; _filmGrain = 0;
                   _highlights = 0; _shadows = 0; _temperature = 0;
                   _tint = 0; _sharpness = 0; _vignette = 0; _skinTone = 0;
                 });
+                _updateImagePreview();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -235,24 +269,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
             const SizedBox(width: 8),
           ],
-          // 비교 버튼 (Before/After 토글)
-          GestureDetector(
-            onTap: () => setState(() => _showSplit = !_showSplit),
-            child: Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: _showSplit
-                    ? const Color(0xFF3D3531)
-                    : const Color(0xFFF5F0EC),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
-              ),
-              child: Icon(Icons.compare_rounded,
-                  color: _showSplit ? Colors.white : const Color(0xFF3D3531),
-                  size: 18),
-            ),
-          ),
-          const SizedBox(width: 8),
           if (widget.assetId != null) ...[
             GestureDetector(
               onTap: _deletePhoto,
@@ -312,7 +328,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             color: Colors.black26, size: 64),
       );
     }
-    final displayPath = _filteredPreviewPath ?? _croppedSourcePath ?? widget.imagePath!;
+    final displayPath = _croppedSourcePath ?? widget.imagePath!;
     return Stack(
       children: [
         // 배경: 사진이 contain으로 letterbox될 때 보이는 영역
@@ -324,27 +340,24 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         ),
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: _showSplit
-          ? GestureDetector(
-              onHorizontalDragUpdate: (d) {
-                final w = MediaQuery.sizeOf(context).width - 32;
-                setState(() {
-                  _splitPosition =
-                      (_splitPosition + d.delta.dx / w).clamp(0.05, 0.95);
-                });
-              },
-              child: LayoutBuilder(
-                builder: (ctx, constraints) =>
-                    _buildSplitView(constraints.maxWidth, constraints.maxHeight),
-              ),
-            )
-          : Image.file(
-              File(displayPath),
-              fit: BoxFit.contain,
-              gaplessPlayback: true,
-              width: double.infinity,
-              height: double.infinity,
-            ),
+          child: _imageTextureId != null && _activeTab != 'crop'
+              // 실시간 텍스처 프리뷰 (효과 탭 / 필터 탭)
+              ? FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: _imageTextureW.toDouble(),
+                    height: _imageTextureH.toDouble(),
+                    child: Texture(textureId: _imageTextureId!),
+                  ),
+                )
+              // 자르기 탭 or 텍스처 초기화 전: 파일 기반 표시
+              : Image.file(
+                  File(displayPath),
+                  key: ValueKey(displayPath),
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
         ),
         // 자르기 오버레이
         if (_activeTab == 'crop')
@@ -358,80 +371,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     );
   }
 
-  Widget _buildSplitView(double w, double h) {
-    final original = widget.imagePath!;
-    final filtered = _filteredPreviewPath ?? original;
-    final lineX = w * _splitPosition;
-
-    return SizedBox(
-      width: w,
-      height: h,
-      child: Stack(
-        children: [
-        // 오른쪽 (After = 필터 적용)
-        Positioned.fill(
-          child: Image.file(File(filtered), fit: BoxFit.contain, gaplessPlayback: true),
-        ),
-        // 왼쪽 (Before = 원본)
-        ClipRect(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            widthFactor: _splitPosition,
-            child: SizedBox(
-              width: w,
-              height: h,
-              child: Image.file(File(original), fit: BoxFit.contain, gaplessPlayback: true),
-            ),
-          ),
-        ),
-        // 분할선
-        Positioned(
-          left: lineX - 1, top: 0, bottom: 0,
-          child: Container(
-            width: 2,
-            color: Colors.white.withValues(alpha: 0.9),
-          ),
-        ),
-        // 핸들
-        Positioned(
-          left: lineX - 14,
-          top: h / 2 - 14,
-          child: Container(
-            width: 28, height: 28,
-            decoration: const BoxDecoration(
-                color: Colors.white, shape: BoxShape.circle),
-            child: const Icon(Icons.compare_arrows_rounded,
-                color: Colors.black54, size: 16),
-          ),
-        ),
-        // Before 라벨 (분할선 왼쪽)
-        Positioned(
-          right: (w - lineX + 8).clamp(8.0, w - 8),
-          top: h / 2 + 18,
-          child: _splitLabel('Before'),
-        ),
-        // After 라벨 (분할선 오른쪽)
-        Positioned(
-          left: (lineX + 8).clamp(8.0, w - 56),
-          top: h / 2 + 18,
-          child: _splitLabel('After'),
-        ),
-        ],
-      ),
-    );
-  }
-
-  Widget _splitLabel(String text) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(100),
-    ),
-    child: Text(text,
-        style: const TextStyle(
-            color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-  );
-
   // MARK: - 효과 파라미터 행
 
   Widget _buildEffectRow() {
@@ -439,52 +378,56 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     return SizedBox(
       height: 68,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(_params.length, (i) {
           final isActive = i == _activeParamIndex;
           final param = _params[i];
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _activeParamIndex = i),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 52, height: 28,
-                  child: Center(
-                    child: isActive
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFADDE6),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              _formatValue(i),
-                              style: const TextStyle(
-                                color: Color(0xFFB06878),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          )
-                        : Icon(param.icon,
-                            color: const Color(0xFF8A8480), size: 20),
-                  ),
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _activeParamIndex = i),
+              child: SizedBox(
+                height: 68,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 52, height: 28,
+                      child: Center(
+                        child: isActive
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFADDE6),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(
+                                  _formatValue(i),
+                                  style: const TextStyle(
+                                    color: Color(0xFFB06878),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              )
+                            : Icon(param.icon,
+                                color: const Color(0xFF8A8480), size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _paramLabel(i, l10n),
+                      style: TextStyle(
+                        color: isActive
+                            ? const Color(0xFFB06878)
+                            : const Color(0xFF8A8480),
+                        fontSize: 11,
+                        fontWeight:
+                            isActive ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _paramLabel(i, l10n),
-                  style: TextStyle(
-                    color: isActive
-                        ? const Color(0xFFB06878)
-                        : const Color(0xFF8A8480),
-                    fontSize: 11,
-                    fontWeight:
-                        isActive ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         }),
@@ -515,9 +458,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           divisions: 200,
           onChanged: (v) {
             setState(() => _setParamValueDirectly(_activeParamIndex, v));
-            _generatePreview(quickMode: true);
+            _updateImagePreview();
           },
-          onChangeEnd: (_) => _generatePreview(),
         ),
       ),
     );
@@ -548,10 +490,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             isNoFilterSelected: _editorNoFilter,
             onNoFilterSelected: () {
               ref.read(cameraProvider.notifier).clearFilter();
-              setState(() {
-                _editorNoFilter = true;
-                _filteredPreviewPath = null;
-              });
+              setState(() => _editorNoFilter = true);
+              _updateImagePreview();
             },
           ),
         ),
@@ -577,9 +517,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       max: 1.0,
                       onChanged: (v) {
                         ref.read(cameraProvider.notifier).setFilterIntensity(v);
-                        _generatePreview(quickMode: true);
+                        _updateImagePreview();
                       },
-                      onChangeEnd: (_) => _generatePreview(),
                     ),
                   ),
                 ),
@@ -863,10 +802,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         _sourceImageSize = Size(outW.toDouble(), outH.toDouble());
         _cropNorm = const Rect.fromLTRB(0, 0, 1, 1);
         _aspectIndex = 0;
-        _filteredPreviewPath = null;
+        _imageTextureId = null; // 텍스처 재초기화 대기
         _activeTab = 'effect';
       });
-      _generatePreview();
+      _initImagePreview(); // 크롭된 소스로 텍스처 재초기화
     }
   }
 
@@ -985,63 +924,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     'lightLeak': _lightLeak,
   };
 
-  Future<void> _generatePreview({bool quickMode = false}) async {
-    if (widget.imagePath == null) return;
-
-    final camera = ref.read(cameraProvider);
-    final hasFilter = !_editorNoFilter && camera.activeFilter != null;
-    if (!hasFilter && !_hasChanges) {
-      setState(() => _filteredPreviewPath = null);
-      return;
-    }
-
-    if (quickMode) {
-      // 빠른 프리뷰: 스로틀(16ms)로 네이티브 호출 제한
-      if (_isGeneratingPreview) {
-        _quickModeQueued = true;
-        return;
-      }
-      if (_quickPreviewThrottle?.isActive == true) return;
-      _quickPreviewThrottle = Timer(const Duration(milliseconds: 8), () async {
-        if (!mounted) return;
-        final token = ++_previewToken;
-        final cam = ref.read(cameraProvider);
-        final path = await FilterEngine.processImage(
-          sourcePath: _effectiveSourcePath,
-          lutFileName: _editorNoFilter ? '' : (cam.activeFilter?.lutFileName ?? ''),
-          intensity: _editorNoFilter ? 0.0 : cam.filterIntensity,
-          adjustments: _adjustmentsMap,
-          effects: _effectsMap,
-          maxSize: 480,
-        );
-        if (!mounted || _previewToken != token) return;
-        setState(() => _filteredPreviewPath = path);
-      });
-      return;
-    }
-
-    // 풀해상도 처리
-    if (_isGeneratingPreview) {
-      _needsPreviewRegenerate = true;
-      return;
-    }
-
-    setState(() { _isGeneratingPreview = true; _needsPreviewRegenerate = false; _quickModeQueued = false; });
-    final path = await FilterEngine.processImage(
-      sourcePath: _effectiveSourcePath,
-      lutFileName: _editorNoFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
-      intensity: _editorNoFilter ? 0.0 : camera.filterIntensity,
-      adjustments: _adjustmentsMap,
-      effects: _effectsMap,
-    );
-    if (!mounted) return;
-    setState(() {
-      _filteredPreviewPath = path;
-      _isGeneratingPreview = false;
-    });
-    if (_needsPreviewRegenerate) _generatePreview();
-  }
-
   // MARK: - 저장
 
   Future<void> _saveImage() async {
@@ -1139,19 +1021,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           sharePositionOrigin: origin,
         );
         return;
-      }
-
-      // 이미 프리뷰가 생성돼 있으면 재처리 없이 바로 공유
-      if (_filteredPreviewPath != null) {
-        final p = _filteredPreviewPath!;
-        if (File(p).existsSync()) {
-          await Share.shareXFiles(
-            [XFile(p, mimeType: _mimeType(p))],
-            sharePositionOrigin: origin,
-          );
-          return;
-        }
-        // 프리뷰 파일이 사라진 경우 재처리로 폴백
       }
 
       if (!mounted) return;

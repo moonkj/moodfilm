@@ -123,6 +123,46 @@ class FilterEngine {
     await _channel.invokeMethod('seekVideoPreview', {'seconds': seconds});
   }
 
+  // ─── 실시간 이미지 필터 프리뷰 (FlutterTexture 기반) ──────────────────────
+
+  /// 이미지 프리뷰 텍스처 초기화
+  /// Returns: {'textureId': int, 'width': int, 'height': int}
+  static Future<Map<Object?, Object?>?> initImagePreview({
+    required String sourcePath,
+    required String lutFileName,
+    required double intensity,
+    Map<String, double>? adjustments,
+    Map<String, double>? effects,
+  }) async {
+    return _channel.invokeMapMethod('initImagePreview', {
+      'sourcePath':  sourcePath,
+      'lutFile':     lutFileName,
+      'intensity':   intensity,
+      'adjustments': adjustments ?? {},
+      'effects':     effects ?? {},
+    });
+  }
+
+  /// 이미지 프리뷰 파라미터 업데이트 (실시간 반영)
+  static Future<void> updateImagePreview({
+    required String lutFileName,
+    required double intensity,
+    Map<String, double>? adjustments,
+    Map<String, double>? effects,
+  }) async {
+    await _channel.invokeMethod('updateImagePreview', {
+      'lutFile':     lutFileName,
+      'intensity':   intensity,
+      'adjustments': adjustments ?? {},
+      'effects':     effects ?? {},
+    });
+  }
+
+  /// 이미지 프리뷰 텍스처 해제
+  static Future<void> disposeImagePreview() async {
+    await _channel.invokeMethod('disposeImagePreview');
+  }
+
   /// 이미지 썸네일 생성 (필터 미리보기용)
   /// Returns: 썸네일 바이트 데이터
   static Future<List<int>?> generateThumbnail({

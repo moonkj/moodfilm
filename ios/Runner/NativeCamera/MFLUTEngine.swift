@@ -124,6 +124,7 @@ class MFLUTEngine {
     /// CIImage에 현재 LUT + 이펙트 파이프라인 적용
     func apply(to image: CIImage) -> CIImage {
         var result = image
+        let originalExtent = image.extent  // 원본 extent 저장 — 마지막에 크롭 기준으로 사용
 
         // 1. LUT 필터 적용 (강도 블렌딩)
         if let lutFilter = currentLUTFilter, intensity > 0 {
@@ -195,7 +196,8 @@ class MFLUTEngine {
                                            position: CGFloat(splitPosition))
         }
 
-        return result
+        // 최종 안전장치: 어떤 이펙트도 원본 extent 밖으로 번지지 않도록 크롭
+        return result.cropped(to: originalExtent)
     }
 
     // MARK: - 시그니처 이펙트: Dreamy Glow
@@ -437,6 +439,104 @@ class MFLUTEngine {
         return composite.outputImage?.cropped(to: extent) ?? filtered
     }
 
+    // MARK: - 정지 이미지 조정값 파이프라인 (FilterEnginePlugin + MFImagePreviewRenderer 공유)
+
+    /// CIFilter 조정값을 이미지에 적용 (exposure / highlights / shadows / contrast / saturation /
+    /// temperature / tint / skinTone / sharpness / vignette / fade)
+    static func applyAdjustments(to image: CIImage, adjustments: [String: Double]) -> CIImage {
+        var result = image
+        let extent = image.extent
+
+        if let ev = adjustments["exposure"], ev != 0 {
+            if let f = CIFilter(name: "CIExposureAdjust") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                f.setValue(ev * 2.0, forKey: kCIInputEVKey)
+                result = f.outputImage ?? result
+            }
+        }
+
+        let highlights = adjustments["highlights"] ?? 0
+        let shadows    = adjustments["shadows"]    ?? 0
+        if highlights != 0 || shadows != 0 {
+            if let f = CIFilter(name: "CIHighlightShadowAdjust") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                f.setValue(1.0 + Float(highlights) * 0.7, forKey: "inputHighlightAmount")
+                f.setValue(Float(shadows) * 0.7,          forKey: "inputShadowAmount")
+                result = f.outputImage ?? result
+            }
+        }
+
+        let contrast   = adjustments["contrast"]   ?? 0
+        let saturation = adjustments["saturation"] ?? 0
+        if contrast != 0 || saturation != 0 {
+            if let f = CIFilter(name: "CIColorControls") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                f.setValue(1.0 + contrast,   forKey: kCIInputContrastKey)
+                f.setValue(1.0 + saturation, forKey: kCIInputSaturationKey)
+                result = f.outputImage ?? result
+            }
+        }
+
+        let temperature = adjustments["temperature"] ?? adjustments["warmth"] ?? 0
+        let tint        = adjustments["tint"]        ?? 0
+        if temperature != 0 || tint != 0 {
+            if let f = CIFilter(name: "CITemperatureAndTint") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                let temp = 6500.0 + temperature * 1500.0
+                f.setValue(CIVector(x: temp, y: 0),              forKey: "inputNeutral")
+                f.setValue(CIVector(x: 6500.0, y: tint * 50.0), forKey: "inputTargetNeutral")
+                result = f.outputImage ?? result
+            }
+        }
+
+        if let skinTone = adjustments["skinTone"], skinTone != 0 {
+            if let f = CIFilter(name: "CIHueAdjust") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                f.setValue(Float(skinTone) * 0.15, forKey: kCIInputAngleKey)
+                result = f.outputImage ?? result
+            }
+        }
+
+        if let sharpness = adjustments["sharpness"], sharpness != 0 {
+            if sharpness > 0 {
+                if let f = CIFilter(name: "CISharpenLuminance") {
+                    f.setValue(result, forKey: kCIInputImageKey)
+                    f.setValue(Float(sharpness) * 1.5, forKey: kCIInputSharpnessKey)
+                    result = f.outputImage?.cropped(to: extent) ?? result
+                }
+            } else {
+                if let f = CIFilter(name: "CIGaussianBlur") {
+                    f.setValue(result, forKey: kCIInputImageKey)
+                    f.setValue(Float(-sharpness) * 4.0, forKey: kCIInputRadiusKey)
+                    result = f.outputImage?.cropped(to: extent) ?? result
+                }
+            }
+        }
+
+        if let vignette = adjustments["vignette"], vignette > 0 {
+            if let f = CIFilter(name: "CIVignette") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                f.setValue(Float(vignette) * 2.0,       forKey: kCIInputIntensityKey)
+                f.setValue(Float(1.0 - vignette * 0.3), forKey: kCIInputRadiusKey)
+                result = f.outputImage ?? result
+            }
+        }
+
+        if let fade = adjustments["fade"], fade > 0 {
+            if let f = CIFilter(name: "CIColorMatrix") {
+                f.setValue(result, forKey: kCIInputImageKey)
+                let fv = CGFloat(fade * 0.3)
+                f.setValue(CIVector(x: 1-fv, y: 0,    z: 0,    w: 0), forKey: "inputRVector")
+                f.setValue(CIVector(x: 0,    y: 1-fv, z: 0,    w: 0), forKey: "inputGVector")
+                f.setValue(CIVector(x: 0,    y: 0,    z: 1-fv, w: 0), forKey: "inputBVector")
+                f.setValue(CIVector(x: fv,   y: fv,   z: fv,   w: 0), forKey: "inputBiasVector")
+                result = f.outputImage ?? result
+            }
+        }
+
+        return result
+    }
+
     // MARK: - 캐시 관리
 
     func clearCache() {
@@ -448,5 +548,29 @@ class MFLUTEngine {
         for name in lutFileNames {
             loadLUT(named: name)
         }
+    }
+
+    /// LUT가 캐시에 있는지 확인 (메인 스레드에서 호출)
+    func isLUTCached(named lutFileName: String) -> Bool {
+        return lutCache.object(forKey: NSString(string: lutFileName)) != nil
+    }
+
+    /// 백그라운드 스레드에서 안전하게 캐시만 채움 — currentLUTFilter 변경 없음
+    /// NSCache는 스레드 안전(thread-safe)하므로 동시 접근 가능
+    func preloadToCache(named lutFileName: String) {
+        let cacheKey = NSString(string: lutFileName)
+        guard lutCache.object(forKey: cacheKey) == nil else { return }
+
+        let resourceName = (lutFileName as NSString).deletingPathExtension
+        let appFrameworkBundle = Bundle(url: Bundle.main.bundleURL
+            .appendingPathComponent("Frameworks/App.framework"))
+        let resolvedURL = appFrameworkBundle?.url(forResource: resourceName, withExtension: "cube",
+                                                   subdirectory: "flutter_assets/assets/luts")
+            ?? Bundle.main.url(forResource: resourceName, withExtension: "cube",
+                               subdirectory: "flutter_assets/assets/luts")
+            ?? Bundle.main.url(forResource: resourceName, withExtension: "cube",
+                               subdirectory: "luts")
+        guard let url = resolvedURL, let filter = buildLUTFilter(from: url) else { return }
+        lutCache.setObject(filter, forKey: cacheKey)
     }
 }

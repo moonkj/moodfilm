@@ -487,35 +487,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                           children: [
                             _buildEffectRow(),
                             _buildTickSlider(),
-                            if (_hasEffectChanges)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _brightness = 0; _contrast = 0; _saturation = 0;
-                                      _softness = 0; _beauty = 0; _dreamyGlow = 0;
-                                    });
-                                    _onEffectsChanged();
-                                    if (_showSplit) _generateCompare();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF5F2EF),
-                                      borderRadius: BorderRadius.circular(100),
-                                    ),
-                                    child: const Text('전체 초기화',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF8A8480),
-                                            fontWeight: FontWeight.w500)),
-                                  ),
-                                ),
-                              )
-                            else
-                              const SizedBox(height: 4),
+                            const SizedBox(height: 4),
                           ],
                         )
                       : _buildFilterSection(),
@@ -694,46 +666,51 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     return SizedBox(
       height: 68,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(_params.length, (i) {
           final isActive = i == _activeParamIndex;
           final param = _params[i];
-          return GestureDetector(
-            onTap: () => setState(() => _activeParamIndex = i),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 52, height: 28,
-                  child: Center(
-                    child: isActive
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFADDE6),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(_formatValue(i),
-                                style: const TextStyle(
-                                    color: Color(0xFFB06878),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700)),
-                          )
-                        : Icon(param.icon,
-                            color: const Color(0xFF8A8480), size: 20),
-                  ),
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _activeParamIndex = i),
+              child: SizedBox(
+                height: 68,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 52, height: 28,
+                      child: Center(
+                        child: isActive
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFADDE6),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(_formatValue(i),
+                                    style: const TextStyle(
+                                        color: Color(0xFFB06878),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700)),
+                              )
+                            : Icon(param.icon,
+                                color: const Color(0xFF8A8480), size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(param.label,
+                        style: TextStyle(
+                          color: isActive
+                              ? const Color(0xFFB06878)
+                              : const Color(0xFF8A8480),
+                          fontSize: 11,
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                        )),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(param.label,
-                    style: TextStyle(
-                      color: isActive
-                          ? const Color(0xFFB06878)
-                          : const Color(0xFF8A8480),
-                      fontSize: 11,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                    )),
-              ],
+              ),
             ),
           );
         }),
@@ -747,7 +724,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final param = _params[_activeParamIndex];
     final value = _getParamValue(_activeParamIndex);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.only(top: 24, left: 20, right: 20),
       child: SliderTheme(
         data: SliderTheme.of(context).copyWith(
           trackHeight: 2,

@@ -23,6 +23,8 @@
 		AA10000000000000000004BB /* CameraEnginePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000004AA /* CameraEnginePlugin.swift */; };
 		AA10000000000000000005BB /* FilterEnginePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000005AA /* FilterEnginePlugin.swift */; };
 		AA10000000000000000006BB /* MFVideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000006AA /* MFVideoRecorder.swift */; };
+		AA10000000000000000007BB /* MFVideoFilterPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000007AA /* MFVideoFilterPlayer.swift */; };
+		AA10000000000000000008BB /* MFImagePreviewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000008AA /* MFImagePreviewRenderer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +76,8 @@
 		AA10000000000000000003AA /* MFCameraPreview.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MFCameraPreview.swift; sourceTree = "<group>"; };
 		AA10000000000000000004AA /* CameraEnginePlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraEnginePlugin.swift; sourceTree = "<group>"; };
 		AA10000000000000000006AA /* MFVideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFVideoRecorder.swift; sourceTree = "<group>"; };
+		AA10000000000000000007AA /* MFVideoFilterPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFVideoFilterPlayer.swift; sourceTree = "<group>"; };
+		AA10000000000000000008AA /* MFImagePreviewRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFImagePreviewRenderer.swift; sourceTree = "<group>"; };
 		AA10000000000000000005AA /* FilterEnginePlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FilterEnginePlugin.swift; sourceTree = "<group>"; };
 		B0D88EEE320CF52A23387F11 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		C8471CFDA04BC471CF692D93 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -176,6 +180,8 @@
 				AA10000000000000000004AA /* CameraEnginePlugin.swift */,
 				AA10000000000000000005AA /* FilterEnginePlugin.swift */,
 				AA10000000000000000006AA /* MFVideoRecorder.swift */,
+				AA10000000000000000007AA /* MFVideoFilterPlayer.swift */,
+				AA10000000000000000008AA /* MFImagePreviewRenderer.swift */,
 			);
 			path = NativeCamera;
 			sourceTree = "<group>";
@@ -433,6 +439,8 @@
 				AA10000000000000000004BB /* CameraEnginePlugin.swift in Sources */,
 				AA10000000000000000005BB /* FilterEnginePlugin.swift in Sources */,
 				AA10000000000000000006BB /* MFVideoRecorder.swift in Sources */,
+				AA10000000000000000007BB /* MFVideoFilterPlayer.swift in Sources */,
+				AA10000000000000000008BB /* MFImagePreviewRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

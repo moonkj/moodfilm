@@ -20,6 +20,8 @@ void _setupMocks() {
         return '/tmp/processed.mp4';
       case 'generateThumbnail':
         return [1, 2, 3, 4]; // dummy bytes
+      case 'initImagePreview':
+        return {'textureId': 42, 'width': 1080, 'height': 1350};
       default:
         return null;
     }
@@ -215,6 +217,94 @@ void main() {
       );
       final call = _calls.firstWhere((c) => c.method == 'generateThumbnail');
       expect(call.arguments['size'], 200);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // initImagePreview / updateImagePreview / disposeImagePreview
+  // ──────────────────────────────────────────────────────────────────────────
+  group('FilterEngine.initImagePreview', () {
+    test('initImagePreview — textureId, width, height를 반환한다', () async {
+      final result = await FilterEngine.initImagePreview(
+        sourcePath: '/input/photo.jpg',
+        lutFileName: 'milk.cube',
+        intensity: 0.8,
+      );
+      expect(result, isNotNull);
+      expect(result!['textureId'], 42);
+      expect(result['width'], 1080);
+      expect(result['height'], 1350);
+    });
+
+    test('initImagePreview — 채널에 sourcePath, lutFile, intensity가 전달된다', () async {
+      await FilterEngine.initImagePreview(
+        sourcePath: '/input/photo.jpg',
+        lutFileName: 'film_80.cube',
+        intensity: 0.6,
+      );
+      final call = _calls.firstWhere((c) => c.method == 'initImagePreview');
+      expect(call.arguments['sourcePath'], '/input/photo.jpg');
+      expect(call.arguments['lutFile'], 'film_80.cube');
+      expect(call.arguments['intensity'], 0.6);
+    });
+
+    test('initImagePreview — adjustments 미전달 시 빈 맵이 전달된다', () async {
+      await FilterEngine.initImagePreview(
+        sourcePath: '/input/photo.jpg',
+        lutFileName: 'milk.cube',
+        intensity: 1.0,
+      );
+      final call = _calls.firstWhere((c) => c.method == 'initImagePreview');
+      expect(call.arguments['adjustments'], isEmpty);
+      expect(call.arguments['effects'], isEmpty);
+    });
+
+    test('initImagePreview — adjustments, effects 맵이 채널에 전달된다', () async {
+      await FilterEngine.initImagePreview(
+        sourcePath: '/input/photo.jpg',
+        lutFileName: 'milk.cube',
+        intensity: 1.0,
+        adjustments: {'exposure': 0.3, 'contrast': -0.1},
+        effects: {'dreamyGlow': 0.5, 'beauty': 0.2},
+      );
+      final call = _calls.firstWhere((c) => c.method == 'initImagePreview');
+      final adj = call.arguments['adjustments'] as Map;
+      final eff = call.arguments['effects'] as Map;
+      expect(adj['exposure'], 0.3);
+      expect(adj['contrast'], -0.1);
+      expect(eff['dreamyGlow'], 0.5);
+      expect(eff['beauty'], 0.2);
+    });
+  });
+
+  group('FilterEngine.updateImagePreview', () {
+    test('updateImagePreview — 채널에 lutFile, intensity가 전달된다', () async {
+      await FilterEngine.updateImagePreview(
+        lutFileName: 'lomo.cube',
+        intensity: 0.7,
+      );
+      final call = _calls.firstWhere((c) => c.method == 'updateImagePreview');
+      expect(call.arguments['lutFile'], 'lomo.cube');
+      expect(call.arguments['intensity'], 0.7);
+    });
+
+    test('updateImagePreview — adjustments, effects 맵이 채널에 전달된다', () async {
+      await FilterEngine.updateImagePreview(
+        lutFileName: '',
+        intensity: 0.0,
+        adjustments: {'vignette': 0.4},
+        effects: {'filmGrain': 0.3},
+      );
+      final call = _calls.firstWhere((c) => c.method == 'updateImagePreview');
+      expect((call.arguments['adjustments'] as Map)['vignette'], 0.4);
+      expect((call.arguments['effects'] as Map)['filmGrain'], 0.3);
+    });
+  });
+
+  group('FilterEngine.disposeImagePreview', () {
+    test('disposeImagePreview — disposeImagePreview 채널 메서드를 호출한다', () async {
+      await FilterEngine.disposeImagePreview();
+      expect(_calls.any((c) => c.method == 'disposeImagePreview'), isTrue);
     });
   });
 

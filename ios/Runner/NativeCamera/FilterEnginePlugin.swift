@@ -5,7 +5,8 @@ import AVFoundation
 import Photos
 
 // UIImage.Orientation → CGImagePropertyOrientation 변환 (rawValue가 다름)
-private extension CGImagePropertyOrientation {
+// private → internal: MFImagePreviewRenderer에서도 사용
+extension CGImagePropertyOrientation {
     init(_ uiOrientation: UIImage.Orientation) {
         switch uiOrientation {
         case .up:            self = .up
@@ -28,6 +29,8 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
     private let lutEngine = MFLUTEngine()
     private var textureRegistry: FlutterTextureRegistry?
     private var videoPlayer: MFVideoFilterPlayer?
+    private var imageRenderer: MFImagePreviewRenderer?
+    private var lastProcessedImagePath: String?  // 임시 파일 누적 방지
 
     static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
@@ -41,6 +44,12 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
 
     func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "initImagePreview":
+            handleInitImagePreview(call: call, result: result)
+        case "updateImagePreview":
+            handleUpdateImagePreview(call: call, result: result)
+        case "disposeImagePreview":
+            imageRenderer?.dispose(); imageRenderer = nil; result(nil)
         case "processImage":
             handleProcessImage(call: call, result: result)
         case "processVideo":
@@ -70,6 +79,58 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+
+    // MARK: - Image Preview (실시간 Texture 기반)
+
+    private func handleInitImagePreview(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let sourcePath = args["sourcePath"] as? String,
+              let registry = textureRegistry else {
+            result(FlutterError(code: "INVALID_ARGS", message: "sourcePath 필요", details: nil))
+            return
+        }
+
+        let lutFile     = args["lutFile"]      as? String ?? ""
+        let intensity   = Float(args["intensity"] as? Double ?? 1.0)
+        let adjustments = args["adjustments"]  as? [String: Double] ?? [:]
+        let effects     = args["effects"]      as? [String: Double] ?? [:]
+
+        imageRenderer?.dispose()
+        let renderer = MFImagePreviewRenderer()
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard self != nil else { return }
+            guard renderer.loadImage(from: sourcePath) else {
+                DispatchQueue.main.async {
+                    result(FlutterError(code: "LOAD_FAILED", message: "이미지 로드 실패", details: nil))
+                }
+                return
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let textureId = renderer.start(registry: registry)
+                renderer.update(lutFile: lutFile, intensity: intensity,
+                                adjustments: adjustments, effects: effects)
+                self.imageRenderer = renderer
+                result([
+                    "textureId": textureId,
+                    "width":     renderer.outputWidth,
+                    "height":    renderer.outputHeight,
+                ])
+            }
+        }
+    }
+
+    private func handleUpdateImagePreview(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any] else { result(nil); return }
+        let lutFile     = args["lutFile"]      as? String ?? ""
+        let intensity   = Float(args["intensity"] as? Double ?? 1.0)
+        let adjustments = args["adjustments"]  as? [String: Double] ?? [:]
+        let effects     = args["effects"]      as? [String: Double] ?? [:]
+        imageRenderer?.update(lutFile: lutFile, intensity: intensity,
+                              adjustments: adjustments, effects: effects)
+        result(nil)
     }
 
     // MARK: - Video Preview
@@ -223,7 +284,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         }
 
         // 1. 조정값 적용 (CIFilters)
-        ciImage = applyAdjustments(to: ciImage, adjustments: adjustments)
+        ciImage = MFLUTEngine.applyAdjustments(to: ciImage, adjustments: adjustments)
 
         // 2. LUT 필터 + 이펙트 적용 (빈 lutFile = 필터 없음)
         if !lutFile.isEmpty {
@@ -267,9 +328,14 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         let outputImage = UIImage(cgImage: cgImage, scale: uiImage.scale, orientation: .up)
         guard let jpegData = outputImage.jpegData(compressionQuality: 0.95) else { return nil }
 
+        // 이전 임시 파일 삭제 (누적 방지)
+        if let prev = lastProcessedImagePath {
+            try? FileManager.default.removeItem(atPath: prev)
+        }
         let outputPath = NSTemporaryDirectory() + "moodfilm_\(Int(Date().timeIntervalSince1970)).jpg"
         do {
             try jpegData.write(to: URL(fileURLWithPath: outputPath))
+            lastProcessedImagePath = outputPath
             return outputPath
         } catch {
             print("[FilterEnginePlugin] 저장 실패: \(error)")
@@ -424,113 +490,6 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         guard let jpegData = resultImage.jpegData(compressionQuality: 0.8) else { return nil }
 
         return FlutterStandardTypedData(bytes: jpegData)
-    }
-
-    // MARK: - 조정값 CIFilter 파이프라인
-
-    private func applyAdjustments(to image: CIImage, adjustments: [String: Double]) -> CIImage {
-        var result = image
-        let extent = image.extent
-
-        // 1. Exposure (CIExposureAdjust)
-        if let ev = adjustments["exposure"], ev != 0 {
-            if let filter = CIFilter(name: "CIExposureAdjust") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                filter.setValue(ev * 2.0, forKey: kCIInputEVKey)
-                result = filter.outputImage ?? result
-            }
-        }
-
-        // 2. Highlights + Shadows (CIHighlightShadowAdjust)
-        let highlights = adjustments["highlights"] ?? 0
-        let shadows = adjustments["shadows"] ?? 0
-        if highlights != 0 || shadows != 0 {
-            if let filter = CIFilter(name: "CIHighlightShadowAdjust") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                // inputHighlightAmount: 0~2, default 1.0 (낮을수록 하이라이트 복구)
-                filter.setValue(1.0 + Float(highlights) * 0.7, forKey: "inputHighlightAmount")
-                // inputShadowAmount: -1~1, default 0 (양수 = 그림자 밝히기)
-                filter.setValue(Float(shadows) * 0.7, forKey: "inputShadowAmount")
-                result = filter.outputImage ?? result
-            }
-        }
-
-        // 3. Contrast + Saturation (CIColorControls)
-        let contrast = adjustments["contrast"] ?? 0
-        let saturation = adjustments["saturation"] ?? 0
-        if contrast != 0 || saturation != 0 {
-            if let filter = CIFilter(name: "CIColorControls") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                filter.setValue(1.0 + contrast, forKey: kCIInputContrastKey)
-                filter.setValue(1.0 + saturation, forKey: kCIInputSaturationKey)
-                result = filter.outputImage ?? result
-            }
-        }
-
-        // 4. Temperature + Tint (CITemperatureAndTint)
-        // "temperature" 키 우선, 없으면 이전 "warmth" 키 호환
-        let temperature = adjustments["temperature"] ?? adjustments["warmth"] ?? 0
-        let tint = adjustments["tint"] ?? 0
-        if temperature != 0 || tint != 0 {
-            if let filter = CIFilter(name: "CITemperatureAndTint") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                let temp = 6500.0 + temperature * 1500.0
-                filter.setValue(CIVector(x: temp, y: 0), forKey: "inputNeutral")
-                filter.setValue(CIVector(x: 6500.0, y: tint * 50.0), forKey: "inputTargetNeutral")
-                result = filter.outputImage ?? result
-            }
-        }
-
-        // 5. Skin Tone — CIHueAdjust: 피부 오렌지/핑크 계열 미세 보정
-        if let skinTone = adjustments["skinTone"], skinTone != 0 {
-            if let filter = CIFilter(name: "CIHueAdjust") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                filter.setValue(Float(skinTone) * 0.15, forKey: kCIInputAngleKey)
-                result = filter.outputImage ?? result
-            }
-        }
-
-        // 6. Sharpness / Blur (양수=선명, 음수=흐림)
-        if let sharpness = adjustments["sharpness"], sharpness != 0 {
-            if sharpness > 0 {
-                if let filter = CIFilter(name: "CISharpenLuminance") {
-                    filter.setValue(result, forKey: kCIInputImageKey)
-                    filter.setValue(Float(sharpness) * 1.5, forKey: kCIInputSharpnessKey)
-                    result = filter.outputImage?.cropped(to: extent) ?? result
-                }
-            } else {
-                if let filter = CIFilter(name: "CIGaussianBlur") {
-                    filter.setValue(result, forKey: kCIInputImageKey)
-                    filter.setValue(Float(-sharpness) * 4.0, forKey: kCIInputRadiusKey)
-                    result = filter.outputImage?.cropped(to: extent) ?? result
-                }
-            }
-        }
-
-        // 7. Vignette (CIVignette)
-        if let vignette = adjustments["vignette"], vignette > 0 {
-            if let filter = CIFilter(name: "CIVignette") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                filter.setValue(Float(vignette) * 2.0, forKey: kCIInputIntensityKey)
-                filter.setValue(Float(1.0 - vignette * 0.3), forKey: kCIInputRadiusKey)
-                result = filter.outputImage ?? result
-            }
-        }
-
-        // 8. Fade (CIColorMatrix — 밝기 압축으로 페이드 효과)
-        if let fade = adjustments["fade"], fade > 0 {
-            if let filter = CIFilter(name: "CIColorMatrix") {
-                filter.setValue(result, forKey: kCIInputImageKey)
-                let f = CGFloat(fade * 0.3)
-                filter.setValue(CIVector(x: 1-f, y: 0, z: 0, w: 0), forKey: "inputRVector")
-                filter.setValue(CIVector(x: 0, y: 1-f, z: 0, w: 0), forKey: "inputGVector")
-                filter.setValue(CIVector(x: 0, y: 0, z: 1-f, w: 0), forKey: "inputBVector")
-                filter.setValue(CIVector(x: f, y: f, z: f, w: 0), forKey: "inputBiasVector")
-                result = filter.outputImage ?? result
-            }
-        }
-
-        return result
     }
 
     // MARK: - extractVideoFrame

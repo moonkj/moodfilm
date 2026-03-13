@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 30)
+> 마지막 업데이트: 2026-03-13 (세션 31)
 
 ---
 
@@ -1252,3 +1252,89 @@ LUT 3D(sampler3D) → Brightness → Contrast → Saturation → Softness → Gl
 ### iOS 실기기 릴리즈 설치
 - `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.2MB)
 - `xcrun devicectl device install app --device 835A5E84-05B4-520C-B52C-E69BBEE38FED` ✅
+
+---
+
+## 세션 31 변경사항 (2026-03-13) — 전체 코드 리뷰 + 이미지 프리뷰 리팩토링
+
+### 전체 코드 리뷰 워크플로우 (UX→설계→코더→디버거→성능→테스트→빌드→리뷰어)
+
+이번 세션은 UX설계자부터 리뷰어까지 전체 워크플로우를 순서대로 완료.
+
+### 에디터 — `ref.listenManual` subscription 취소 (메모리 누수 수정)
+
+**문제:** `initState()`에서 `ref.listenManual(cameraProvider, ...)` 등록 후 `dispose()`에서 취소 안 함 → 화면 해제 후에도 리스너 활성 상태 유지 (메모리 누수)
+
+**수정 (`editor_screen.dart`):**
+```dart
+ProviderSubscription<dynamic>? _filterSubscription;
+
+@override
+void initState() {
+  super.initState();
+  _filterSubscription = ref.listenManual(cameraProvider, (prev, next) { ... });
+}
+
+@override
+void dispose() {
+  _filterSubscription?.close();  // ← 추가
+  FilterEngine.disposeImagePreview();
+  super.dispose();
+}
+```
+
+### Dead code 제거 (`editor_screen.dart`)
+
+**배경:** `onChangeEnd` 제거로 `_filteredPreviewPath` 등이 사용되지 않음
+
+**제거 대상:**
+- `_filteredPreviewPath: String?` 필드
+- `_isGeneratingPreview: bool` 필드
+- `_needsPreviewRegenerate: bool` 필드
+- `_generatePreview()` 메서드 전체
+- `_shareImage()` 내 dead 최적화 블록
+- `_buildImageSection()` displayPath에서 `_filteredPreviewPath` 제거
+
+### `MFLUTEngine.applyAdjustments` — static 메서드로 통합
+
+**문제:** `FilterEnginePlugin.swift`와 `MFImagePreviewRenderer.swift` 양쪽에 동일한 이미지 조정 파이프라인 (~100줄) 중복 존재
+
+**해결:** `MFLUTEngine.swift`에 static 메서드 추가:
+```swift
+// MARK: - 정지 이미지 조정값 파이프라인
+static func applyAdjustments(to image: CIImage, adjustments: [String: Double]) -> CIImage
+```
+- exposure / highlights / shadows / contrast / saturation / temperature / tint / skinTone / sharpness / vignette / fade 처리
+- `FilterEnginePlugin`과 `MFImagePreviewRenderer` 양쪽에서 `MFLUTEngine.applyAdjustments()` 호출로 교체
+
+**결과:** ~200줄 중복 코드 제거
+
+### 임시 파일 누적 방지 (`FilterEnginePlugin.swift`)
+
+**문제:** `processImage` 호출마다 `/tmp/moodfilm_<timestamp>.jpg` 생성, 이전 파일 미삭제 → 임시 디렉토리 무한 누적
+
+**수정:**
+```swift
+private var lastProcessedImagePath: String?
+
+// ...
+if let prev = lastProcessedImagePath {
+    try? FileManager.default.removeItem(atPath: prev)
+}
+lastProcessedImagePath = outputPath
+```
+
+### 이미지 프리뷰 텍스처 테스트 추가 (`filter_engine_test.dart`)
+
+**신규 테스트 7개 (총 26/26 통과):**
+- `initImagePreview — textureId, width, height를 반환한다`
+- `initImagePreview — 채널에 sourcePath, lutFile, intensity가 전달된다`
+- `initImagePreview — adjustments 미전달 시 빈 맵이 전달된다`
+- `initImagePreview — adjustments, effects 맵이 채널에 전달된다`
+- `updateImagePreview — 채널에 lutFile, intensity가 전달된다`
+- `updateImagePreview — adjustments, effects 맵이 채널에 전달된다`
+- `disposeImagePreview — disposeImagePreview 채널 메서드를 호출한다`
+
+### iOS 실기기 릴리즈 설치
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB)
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
