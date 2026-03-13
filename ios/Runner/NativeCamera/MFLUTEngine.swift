@@ -220,12 +220,26 @@ class MFLUTEngine {
 
         guard let blurred = blurFilter.outputImage else { return bloomed }
 
-        // 원본 이미지 위에 glow 레이어 overlay blend
+        // Overlay blend: glow 레이어를 원본에 합성
         guard let overlayFilter = CIFilter(name: "CIOverlayBlendMode") else { return blurred }
         overlayFilter.setValue(blurred.cropped(to: image.extent), forKey: kCIInputImageKey)
         overlayFilter.setValue(image, forKey: kCIInputBackgroundImageKey)
+        guard let glowResult = overlayFilter.outputImage?.cropped(to: image.extent) else { return image }
 
-        return overlayFilter.outputImage?.cropped(to: image.extent) ?? image
+        // eased 값으로 glow 결과의 알파를 제어 → 원본과 부드럽게 블렌딩
+        // CIOverlayBlendMode는 강도 파라미터가 없으므로 CIColorMatrix로 알파 조정 후 SourceOver 합성
+        guard let alphaFilter = CIFilter(name: "CIColorMatrix") else { return glowResult }
+        alphaFilter.setValue(glowResult, forKey: kCIInputImageKey)
+        alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(eased)), forKey: "inputAVector")
+        guard let fadedGlow = alphaFilter.outputImage else { return glowResult }
+
+        guard let composite = CIFilter(name: "CISourceOverCompositing") else { return glowResult }
+        composite.setValue(fadedGlow, forKey: kCIInputImageKey)
+        composite.setValue(image, forKey: kCIInputBackgroundImageKey)
+        return composite.outputImage?.cropped(to: image.extent) ?? glowResult
     }
 
     // MARK: - Film Grain 이펙트
