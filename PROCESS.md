@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 32)
+> 마지막 업데이트: 2026-03-13 (세션 33)
 
 ---
 
@@ -1386,3 +1386,40 @@ onScaleEnd:   _showIntensitySlider ? null : _onScaleEnd,
 ### iOS 실기기 릴리즈 설치
 - `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB)
 - `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
+
+---
+
+## 세션 33 변경사항 (2026-03-13) — 필터 메뉴 기본 표시 + 슬라이더 터치 개선
+
+### 필터/효과 패널 토글 구조 변경 (`camera_screen.dart`)
+
+**문제:** 필터/효과 자리가 비어있을 때 UI가 너무 허전함.
+
+**변경 내용:**
+- 앱 시작 시 필터 메뉴 항상 열림 (기본 상태)
+- 필터 버튼(좌측 ✨) ↔ 효과 버튼(우측 ✨) 토글 구조
+  - 필터 버튼 → 필터 패널 표시 (효과 패널 닫힘)
+  - 효과 버튼 → 효과 패널 표시 (필터 패널 닫힘)
+  - 항상 두 패널 중 하나가 표시 (`SizedBox.shrink()` 제거)
+- `_showFilterPanel` 변수 제거 → `_showEffectsPanel` 단일 bool로 관리
+
+### 슬라이더 터치 추가 개선 (`camera_screen.dart`)
+
+**문제:** 100% 등 극값에서 슬라이더 thumb 드래그가 여전히 어려움.
+
+**원인 1 — GestureDetector onTap/onDoubleTap 잔류:**
+- 이전 수정에서 Scale 콜백만 null 처리 → `onTap`, `onDoubleTap`이 GestureArena에 잔류
+- 해결: 강도 슬라이더 표시 중 모든 콜백 null 처리
+
+```dart
+onTap: _showIntensitySlider ? null : _resetSideButtonsTimer,
+onDoubleTap: _showIntensitySlider ? null : _handleCameraFlip,
+```
+
+**원인 2 — SliderComponentShape.noOverlay가 터치 영역 축소:**
+- `noOverlay` 설정 시 터치 hit area = thumb 반경(7~8px)만 남음
+- 해결: `overlayColor: Colors.transparent` 사용 → 기본 24px 반경 터치 영역 유지, 시각적으로는 투명
+
+```dart
+overlayColor: Colors.transparent,  // noOverlay 대신 사용
+```

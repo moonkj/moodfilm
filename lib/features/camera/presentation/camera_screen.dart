@@ -52,7 +52,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Timer? _splitAutoHideTimer;
 
   // 필터 패널 (앱 실행 시 기본 열림)
-  bool _showFilterPanel = true;
+
 
   // 색보정 효과 패널
   bool _showEffectsPanel = false;
@@ -429,12 +429,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _buildCameraPreview(cameraState),
         GestureDetector(
           behavior: HitTestBehavior.translucent,
-          onTap: _resetSideButtonsTimer,
-          // 강도 슬라이더 표시 중에는 스케일/팬 제스처 비활성 → 슬라이더 thumb 드래그 허용
+          // 강도 슬라이더 표시 중에는 모든 제스처 비활성 → 슬라이더 thumb 드래그 허용
+          onTap: _showIntensitySlider ? null : _resetSideButtonsTimer,
           onScaleStart: _showIntensitySlider ? null : _onScaleStart,
           onScaleUpdate: _showIntensitySlider ? null : _onScaleUpdate,
           onScaleEnd: _showIntensitySlider ? null : _onScaleEnd,
-          onDoubleTap: _handleCameraFlip,
+          onDoubleTap: _showIntensitySlider ? null : _handleCameraFlip,
           child: const SizedBox.expand(),
         ),
         if (_isSplitMode && !cameraState.isRecording) _buildSplitOverlay(cameraState),
@@ -702,7 +702,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 2,
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                overlayShape: SliderComponentShape.noOverlay,
+                overlayColor: Colors.transparent,
               ),
               child: Slider(
                 value: cameraState.filterIntensity,
@@ -740,13 +740,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 : const Duration(milliseconds: 200),
             child: _showEffectsPanel
                 ? _buildEffectsPanel()
-                : _showFilterPanel
-                    ? FilterScrollBar(
-                        key: const ValueKey('filter'),
-                        isNoFilterSelected: cameraState.activeFilter == null,
-                        onNoFilterSelected: () => ref.read(cameraProvider.notifier).clearFilter(),
-                      )
-                    : const SizedBox.shrink(),
+                : FilterScrollBar(
+                    key: const ValueKey('filter'),
+                    isNoFilterSelected: cameraState.activeFilter == null,
+                    onNoFilterSelected: () => ref.read(cameraProvider.notifier).clearFilter(),
+                  ),
           ),
         ),
         const SizedBox(height: 4),
@@ -767,12 +765,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     _buildGalleryButton(cameraState),
                     const SizedBox(width: 12),
                     _iconBtn(
-                      _showFilterPanel ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+                      _showEffectsPanel ? Icons.auto_awesome_outlined : Icons.auto_awesome,
                       () => setState(() {
-                        _showFilterPanel = !_showFilterPanel;
-                        if (_showFilterPanel) _showEffectsPanel = false;
+                        _showEffectsPanel = false;
                       }),
-                      active: _showFilterPanel,
+                      active: !_showEffectsPanel,
                     ),
                   ],
                 ),
@@ -793,8 +790,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     _iconBtn(
                       Icons.auto_fix_high_rounded,
                       () => setState(() {
-                        _showEffectsPanel = !_showEffectsPanel;
-                        if (_showEffectsPanel) _showFilterPanel = false;
+                        _showEffectsPanel = true;
                       }),
                       active: _showEffectsPanel,
                     ),
@@ -891,7 +887,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 trackHeight: 2,
                 thumbShape:
                     const RoundSliderThumbShape(enabledThumbRadius: 8),
-                overlayShape: SliderComponentShape.noOverlay,
+                overlayColor: Colors.transparent,
                 activeTrackColor: const Color(0xFFD4A0B0),
                 inactiveTrackColor: const Color(0xFFEAE4E0),
                 thumbColor: const Color(0xFF8A6870),
