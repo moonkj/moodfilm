@@ -430,9 +430,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: _resetSideButtonsTimer,
-          onScaleStart: _onScaleStart,
-          onScaleUpdate: _onScaleUpdate,
-          onScaleEnd: _onScaleEnd,
+          // 강도 슬라이더 표시 중에는 스케일/팬 제스처 비활성 → 슬라이더 thumb 드래그 허용
+          onScaleStart: _showIntensitySlider ? null : _onScaleStart,
+          onScaleUpdate: _showIntensitySlider ? null : _onScaleUpdate,
+          onScaleEnd: _showIntensitySlider ? null : _onScaleEnd,
           onDoubleTap: _handleCameraFlip,
           child: const SizedBox.expand(),
         ),

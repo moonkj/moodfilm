@@ -126,28 +126,23 @@ class MFLUTEngine {
         var result = image
         let originalExtent = image.extent  // 원본 extent 저장 — 마지막에 크롭 기준으로 사용
 
-        // 1. LUT 필터 적용 (강도 블렌딩)
+        // 1. LUT 필터 적용 (강도 블렌딩) + 채도/대비 부스트
+        // intensity 1.0 기준: LUT 100% + 채도 +45% / 대비 +35% → 2배 강도 체감
         if let lutFilter = currentLUTFilter, intensity > 0 {
-            lutFilter.setValue(result, forKey: kCIInputImageKey)
+            let base = result
+            lutFilter.setValue(base, forKey: kCIInputImageKey)
             if let filtered = lutFilter.outputImage {
-                if intensity >= 1.0 {
-                    result = filtered
-                } else {
-                    // intensity 블렌딩: filtered * intensity + original * (1 - intensity)
-                    // filtered 이미지의 alpha를 intensity로 설정한 뒤 source-over 합성
-                    if let alphaFilter = CIFilter(name: "CIColorMatrix"),
-                       let composite = CIFilter(name: "CISourceOverCompositing") {
-                        alphaFilter.setValue(filtered, forKey: kCIInputImageKey)
-                        alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
-                        alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
-                        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
-                        alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity)), forKey: "inputAVector")
-                        if let semiTransparent = alphaFilter.outputImage {
-                            composite.setValue(semiTransparent, forKey: kCIInputImageKey)
-                            composite.setValue(result, forKey: kCIInputBackgroundImageKey)
-                            result = composite.outputImage ?? result
-                        }
-                    }
+                result = intensity >= 1.0
+                    ? filtered
+                    : lerpCI(fg: filtered, bg: base, alpha: CGFloat(intensity))
+
+                // 강도 비례 채도/대비 부스트 (잡음 없이 색감 강화)
+                let boost = CGFloat(min(intensity, 1.0))
+                if boost > 0, let vivid = CIFilter(name: "CIColorControls") {
+                    vivid.setValue(result, forKey: kCIInputImageKey)
+                    vivid.setValue(1.0 + boost * 0.35, forKey: kCIInputContrastKey)
+                    vivid.setValue(1.0 + boost * 0.45, forKey: kCIInputSaturationKey)
+                    result = vivid.outputImage?.cropped(to: result.extent) ?? result
                 }
             }
         }
@@ -535,6 +530,25 @@ class MFLUTEngine {
         }
 
         return result
+    }
+
+    // MARK: - 내부 블렌딩 유틸
+
+    /// CIImage 두 장을 alpha 비율로 선형 블렌딩 (0=bg, 1=fg)
+    private func lerpCI(fg: CIImage, bg: CIImage, alpha: CGFloat) -> CIImage {
+        guard alpha > 0 else { return bg }
+        guard alpha < 1 else { return fg }
+        guard let af = CIFilter(name: "CIColorMatrix"),
+              let comp = CIFilter(name: "CISourceOverCompositing") else { return fg }
+        af.setValue(fg, forKey: kCIInputImageKey)
+        af.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+        af.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+        af.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+        af.setValue(CIVector(x: 0, y: 0, z: 0, w: alpha), forKey: "inputAVector")
+        guard let semi = af.outputImage else { return fg }
+        comp.setValue(semi, forKey: kCIInputImageKey)
+        comp.setValue(bg, forKey: kCIInputBackgroundImageKey)
+        return comp.outputImage ?? fg
     }
 
     // MARK: - 캐시 관리

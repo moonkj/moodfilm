@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 31)
+> 마지막 업데이트: 2026-03-13 (세션 32)
 
 ---
 
@@ -1334,6 +1334,54 @@ lastProcessedImagePath = outputPath
 - `updateImagePreview — 채널에 lutFile, intensity가 전달된다`
 - `updateImagePreview — adjustments, effects 맵이 채널에 전달된다`
 - `disposeImagePreview — disposeImagePreview 채널 메서드를 호출한다`
+
+### iOS 실기기 릴리즈 설치
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB)
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
+
+---
+
+## 세션 32 변경사항 (2026-03-13) — 필터 강도 강화 + 슬라이더 제스처 수정
+
+### 필터 강도 강화 (`MFLUTEngine.swift`)
+
+**문제:** 필터 효과가 전반적으로 너무 약하게 느껴짐. 100% 기준 2배 이상 강도 요청.
+
+**1차 시도 (double-LUT):**
+- intensity 0.5→LUT 1회, 1.0→LUT 2회 적용하는 2단계 블렌딩 구현
+- 문제: LUT 2회 적용 시 색상 클리핑/밴딩/잡음 발생 → 폐기
+
+**최종 해결 (단일 LUT + 채도/대비 부스트):**
+```swift
+// intensity 비례 채도 +45%, 대비 +35% 부스트
+vivid.setValue(1.0 + boost * 0.35, forKey: kCIInputContrastKey)
+vivid.setValue(1.0 + boost * 0.45, forKey: kCIInputSaturationKey)
+```
+- 잡음 없이 강한 색감, `lerpCI` 헬퍼 메서드 추가
+
+### 필터 기본 강도 전체 1.0으로 상향 (`filter_model.dart`)
+
+- 모든 필터 `defaultIntensities` → 1.0 (이전: 0.50~0.75)
+- fallback `intensityFor` 기본값: 0.6 → 0.80 (`user_preferences.dart`)
+
+### Hive 강도 마이그레이션 (`storage_service.dart`)
+
+- 앱 시작 시 저장된 강도가 새 기본값보다 낮으면 자동 삭제 → 새 기본값 적용
+- 사용자가 슬라이더로 높게 설정한 값은 유지
+
+### 강도 슬라이더 thumb 드래그 수정 (`camera_screen.dart`)
+
+**문제:** 강도 슬라이더 표시 중 thumb를 드래그할 수 없고 원하는 위치를 탭해야만 했음.
+
+**원인:** 카메라 프리뷰의 `GestureDetector(behavior: .translucent)`가 `ScaleGestureRecognizer`를 항상 등록해 Slider의 `PanGestureRecognizer`와 충돌 → Scale이 arena 우선.
+
+**해결:**
+```dart
+onScaleStart: _showIntensitySlider ? null : _onScaleStart,
+onScaleUpdate: _showIntensitySlider ? null : _onScaleUpdate,
+onScaleEnd:   _showIntensitySlider ? null : _onScaleEnd,
+```
+강도 슬라이더 표시 중에는 Scale/Pan 제스처 비활성화.
 
 ### iOS 실기기 릴리즈 설치
 - `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB)

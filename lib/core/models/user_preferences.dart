@@ -54,7 +54,7 @@ class UserPreferences extends HiveObject {
   double intensityFor(String filterId) =>
       filterIntensities[filterId] ??
       FilterData.defaultIntensities[filterId] ??
-      0.6;
+      0.80;
 
   void setIntensity(String filterId, double intensity) {
     filterIntensities[filterId] = intensity;
