@@ -256,7 +256,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         alignment: Alignment.center,
                         children: [
                           if (_initialized)
-                            SizedBox.expand(child: VideoPlayer(_controller))
+                            Center(child: _buildVideoWithCorrectAspect())
                           else
                             const CircularProgressIndicator(color: Colors.white38),
                           if (_initialized && !_controller.value.isPlaying)
@@ -304,6 +304,21 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         ),
       ),
     );
+  }
+
+  // MARK: - 회전 보정 AspectRatio 빌드
+
+  Widget _buildVideoWithCorrectAspect() {
+    final size = _controller.value.size;
+    final rotation = _controller.value.rotationCorrection;
+    // video_player iOS: 물리 크기(landscape 1440×1080) + rotationCorrection=90 반환
+    // 실제 표시 비율 = 세로/가로 (90° 또는 270° 회전 시 swap)
+    final double ratio = (size.width > 0 && size.height > 0)
+        ? ((rotation == 90 || rotation == 270)
+            ? size.height / size.width   // 3:4 portrait (1080/1440 = 0.75)
+            : size.width / size.height)
+        : 3.0 / 4.0;
+    return AspectRatio(aspectRatio: ratio, child: VideoPlayer(_controller));
   }
 
   // MARK: - 상단 바

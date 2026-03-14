@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 42)
+> 마지막 업데이트: 2026-03-14 (세션 43)
 
 ---
 
@@ -1436,6 +1436,28 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 43 변경사항 (2026-03-14) — 동영상 플레이어 검정 영역 완전 수정
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart` — rotationCorrection 기반 AspectRatio 적용
+
+### 문제
+- 세션 42의 `SizedBox.expand(VideoPlayer)` 이후에도 상단 검정 영역 지속
+- **근본 원인**: `video_player` iOS는 물리 크기(1440×1080 landscape) + `rotationCorrection = 90` 반환
+- `SizedBox.expand`로 컨테이너를 채워도, 내부 `RotatedBox` → `AVPlayerLayer`가 landscape(1.33) 비율로 letterbox 계산 → 검정 영역 발생
+
+### 수정
+- `SizedBox.expand(VideoPlayer)` → `Center(child: _buildVideoWithCorrectAspect())`
+- `_buildVideoWithCorrectAspect()`: `rotationCorrection == 90 || 270`일 때 height/width로 swap
+  - 물리 1440×1080 + rotation=90 → displayRatio = 1080/1440 = 0.75 (3:4 portrait) ✓
+  - 검정 영역 없이 영상이 컨테이너에 꽉 맞게 표시
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 
