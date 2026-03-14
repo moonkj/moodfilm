@@ -24,6 +24,7 @@ class MFLUTEngine {
     // MARK: - LUT 캐시 (최대 8개 — 즐겨찾기 + 최근 사용)
     private var lutCache = NSCache<NSString, CIFilter>()
     private var currentLUTFilter: CIFilter?
+    private var currentLUTName: String = "" // 필터별 개성 보정에 사용
     var intensity: Float = 1.0
 
     // MARK: - 현재 이펙트 강도
@@ -51,6 +52,7 @@ class MFLUTEngine {
 
     /// .cube 파일을 로드하여 CIColorCubeWithColorSpace 필터 생성
     func loadLUT(named lutFileName: String) {
+        currentLUTName = (lutFileName as NSString).deletingPathExtension
         let cacheKey = NSString(string: lutFileName)
 
         // 캐시 히트
@@ -128,7 +130,7 @@ class MFLUTEngine {
         let originalExtent = image.extent  // 원본 extent 저장 — 마지막에 크롭 기준으로 사용
 
         // 1. LUT 필터 적용 (강도 블렌딩) + 채도/대비 부스트
-        // intensity 1.0 기준: LUT 100% + 채도 +45% / 대비 +35% → 2배 강도 체감
+        // LUT 적용 + 강도 블렌딩 + 필터 개성 보정
         if let lutFilter = currentLUTFilter, intensity > 0 {
             let base = result
             lutFilter.setValue(base, forKey: kCIInputImageKey)
@@ -137,7 +139,7 @@ class MFLUTEngine {
                     ? filtered
                     : lerpCI(fg: filtered, bg: base, alpha: CGFloat(intensity))
 
-                // 강도 비례 채도/대비 미세 부스트 (LUT 고유 색감 최대 보존)
+                // 미세 부스트 (LUT 고유 색감 보존)
                 let boost = CGFloat(min(intensity, 1.0))
                 if boost > 0, let vivid = CIFilter(name: "CIColorControls") {
                     vivid.setValue(result, forKey: kCIInputImageKey)
@@ -145,6 +147,9 @@ class MFLUTEngine {
                     vivid.setValue(1.0 + boost * 0.10, forKey: kCIInputSaturationKey)
                     result = vivid.outputImage?.cropped(to: result.extent) ?? result
                 }
+
+                // 필터별 개성 보정 (비슷한 LUT 차별화 + 약한 LUT 보완)
+                result = applyFilterPersonality(to: result, extent: result.extent)
             }
         }
 
@@ -551,6 +556,124 @@ class MFLUTEngine {
         comp.setValue(semi, forKey: kCIInputImageKey)
         comp.setValue(bg, forKey: kCIInputBackgroundImageKey)
         return comp.outputImage ?? fg
+    }
+
+    // MARK: - 필터별 개성 보정
+    // LUT가 약하거나 비슷한 필터들을 코드 레벨에서 차별화
+
+    private func applyFilterPersonality(to image: CIImage, extent: CGRect) -> CIImage {
+        var result = image
+
+        // 색보정 헬퍼
+        func colorControls(contrast: CGFloat = 1.0, saturation: CGFloat = 1.0, brightness: CGFloat = 0.0) -> CIImage {
+            guard let f = CIFilter(name: "CIColorControls") else { return result }
+            f.setValue(result, forKey: kCIInputImageKey)
+            if contrast != 1.0    { f.setValue(contrast, forKey: kCIInputContrastKey) }
+            if saturation != 1.0  { f.setValue(saturation, forKey: kCIInputSaturationKey) }
+            if brightness != 0.0  { f.setValue(brightness, forKey: kCIInputBrightnessKey) }
+            return f.outputImage?.cropped(to: extent) ?? result
+        }
+
+        func temperature(target: CGFloat) -> CIImage {
+            guard let f = CIFilter(name: "CITemperatureAndTint") else { return result }
+            f.setValue(result, forKey: kCIInputImageKey)
+            f.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
+            f.setValue(CIVector(x: target, y: 0), forKey: "inputTargetNeutral")
+            return f.outputImage?.cropped(to: extent) ?? result
+        }
+
+        func colorMatrix(rScale: CGFloat = 1, gScale: CGFloat = 1, bScale: CGFloat = 1,
+                         rBias: CGFloat = 0, gBias: CGFloat = 0, bBias: CGFloat = 0) -> CIImage {
+            guard let f = CIFilter(name: "CIColorMatrix") else { return result }
+            f.setValue(result, forKey: kCIInputImageKey)
+            f.setValue(CIVector(x: rScale, y: 0, z: 0, w: 0), forKey: "inputRVector")
+            f.setValue(CIVector(x: 0, y: gScale, z: 0, w: 0), forKey: "inputGVector")
+            f.setValue(CIVector(x: 0, y: 0, z: bScale, w: 0), forKey: "inputBVector")
+            f.setValue(CIVector(x: rBias, y: gBias, z: bBias, w: 0), forKey: "inputBiasVector")
+            return f.outputImage?.cropped(to: extent) ?? result
+        }
+
+        switch currentLUTName {
+
+        // ─── LUT 거의 identity → 코드로 전부 구현 ───────────────────────────
+        case "vivid":
+            // 선명하고 진한 채도 — 인스타 감성 팝아트 느낌
+            result = colorControls(contrast: 1.45, saturation: 1.55)
+
+        case "retro_ccd":
+            // 구형 디카: 탈포화 + 강한 대비 + 차가운 화이트
+            result = colorControls(contrast: 1.35, saturation: 0.72)
+            result = temperature(target: 5800)
+
+        case "film03":
+            // Y2K: 쿨한 페이드 + 약한 탈포화 + 대비
+            result = colorMatrix(rScale: 0.94, gScale: 0.94, bScale: 0.93,
+                                 rBias: 0.05, gBias: 0.05, bBias: 0.08) // 쿨 하이라이트 페이드
+            result = colorControls(contrast: 1.20, saturation: 0.88)
+
+        // ─── 쌍둥이 차별화 ────────────────────────────────────────────────
+        case "lavender":
+            // dream보다 더 핑크-퍼플: R 약간+, 약한 채도 부스트
+            result = colorMatrix(rScale: 1.04, gScale: 0.98, bScale: 1.02,
+                                 rBias: 0.02, gBias: 0.0, bBias: 0.03)
+
+        case "winter":
+            // cloud보다 선명하고 깨끗한 쿨화이트
+            result = colorControls(contrast: 1.22, saturation: 1.12)
+
+        case "cloud":
+            // winter보다 부드럽고 안개낀 느낌
+            result = colorControls(contrast: 0.92, saturation: 0.90, brightness: 0.03)
+
+        case "kodak_soft":
+            // film98보다 따뜻하고 부드러운 아날로그
+            result = temperature(target: 7100)
+            result = colorControls(saturation: 0.94)
+
+        case "film98":
+            // 90년대 필름: 콘트라스트 강조 + 약한 페이드
+            result = colorControls(contrast: 1.28)
+            result = colorMatrix(rScale: 0.97, gScale: 0.97, bScale: 0.97,
+                                 rBias: 0.025, gBias: 0.015, bBias: 0.005) // 웜 페이드
+
+        case "disposable":
+            // 일회용: 채도+대비 과장, 살짝 옐로 캐스트
+            result = colorControls(contrast: 1.22, saturation: 1.18)
+            result = colorMatrix(rBias: 0.01, gBias: 0.005, bBias: -0.01)
+
+        case "mocha":
+            // 커피브라운: 채도 낮춰 브라운 무드 강화
+            result = colorControls(contrast: 1.10, saturation: 0.75)
+
+        case "latte":
+            // 카페라떼: mocha보다 밝고 따뜻함
+            result = temperature(target: 7000)
+            result = colorControls(saturation: 0.90, brightness: 0.03)
+
+        case "soft_pink":
+            // 인스타 핑크: peach보다 더 핑크-로즈
+            result = colorMatrix(rScale: 1.03, gScale: 0.96, bScale: 0.97,
+                                 rBias: 0.03, gBias: 0.01, bBias: 0.02)
+
+        case "pale":
+            // 창백한 쿨톤: 탈포화 + 밝게
+            result = colorControls(saturation: 0.72, brightness: 0.05)
+
+        case "blossom":
+            // 벚꽃: 핑크 틴트 + 약간 밝게
+            result = colorMatrix(rScale: 1.02, gScale: 0.99, bScale: 1.01,
+                                 rBias: 0.025, gBias: 0.01, bBias: 0.02)
+            result = colorControls(brightness: 0.02)
+
+        case "dusty_blue":
+            // 빈티지 블루: 채도 낮춰 먼지낀 느낌 강화
+            result = colorControls(saturation: 0.82)
+
+        default:
+            break
+        }
+
+        return result
     }
 
     // MARK: - 캐시 관리

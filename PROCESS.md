@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 62)
+> 마지막 업데이트: 2026-03-15 (세션 63)
 
 ---
 
@@ -1923,5 +1923,39 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 - `lib/core/services/storage_service.dart`
 
 ### iOS 실기기 설치 (세션 62)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅
+
+## 세션 63 변경사항 (2026-03-15) — 26종 필터 개성 보정 레이어 추가
+
+### 전체 LUT 분석 결과
+| 문제 | 필터 |
+|------|------|
+| 거의 identity | vivid, retro_ccd, film03 |
+| 쌍둥이 (너무 비슷) | dream↔lavender, cloud↔winter, film98↔kodak_soft↔disposable, mocha↔latte, soft_pink↔peach |
+
+### 해결: applyFilterPersonality() 추가 (MFLUTEngine.swift)
+- `currentLUTName` 프로퍼티 추가 (loadLUT 시 저장)
+- 필터별 개성 보정 레이어 (LUT 적용 직후):
+  - **vivid**: 채도+55%, 대비+45% → 선명한 팝아트
+  - **retro_ccd**: 채도-28%, 대비+35%, 5800K → 구형 디카
+  - **film03**: 쿨 페이드 + 채도-12%, 대비+20% → Y2K
+  - **lavender**: R+4%, B+3% 핑크퍼플 틴트 → dream과 차별화
+  - **winter**: 대비+22%, 채도+12% → cloud보다 선명
+  - **cloud**: 대비-8%, 채도-10%, 밝기+3% → 안개낀 부드러움
+  - **kodak_soft**: 7100K 따뜻함, 채도-6% → film98보다 소프트
+  - **film98**: 대비+28%, 웜 페이드 → 90년대 필름
+  - **disposable**: 대비+22%, 채도+18%, 옐로 캐스트 → 일회용 과장
+  - **mocha**: 대비+10%, 채도-25% → 브라운 무드
+  - **latte**: 7000K, 채도-10%, 밝기+3% → 밝고 따뜻한 라떼
+  - **soft_pink**: R+3%, 핑크-로즈 틴트 → peach보다 더 핑크
+  - **pale**: 채도-28%, 밝기+5% → 창백한 쿨톤
+  - **blossom**: 핑크 틴트+밝기 → 벚꽃
+  - **dusty_blue**: 채도-18% → 먼지낀 빈티지 블루
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`
+
+### iOS 실기기 설치 (세션 63)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅
