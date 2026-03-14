@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_typography.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
@@ -234,7 +233,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
   Future<void> _showBatchFilterPicker() async {
     if (_selectedIds.isEmpty) return;
 
-    final selectedFilter = await showModalBottomSheet<FilterModel>(
+    final result = await showModalBottomSheet<(FilterModel, double)>(
       context: context,
       backgroundColor: AppColors.darkSurface,
       shape: const RoundedRectangleBorder(
@@ -243,11 +242,11 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       builder: (ctx) => _FilterPickerSheet(),
     );
 
-    if (selectedFilter == null || !mounted) return;
-    await _applyBatchFilter(selectedFilter);
+    if (result == null || !mounted) return;
+    await _applyBatchFilter(result.$1, result.$2);
   }
 
-  Future<void> _applyBatchFilter(FilterModel filter) async {
+  Future<void> _applyBatchFilter(FilterModel filter, double intensity) async {
     final selected = _assets.where((a) => _selectedIds.contains(a.id)).toList();
 
     setState(() {
@@ -268,7 +267,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       final result = await FilterEngine.processImage(
         sourcePath: file.path,
         lutFileName: filter.lutFileName,
-        intensity: 1.0,
+        intensity: intensity,
         adjustments: {},
         effects: {},
         saveToGallery: true,
@@ -534,56 +533,151 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
 // MARK: - 필터 선택 바텀시트
 
-class _FilterPickerSheet extends StatelessWidget {
+class _FilterPickerSheet extends StatefulWidget {
+  @override
+  State<_FilterPickerSheet> createState() => _FilterPickerSheetState();
+}
+
+class _FilterPickerSheetState extends State<_FilterPickerSheet> {
+  FilterModel? _selected;
+  double _intensity = 1.0;
+
   @override
   Widget build(BuildContext context) {
     final filters = FilterData.all;
+    final intensityPct = (_intensity * 100).round();
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(AppLocalizations.of(context).selectFilter, style: AppTypography.h2),
+        // 핸들
+        Container(
+          width: 36, height: 4,
+          margin: const EdgeInsets.only(top: 12, bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white24,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
+        // 필터 가로 스크롤
         SizedBox(
-          height: 100,
+          height: 104,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            separatorBuilder: (context, index) => const SizedBox(width: 10),
             itemCount: filters.length,
             itemBuilder: (ctx, i) {
               final f = filters[i];
+              final isActive = _selected?.id == f.id;
               return GestureDetector(
-                onTap: () => Navigator.of(ctx).pop(f),
+                onTap: () => setState(() => _selected = f),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        f.thumbnailAssetPath,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, a, b) => Container(
-                          width: 60,
-                          height: 60,
-                          color: AppColors.darkBg,
-                          child: const Icon(Icons.filter_rounded,
-                              color: Colors.white38, size: 24),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isActive ? AppColors.accent : Colors.transparent,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          f.thumbnailAssetPath,
+                          width: 60, height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, err, st) => Container(
+                            width: 60, height: 60,
+                            color: AppColors.darkBg,
+                            child: const Icon(Icons.filter_rounded,
+                                color: Colors.white38, size: 24),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(f.name, style: AppTypography.caption),
+                    Text(
+                      f.name,
+                      style: TextStyle(
+                        color: isActive ? AppColors.accent : Colors.white54,
+                        fontSize: 11,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
                   ],
                 ),
               );
             },
           ),
         ),
-        const SizedBox(height: 16),
+        // 강도 슬라이더
+        if (_selected != null) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Row(
+              children: [
+                const Text('강도', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                const Spacer(),
+                Text(
+                  '$intensityPct%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape: SliderComponentShape.noOverlay,
+              activeTrackColor: AppColors.accent,
+              inactiveTrackColor: Colors.white24,
+              thumbColor: Colors.white,
+            ),
+            child: Slider(
+              value: _intensity,
+              min: 0.0,
+              max: 1.0,
+              onChanged: (v) => setState(() => _intensity = v),
+            ),
+          ),
+        ] else
+          const SizedBox(height: 16),
+        // 적용 버튼
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16,
+              MediaQuery.of(context).padding.bottom + 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _selected == null
+                  ? null
+                  : () => Navigator.of(context).pop((_selected!, _intensity)),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                disabledBackgroundColor: Colors.white12,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text(
+                _selected == null ? '필터를 선택하세요' : '적용',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
