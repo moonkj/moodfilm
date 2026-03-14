@@ -227,8 +227,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     });
 
     final screenW = MediaQuery.of(context).size.width;
-    // 3:4 비율 고정 컨테이너 (레퍼런스 방식)
-    final previewH = screenW * 4.0 / 3.0;
     final camera = ref.watch(cameraProvider);
 
     return Scaffold(
@@ -239,42 +237,40 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Column(
               children: [
                 _buildTopBar(camera),
-                // 동영상 프리뷰 — 3:4 고정 컨테이너, 영상 비율 유지
-                GestureDetector(
-                  onTap: () {
-                    if (_initialized) {
-                      setState(() {
-                        _controller.value.isPlaying
-                            ? _controller.pause()
-                            : _controller.play();
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: screenW,
-                    height: previewH,
-                    color: Colors.black,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (_initialized)
-                          AspectRatio(
-                            aspectRatio: _controller.value.aspectRatio,
-                            child: VideoPlayer(_controller),
-                          )
-                        else
-                          const CircularProgressIndicator(color: Colors.white38),
-                        if (_initialized && !_controller.value.isPlaying)
-                          Container(
-                            width: 56, height: 56,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              shape: BoxShape.circle,
+                // 동영상 프리뷰 — Expanded로 남은 공간 채움, AVPlayerLayer resizeAspect로 비율 유지
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_initialized) {
+                        setState(() {
+                          _controller.value.isPlaying
+                              ? _controller.pause()
+                              : _controller.play();
+                        });
+                      }
+                    },
+                    child: Container(
+                      width: screenW,
+                      color: Colors.black,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (_initialized)
+                            SizedBox.expand(child: VideoPlayer(_controller))
+                          else
+                            const CircularProgressIndicator(color: Colors.white38),
+                          if (_initialized && !_controller.value.isPlaying)
+                            Container(
+                              width: 56, height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.play_arrow_rounded,
+                                  color: Colors.white, size: 32),
                             ),
-                            child: const Icon(Icons.play_arrow_rounded,
-                                color: Colors.white, size: 32),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

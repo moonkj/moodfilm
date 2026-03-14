@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 41)
+> 마지막 업데이트: 2026-03-14 (세션 42)
 
 ---
 
@@ -1436,6 +1436,27 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 42 변경사항 (2026-03-14) — 동영상 플레이어 레이아웃 수정 (상단 검정 영역 제거)
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart` — 고정 previewH 제거 → Expanded + SizedBox.expand
+
+### 문제
+- `previewH = screenW * 4/3 = 520px` 고정값이 SafeArea(~760px) 초과 → Column 오버플로우
+- `AspectRatio(aspectRatio)` 위젯이 비율 계산에 따라 상단 검정 영역 발생
+- 영상이 컨테이너 내 아래쪽으로 쏠리는 현상
+
+### 수정
+- 고정 `previewH` + `AspectRatio` → `Expanded` + `SizedBox.expand(VideoPlayer)` 로 변경
+- `AVPlayerLayer.videoGravity = .resizeAspect` (video_player 기본값)가 자동 중앙 정렬 + 레터박스 처리
+- 어떤 영상 비율이든 안전하게 표시 (9:16, 3:4, 16:9 모두 대응)
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 
