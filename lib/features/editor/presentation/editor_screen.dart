@@ -32,7 +32,8 @@ class EditorScreen extends ConsumerStatefulWidget {
   ConsumerState<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorScreenState extends ConsumerState<EditorScreen> {
+class _EditorScreenState extends ConsumerState<EditorScreen>
+    with SingleTickerProviderStateMixin {
   // 공유 버튼 위치 (iOS sharePositionOrigin)
   final _shareButtonKey = GlobalKey();
 
@@ -62,7 +63,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   bool _editorNoFilter = true;
   ProviderSubscription<dynamic>? _filterSubscription;
 
-  // 인접 에셋 스와이프 내비게이션
+  // 카드 스와이프 애니메이션
+  late final AnimationController _swipeController;
+  double _dragOffset = 0;
+  double _cardWidth = 300;
   bool _isNavigating = false;
 
   // 실시간 이미지 프리뷰 텍스처
@@ -152,6 +156,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     _currentPath = widget.imagePath;
     _currentAssetId = widget.assetId;
     _stateIndex = widget.currentIndex;
+    _swipeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _initImagePreview());
     _filterSubscription = ref.listenManual(cameraProvider, (prev, next) {
       final prevId = prev?.activeFilter?.id;
@@ -169,6 +177,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   @override
   void dispose() {
+    _swipeController.dispose();
     _filterSubscription?.close();
     FilterEngine.disposeImagePreview();
     super.dispose();
@@ -206,49 +215,76 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     );
   }
 
-  // MARK: - 스와이프 내비게이션
+  // MARK: - 카드 스와이프 애니메이션
 
-  Future<void> _goToAdjacent(int delta) async {
+  void _snapBack() => _animateDragTo(0);
+
+  Future<void> _animateDragTo(double target) async {
+    _swipeController.stop();
+    final start = _dragOffset;
+    final anim = Tween<double>(begin: start, end: target).animate(
+      CurvedAnimation(parent: _swipeController, curve: Curves.easeOut),
+    );
+    void tick() { if (mounted) setState(() => _dragOffset = anim.value); }
+    anim.addListener(tick);
+    _swipeController.reset();
+    try { await _swipeController.forward().orCancel; } catch (_) {}
+    anim.removeListener(tick);
+  }
+
+  Future<void> _commitSwipe(int delta) async {
+    if (_isNavigating) { _snapBack(); return; }
     final assets = widget.assets;
-    if (assets == null || _isNavigating) return;
+    if (assets == null) { _snapBack(); return; }
     final newIdx = _stateIndex + delta;
-    if (newIdx < 0 || newIdx >= assets.length) return;
+    if (newIdx < 0 || newIdx >= assets.length) { _snapBack(); return; }
 
     setState(() => _isNavigating = true);
-    final asset = assets[newIdx];
-    final file = await asset.file;
+    final assetFuture = assets[newIdx].file;
+
+    // 카드 화면 밖으로 슬라이드
+    await _animateDragTo(_cardWidth * (delta > 0 ? -1 : 1));
+    if (!mounted) return;
+
+    final file = await assetFuture;
     if (!mounted || file == null) {
-      if (mounted) setState(() => _isNavigating = false);
+      if (mounted) setState(() { _dragOffset = 0; _isNavigating = false; });
       return;
     }
 
+    final asset = assets[newIdx];
     if (asset.type == AssetType.video) {
-      // 타입 경계: 동영상 화면으로 전환
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => VideoPlayerScreen(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 220),
+          pageBuilder: (ctx, a1, a2) => VideoPlayerScreen(
             videoPath: file.path,
             assetId: asset.id,
             assets: assets,
             currentIndex: newIdx,
+          ),
+          transitionsBuilder: (ctx, anim, a2, child) => SlideTransition(
+            position: Tween<Offset>(
+              begin: Offset(delta > 0 ? 1.0 : -1.0, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+            child: child,
           ),
         ),
       );
       return;
     }
 
-    // 같은 타입(사진→사진): 프리뷰만 인플레이스 교체
     await FilterEngine.disposeImagePreview();
     if (!mounted) return;
     setState(() {
       _currentPath = file.path;
       _currentAssetId = asset.id;
       _stateIndex = newIdx;
+      _dragOffset = 0;
       _croppedSourcePath = null;
-      _imageTextureId = null;
-      _imageTextureW = 1;
-      _imageTextureH = 1;
+      _imageTextureId = null; _imageTextureW = 1; _imageTextureH = 1;
       _editorNoFilter = true;
       _exposure = 0; _contrast = 0; _saturation = 0;
       _beauty = 0; _fade = 0; _dreamyGlow = 0;
@@ -280,12 +316,27 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                         ? _buildImageSection()
                         : GestureDetector(
                             behavior: HitTestBehavior.translucent,
+                            onHorizontalDragUpdate: (d) {
+                              _swipeController.stop();
+                              setState(() => _dragOffset += d.delta.dx);
+                            },
                             onHorizontalDragEnd: (d) {
                               final v = d.primaryVelocity ?? 0;
-                              if (v < -500) { _goToAdjacent(1); }
-                              else if (v > 500) { _goToAdjacent(-1); }
+                              final threshold = _cardWidth * 0.3;
+                              if (v < -500 || _dragOffset < -threshold) { _commitSwipe(1); }
+                              else if (v > 500 || _dragOffset > threshold) { _commitSwipe(-1); }
+                              else { _snapBack(); }
                             },
-                            child: _buildImageSection(),
+                            onHorizontalDragCancel: () => _snapBack(),
+                            child: LayoutBuilder(
+                              builder: (ctx, constraints) {
+                                _cardWidth = constraints.maxWidth;
+                                return Transform.translate(
+                                  offset: Offset(_dragOffset, 0),
+                                  child: _buildImageSection(),
+                                );
+                              },
+                            ),
                           ),
                   ),
                 ),

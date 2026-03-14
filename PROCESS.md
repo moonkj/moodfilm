@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 57)
+> 마지막 업데이트: 2026-03-14 (세션 58)
 
 ---
 
@@ -1811,3 +1811,25 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### 변경 파일
 - `lib/features/editor/presentation/editor_screen.dart`
 - `lib/features/gallery/presentation/video_player_screen.dart`
+
+---
+
+## 세션 58 변경사항 (2026-03-14) — 카드 스와이프 애니메이션 + 동영상 트림
+
+### 카드 스와이프 (드래그 팔로우)
+- EditorScreen/VideoPlayerScreen에 SingleTickerProviderStateMixin + AnimationController 추가
+- 프리뷰 드래그 중 Transform.translate로 카드가 손가락을 따라 이동
+- 드래그 종료: 속도 500+ 또는 거리 30% 이상 → _commitSwipe() (카드 날아가고 새 콘텐츠 로드)
+- 부족하면 _snapBack() (220ms easeOut 복귀 애니메이션)
+- 크로스 타입 경계(사진↔동영상): PageRouteBuilder 슬라이드 전환
+
+### 동영상 트림 기능
+- iOS Swift: handleTrimVideo (AVAssetExportSession + timeRange) 추가
+- Dart: FilterEngine.trimVideo(), getVideoDuration() 추가
+- VideoPlayerScreen: '트림' 탭 추가, RangeSlider로 구간 선택, '잘라서 저장' 버튼
+
+### 변경 파일
+- `lib/features/editor/presentation/editor_screen.dart`
+- `lib/features/gallery/presentation/video_player_screen.dart`
+- `ios/Runner/NativeCamera/FilterEnginePlugin.swift`
+- `lib/native_plugins/filter_engine/filter_engine.dart`

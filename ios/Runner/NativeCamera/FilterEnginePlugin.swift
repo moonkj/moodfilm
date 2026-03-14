@@ -54,6 +54,15 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             handleProcessImage(call: call, result: result)
         case "processVideo":
             handleProcessVideo(call: call, result: result)
+        case "trimVideo":
+            handleTrimVideo(call: call, result: result)
+        case "getVideoDuration":
+            if let args = call.arguments as? [String: Any],
+               let path = args["path"] as? String {
+                let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+                let seconds = CMTimeGetSeconds(asset.duration)
+                result(seconds.isNaN || seconds.isInfinite ? 0.0 : seconds)
+            } else { result(0.0) }
         case "generateThumbnail":
             handleGenerateThumbnail(call: call, result: result)
         case "extractVideoFrame":
@@ -405,6 +414,67 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
                         message: exportSession.error?.localizedDescription ?? "내보내기 실패",
                         details: nil
                     ))
+                }
+                return
+            }
+
+            guard saveToGallery else {
+                DispatchQueue.main.async { result(outputPath) }
+                return
+            }
+
+            PHPhotoLibrary.requestAuthorization { status in
+                guard status == .authorized || status == .limited else {
+                    DispatchQueue.main.async { result(outputPath) }
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: outputURL)
+                }) { _, _ in
+                    DispatchQueue.main.async { result(outputPath) }
+                }
+            }
+        }
+    }
+
+    // MARK: - trimVideo
+
+    private func handleTrimVideo(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let sourcePath   = args["sourcePath"]    as? String,
+              let startSeconds = args["startSeconds"]  as? Double,
+              let endSeconds   = args["endSeconds"]    as? Double else {
+            result(FlutterError(code: "INVALID_ARGS", message: "sourcePath, startSeconds, endSeconds 필요", details: nil))
+            return
+        }
+
+        let saveToGallery = args["saveToGallery"] as? Bool ?? true
+        let sourceURL = URL(fileURLWithPath: sourcePath)
+        let asset     = AVURLAsset(url: sourceURL)
+
+        let startTime = CMTime(seconds: startSeconds, preferredTimescale: 600)
+        let endTime   = CMTime(seconds: endSeconds,   preferredTimescale: 600)
+        let timeRange = CMTimeRange(start: startTime, end: endTime)
+
+        let outputPath = NSTemporaryDirectory() + "moodfilm_trim_\(Int(Date().timeIntervalSince1970)).mp4"
+        let outputURL  = URL(fileURLWithPath: outputPath)
+        try? FileManager.default.removeItem(at: outputURL)
+
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
+            result(FlutterError(code: "EXPORT_FAILED", message: "AVAssetExportSession 생성 실패", details: nil))
+            return
+        }
+
+        exportSession.outputURL      = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.timeRange      = timeRange
+
+        exportSession.exportAsynchronously {
+            guard exportSession.status == .completed else {
+                DispatchQueue.main.async {
+                    result(FlutterError(code: "EXPORT_FAILED",
+                                        message: exportSession.error?.localizedDescription ?? "트림 실패",
+                                        details: nil))
                 }
                 return
             }

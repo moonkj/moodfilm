@@ -30,7 +30,8 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
+    with SingleTickerProviderStateMixin {
   bool _isProcessing = false;
 
   // 현재 에셋 (스와이프 내비게이션으로 변경 가능)
@@ -38,7 +39,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   String? _currentAssetId;
   int _stateIndex = 0;
 
-  // 인접 에셋 스와이프 내비게이션
+  // 카드 스와이프 애니메이션
+  late final AnimationController _swipeController;
+  double _dragOffset = 0;
+  double _cardWidth = 300;
   bool _isNavigating = false;
 
   // 공유 버튼 위치 (iOS sharePositionOrigin 용)
@@ -72,6 +76,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   double _dreamyGlow = 0;
 
   String _activeTab = 'filter';
+
+  // 트림
+  double _videoDuration = 0;
+  double _trimStart = 0;
+  double _trimEnd = 0;
 
 
   bool get _hasEffectChanges =>
@@ -124,11 +133,26 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _currentPath = widget.videoPath;
     _currentAssetId = widget.assetId;
     _stateIndex = widget.currentIndex;
+    _swipeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
     // 녹화된 영상에는 카메라 필터가 이미 베이크되어 있음.
     // 에디터에서 필터를 다시 적용하면 2중 적용되어 효과가 매우 강해짐.
     // 따라서 항상 _noFilter = true로 시작. 원하면 필터바에서 새로 선택.
     _noFilter = true;
     _startNativePreview();
+    _loadDuration();
+  }
+
+  Future<void> _loadDuration() async {
+    final dur = await FilterEngine.getVideoDuration(_currentPath);
+    if (mounted && dur > 0) {
+      setState(() {
+        _videoDuration = dur;
+        _trimEnd = dur;
+      });
+    }
   }
 
   Future<void> _startNativePreview() async {
@@ -160,6 +184,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   @override
   void dispose() {
+    _swipeController.dispose();
     FilterEngine.stopVideoPreview();
     super.dispose();
   }
@@ -317,50 +342,76 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
-  // MARK: - 스와이프 내비게이션
+  // MARK: - 카드 스와이프 애니메이션
 
-  Future<void> _goToAdjacent(int delta) async {
+  void _snapBack() => _animateDragTo(0);
+
+  Future<void> _animateDragTo(double target) async {
+    _swipeController.stop();
+    final start = _dragOffset;
+    final anim = Tween<double>(begin: start, end: target).animate(
+      CurvedAnimation(parent: _swipeController, curve: Curves.easeOut),
+    );
+    void tick() { if (mounted) setState(() => _dragOffset = anim.value); }
+    anim.addListener(tick);
+    _swipeController.reset();
+    try { await _swipeController.forward().orCancel; } catch (_) {}
+    anim.removeListener(tick);
+  }
+
+  Future<void> _commitSwipe(int delta) async {
+    if (_isNavigating) { _snapBack(); return; }
     final assets = widget.assets;
-    if (assets == null || _isNavigating) return;
+    if (assets == null) { _snapBack(); return; }
     final newIdx = _stateIndex + delta;
-    if (newIdx < 0 || newIdx >= assets.length) return;
+    if (newIdx < 0 || newIdx >= assets.length) { _snapBack(); return; }
 
     setState(() => _isNavigating = true);
-    final asset = assets[newIdx];
-    final file = await asset.file;
+    final assetFuture = assets[newIdx].file;
+
+    // 카드 화면 밖으로 슬라이드
+    await _animateDragTo(_cardWidth * (delta > 0 ? -1 : 1));
+    if (!mounted) return;
+
+    final file = await assetFuture;
     if (!mounted || file == null) {
-      if (mounted) setState(() => _isNavigating = false);
+      if (mounted) setState(() { _dragOffset = 0; _isNavigating = false; });
       return;
     }
 
+    final asset = assets[newIdx];
     if (asset.type != AssetType.video) {
-      // 타입 경계: 사진 에디터로 전환
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => EditorScreen(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 220),
+          pageBuilder: (ctx, a1, a2) => EditorScreen(
             imagePath: file.path,
             assetId: asset.id,
             assets: assets,
             currentIndex: newIdx,
+          ),
+          transitionsBuilder: (ctx, anim, a2, child) => SlideTransition(
+            position: Tween<Offset>(
+              begin: Offset(delta > 0 ? 1.0 : -1.0, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+            child: child,
           ),
         ),
       );
       return;
     }
 
-    // 같은 타입(동영상→동영상): 프리뷰만 인플레이스 교체
     await FilterEngine.stopVideoPreview();
     if (!mounted) return;
     setState(() {
       _currentPath = file.path;
       _currentAssetId = asset.id;
       _stateIndex = newIdx;
-      _textureId = null;
-      _textureW = 16;
-      _textureH = 9;
-      _previewReady = false;
-      _previewPlaying = true;
+      _dragOffset = 0;
+      _textureId = null; _textureW = 16; _textureH = 9;
+      _previewReady = false; _previewPlaying = true;
       _noFilter = true;
       _brightness = 0; _contrast = 0; _saturation = 0;
       _softness = 0; _beauty = 0; _dreamyGlow = 0;
@@ -400,12 +451,27 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         ? _buildVideoSection()
                         : GestureDetector(
                             behavior: HitTestBehavior.translucent,
+                            onHorizontalDragUpdate: (d) {
+                              _swipeController.stop();
+                              setState(() => _dragOffset += d.delta.dx);
+                            },
                             onHorizontalDragEnd: (d) {
                               final v = d.primaryVelocity ?? 0;
-                              if (v < -500) { _goToAdjacent(1); }
-                              else if (v > 500) { _goToAdjacent(-1); }
+                              final threshold = _cardWidth * 0.3;
+                              if (v < -500 || _dragOffset < -threshold) { _commitSwipe(1); }
+                              else if (v > 500 || _dragOffset > threshold) { _commitSwipe(-1); }
+                              else { _snapBack(); }
                             },
-                            child: _buildVideoSection(),
+                            onHorizontalDragCancel: () => _snapBack(),
+                            child: LayoutBuilder(
+                              builder: (ctx, constraints) {
+                                _cardWidth = constraints.maxWidth;
+                                return Transform.translate(
+                                  offset: Offset(_dragOffset, 0),
+                                  child: _buildVideoSection(),
+                                );
+                              },
+                            ),
                           ),
                   ),
                 ),
@@ -420,7 +486,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                             const SizedBox(height: 4),
                           ],
                         )
-                      : _buildFilterSection(camera),
+                      : _activeTab == 'trim'
+                          ? _buildTrimSection()
+                          : _buildFilterSection(camera),
                 ),
                 _buildBottomTabBar(camera),
               ],
@@ -706,6 +774,117 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
+  // MARK: - 트림 섹션
+
+  String _formatDuration(double seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toStringAsFixed(1).padLeft(4, '0');
+    return '$m:$s';
+  }
+
+  Widget _buildTrimSection() {
+    if (_videoDuration <= 0) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    final trimDuration = _trimEnd - _trimStart;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 시간 표시
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_formatDuration(_trimStart),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF8A8480))),
+              Text('${_formatDuration(trimDuration)} / ${_formatDuration(_videoDuration)}',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF3D3531), fontWeight: FontWeight.w600)),
+              Text(_formatDuration(_trimEnd),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF8A8480))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 범위 슬라이더
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 4,
+              rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 10),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
+              activeTrackColor: AppColors.accent,
+              inactiveTrackColor: const Color(0xFFE0DAD4),
+              thumbColor: Colors.white,
+            ),
+            child: RangeSlider(
+              values: RangeValues(_trimStart, _trimEnd),
+              min: 0,
+              max: _videoDuration,
+              onChanged: (values) {
+                if (values.end - values.start < 0.5) return; // 최소 0.5초
+                setState(() {
+                  _trimStart = values.start;
+                  _trimEnd = values.end;
+                });
+                FilterEngine.seekVideoPreview(_trimStart);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 자르기 저장 버튼
+          FilledButton.icon(
+            onPressed: _isProcessing ? null : _trimAndSave,
+            icon: const Icon(Icons.content_cut_rounded, size: 16),
+            label: const Text('잘라서 저장'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF3D3531),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _trimAndSave() async {
+    if (_isProcessing || _videoDuration <= 0) return;
+    setState(() => _isProcessing = true);
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('트림 저장 중...'),
+      backgroundColor: Color(0xFF3D3531),
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 60),
+    ));
+
+    try {
+      final result = await FilterEngine.trimVideo(
+        sourcePath: _currentPath,
+        startSeconds: _trimStart,
+        endSeconds: _trimEnd,
+        saveToGallery: true,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result != null ? '갤러리에 저장했습니다' : '저장 실패'),
+        backgroundColor: result != null ? const Color(0xFF3D3531) : Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('오류: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
   // MARK: - 하단 탭 바
 
   Widget _buildBottomTabBar(dynamic camera) {
@@ -722,6 +901,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               hasDot: !_noFilter),
           _buildTab('효과', Icons.flare_rounded, 'effect',
               hasDot: _hasEffectChanges),
+          _buildTab('트림', Icons.content_cut_rounded, 'trim'),
         ],
       ),
     );

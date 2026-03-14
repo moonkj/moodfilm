@@ -57,6 +57,28 @@ class FilterEngine {
     });
   }
 
+  /// 동영상 트림 (시작~끝 구간 잘라내기)
+  /// Returns: 저장된 파일 경로
+  static Future<String?> trimVideo({
+    required String sourcePath,
+    required double startSeconds,
+    required double endSeconds,
+    bool saveToGallery = true,
+  }) async {
+    return _channel.invokeMethod<String>('trimVideo', {
+      'sourcePath': sourcePath,
+      'startSeconds': startSeconds,
+      'endSeconds': endSeconds,
+      'saveToGallery': saveToGallery,
+    });
+  }
+
+  /// 동영상 길이(초) 반환
+  static Future<double> getVideoDuration(String path) async {
+    final result = await _channel.invokeMethod<double>('getVideoDuration', {'path': path});
+    return result ?? 0.0;
+  }
+
   /// 동영상 첫 번째 프레임을 이미지 파일로 추출
   /// Returns: 추출된 프레임 이미지 경로
   static Future<String?> extractVideoFrame({
