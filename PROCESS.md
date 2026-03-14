@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 54)
+> 마지막 업데이트: 2026-03-14 (세션 55)
 
 ---
 
@@ -1758,3 +1758,18 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
 - `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.3MB) ✅
 - `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 - 포함 변경사항: 세션 33 (필터 메뉴 기본 표시, 슬라이더 터치 개선) + 세션 34 (워크플로우 CLAUDE.md 명시)
+
+---
+
+## 세션 55 변경사항 (2026-03-14) — 갤러리 에디터 스와이프 내비게이션
+
+### 기능
+갤러리에서 사진/동영상을 탭하면 PageView 기반 에디터가 열리고, 좌우 스와이프로 인접 항목으로 이동 가능.
+
+### 변경 파일
+- `lib/features/gallery/presentation/gallery_editor_page_view.dart` (신규)
+  - `GalleryEditorPageView`: `PageView.builder` 래퍼, `List<AssetEntity>` + `initialIndex` 수신
+  - `_GalleryEditorPage`: 에셋 파일 비동기 로드 후 타입에 따라 `VideoPlayerScreen` / `EditorScreen` 렌더
+- `lib/features/gallery/presentation/gallery_picker_screen.dart`
+  - `_selectAsset()` 단순화: 파일 미리 로드 제거, `GalleryEditorPageView` push
+  - `import video_player_screen.dart` → `import gallery_editor_page_view.dart` 변경

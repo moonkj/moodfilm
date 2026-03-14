@@ -8,7 +8,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
-import 'video_player_screen.dart';
+import 'gallery_editor_page_view.dart';
 
 /// 갤러리에서 사진 선택
 /// - 단일 탭: EditorScreen으로 이동
@@ -146,21 +146,15 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       return;
     }
 
-    final file = await asset.file;
-    if (file == null) return;
     if (!mounted) return;
 
-    if (asset.type == AssetType.video) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(videoPath: file.path, assetId: asset.id),
-      ));
-      return;
-    }
-
-    context.push('/editor', extra: <String, String?>{
-      'path': file.path,
-      'assetId': asset.id,
-    });
+    final index = _assets.indexOf(asset);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => GalleryEditorPageView(
+        assets: _assets,
+        initialIndex: index < 0 ? 0 : index,
+      ),
+    ));
   }
 
   void _toggleMultiSelectMode() {
