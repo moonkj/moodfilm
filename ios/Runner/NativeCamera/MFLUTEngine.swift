@@ -595,79 +595,84 @@ class MFLUTEngine {
 
         switch currentLUTName {
 
-        // ─── LUT 거의 identity → 코드로 전부 구현 ───────────────────────────
+        // ─── LUT 거의 identity → 코드로 색감 완전 정의 ──────────────────────
         case "vivid":
-            // 선명하고 진한 채도 — 인스타 감성 팝아트 느낌
-            result = colorControls(contrast: 1.45, saturation: 1.55)
+            // 팝아트 선명함 — 전 채널 균등 채도, R 클리핑 방지
+            result = colorControls(contrast: 1.30, saturation: 1.32)
+            result = colorMatrix(rScale: 0.96, gScale: 1.01, bScale: 1.03) // R 억제·B 살짝+
 
         case "retro_ccd":
-            // 구형 디카: 탈포화 + 강한 대비 + 차가운 화이트
-            result = colorControls(contrast: 1.35, saturation: 0.72)
-            result = temperature(target: 5800)
+            // 구형 디지털 카메라 — 탈포화·그린 캐스트·쿨 화이트
+            result = colorControls(contrast: 1.22, saturation: 0.80)
+            result = colorMatrix(gScale: 1.02, bBias: 0.015)              // CCD 특유 그린+쿨
+            result = temperature(target: 6100)
 
         case "film03":
-            // Y2K: 쿨한 페이드 + 약한 탈포화 + 대비
-            result = colorMatrix(rScale: 0.94, gScale: 0.94, bScale: 0.93,
-                                 rBias: 0.05, gBias: 0.05, bBias: 0.08) // 쿨 하이라이트 페이드
-            result = colorControls(contrast: 1.20, saturation: 0.88)
+            // Y2K 파스텔 페이드 — 쿨 하이라이트·약한 채도
+            result = colorMatrix(rScale: 0.95, gScale: 0.96, bScale: 0.94,
+                                 rBias: 0.04, gBias: 0.04, bBias: 0.07)   // 쿨 파스텔 리프트
+            result = colorControls(contrast: 1.12, saturation: 0.88)
 
         // ─── 쌍둥이 차별화 ────────────────────────────────────────────────
         case "lavender":
-            // dream보다 더 핑크-퍼플: R 약간+, 약한 채도 부스트
-            result = colorMatrix(rScale: 1.04, gScale: 0.98, bScale: 1.02,
-                                 rBias: 0.02, gBias: 0.0, bBias: 0.03)
+            // dream(블루)과 차별화: R+B 동시 올려 따뜻한 퍼플
+            result = colorMatrix(rScale: 1.03, gScale: 0.97, bScale: 1.03,
+                                 rBias: 0.015, gBias: 0.0, bBias: 0.025)
 
         case "winter":
-            // cloud보다 선명하고 깨끗한 쿨화이트
-            result = colorControls(contrast: 1.22, saturation: 1.12)
+            // cloud보다 선명·깨끗한 쿨화이트
+            result = colorControls(contrast: 1.18, saturation: 1.08)
+            result = colorMatrix(bBias: 0.008)                            // 아주 약한 아이시 블루
 
         case "cloud":
-            // winter보다 부드럽고 안개낀 느낌
-            result = colorControls(contrast: 0.92, saturation: 0.90, brightness: 0.03)
+            // muted 흐린 하늘 — 대비↓ 채도↓ 약간 밝게
+            result = colorControls(contrast: 0.90, saturation: 0.86, brightness: 0.04)
 
         case "kodak_soft":
-            // film98보다 따뜻하고 부드러운 아날로그
-            result = temperature(target: 7100)
-            result = colorControls(saturation: 0.94)
+            // 필름 아날로그 — 따뜻함·소프트, film98보다 낮은 대비
+            result = temperature(target: 6900)
+            result = colorControls(contrast: 1.04, saturation: 0.93)
 
         case "film98":
-            // 90년대 필름: 콘트라스트 강조 + 약한 페이드
-            result = colorControls(contrast: 1.28)
+            // 90년대 필름 — 강한 대비 + 웜 마트 페이드
+            result = colorControls(contrast: 1.24)
             result = colorMatrix(rScale: 0.97, gScale: 0.97, bScale: 0.97,
-                                 rBias: 0.025, gBias: 0.015, bBias: 0.005) // 웜 페이드
+                                 rBias: 0.022, gBias: 0.012, bBias: 0.003) // 웜 페이드
 
         case "disposable":
-            // 일회용: 채도+대비 과장, 살짝 옐로 캐스트
-            result = colorControls(contrast: 1.22, saturation: 1.18)
-            result = colorMatrix(rBias: 0.01, gBias: 0.005, bBias: -0.01)
+            // 일회용 카메라 — 채도·대비 과장, 그린-옐로 캐스트
+            result = colorControls(contrast: 1.18, saturation: 1.15)
+            result = colorMatrix(gScale: 1.01, rBias: 0.006, gBias: 0.010, bBias: -0.012)
 
         case "mocha":
-            // 커피브라운: 채도 낮춰 브라운 무드 강화
-            result = colorControls(contrast: 1.10, saturation: 0.75)
+            // 커피브라운 무드 — 탈포화 + 온기로 브라운 강조
+            result = temperature(target: 6900)
+            result = colorControls(contrast: 1.08, saturation: 0.80)
 
         case "latte":
-            // 카페라떼: mocha보다 밝고 따뜻함
+            // 크리미 카페 — mocha보다 밝고 더 크리미한 웜톤
             result = temperature(target: 7000)
-            result = colorControls(saturation: 0.90, brightness: 0.03)
+            result = colorControls(contrast: 1.04, saturation: 0.88, brightness: 0.04)
 
         case "soft_pink":
-            // 인스타 핑크: peach보다 더 핑크-로즈
-            result = colorMatrix(rScale: 1.03, gScale: 0.96, bScale: 0.97,
-                                 rBias: 0.03, gBias: 0.01, bBias: 0.02)
+            // 로즈핑크 — R+B 동시 올려 핑크(레드 아님), G 살짝 내려
+            result = colorMatrix(rScale: 1.02, gScale: 0.97, bScale: 1.00,
+                                 rBias: 0.012, gBias: 0.003, bBias: 0.020) // 로즈핑크 틴트
 
         case "pale":
-            // 창백한 쿨톤: 탈포화 + 밝게
-            result = colorControls(saturation: 0.72, brightness: 0.05)
+            // 창백한 쿨톤 — 탈포화·밝음·약간 차갑게
+            result = colorControls(saturation: 0.75, brightness: 0.05)
+            result = temperature(target: 6200)
 
         case "blossom":
-            // 벚꽃: 핑크 틴트 + 약간 밝게
-            result = colorMatrix(rScale: 1.02, gScale: 0.99, bScale: 1.01,
-                                 rBias: 0.025, gBias: 0.01, bBias: 0.02)
-            result = colorControls(brightness: 0.02)
+            // 벚꽃 봄빛 — 핑크-피치, 은은하게 밝게
+            result = colorMatrix(rScale: 1.02, gScale: 0.98, bScale: 1.01,
+                                 rBias: 0.018, gBias: 0.006, bBias: 0.016) // 피치-핑크
+            result = colorControls(brightness: 0.03)
 
         case "dusty_blue":
-            // 빈티지 블루: 채도 낮춰 먼지낀 느낌 강화
-            result = colorControls(saturation: 0.82)
+            // 빈티지 블루 — 탈포화·대비 약하게, 먼지낀 느낌
+            result = colorControls(contrast: 0.96, saturation: 0.80)
 
         default:
             break

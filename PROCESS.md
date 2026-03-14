@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 63)
+> 마지막 업데이트: 2026-03-15 (세션 64)
 
 ---
 
@@ -1957,5 +1957,37 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 - `ios/Runner/NativeCamera/MFLUTEngine.swift`
 
 ### iOS 실기기 설치 (세션 63)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅
+
+## 세션 64 변경사항 (2026-03-15) — 필터 개성 수치 전면 재조정
+
+### 조정 원칙
+- Warm 필터: temperature() 우선 (R 직접 조작 최소화 → 피부 붉음 방지)
+- Cool 필터: 차별화 강화, 선명도 차이 명확
+- Film 필터: contrast + 페이드(bias) 조합
+- 피부색 영향 최소화: rBias 대신 rScale 미세 조정
+
+### 주요 변경
+- vivid: saturation 1.32, R 억제·G+B 미세 보정 → 팝아트 선명함
+- retro_ccd: 그린 캐스트(CCD 특성)+6100K → 구형 디카 텍스처
+- film03: 쿨 파스텔 페이드 → Y2K 파스텔
+- lavender: R+B 동시 올려 따뜻한 퍼플 (이전: 블루 치우침)
+- winter: 아이시 틴트 추가 → cloud와 명확한 차이
+- cloud: 대비·채도 더 낮춰 muted 극대화
+- kodak_soft: 6900K, 낮은 대비 → 필름 아날로그
+- film98: 대비+웜 마트 페이드 → 90년대 필름
+- disposable: 그린-옐로 캐스트 강화 → 일회용 특성
+- mocha: 6900K+탈포화 → 브라운 무드
+- latte: 7000K+밝기↑ → 크리미 카페
+- soft_pink: R+B 동시 올려 로즈핑크 (레드 방지)
+- pale: 탈포화+6200K → 창백한 쿨톤
+- blossom: 피치-핑크 틴트 → 벚꽃 봄빛
+- dusty_blue: 대비↓·채도↓ → 빈티지 블루
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`
+
+### iOS 실기기 설치 (세션 64)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅
