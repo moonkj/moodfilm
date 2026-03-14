@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 48)
+> 마지막 업데이트: 2026-03-14 (세션 49)
 
 ---
 
@@ -1436,6 +1436,26 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 49 변경사항 (2026-03-14) — 동영상 실시간 필터 프리뷰 (FlutterTexture)
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart`
+
+### 구현 내용
+- `video_player` 패키지 기반 재생 → `FilterEngine.startVideoPreview()` 네이티브 텍스처 방식으로 교체
+- 필터/효과 변경 시 즉시 프리뷰에 반영 (`setVideoPreviewFilter` / `setVideoPreviewEffects`)
+- 슬라이더 드래그 중 50ms throttle로 method channel 과호출 방지
+- 재생/일시정지: `playVideoPreview()` / `pauseVideoPreview()`
+- "필터는 저장/공유 시 적용됩니다" 안내 배너 제거 (실시간으로 보이므로 불필요)
+- 루프 재생: 네이티브 `itemDidEnd → seek(0) → play()` 자동 처리
+
+### 문제/해결
+- **문제**: "동영상에서는 필터도 안됨 — 실시간으로 적용되는게 보여야지"
+- **해결**: 이미 구현된 `MFVideoFilterPlayer` (FlutterTexture + CADisplayLink + CIFilter) 활용.
+  Flutter에서 `Texture(textureId: ...)` 위젯으로 렌더링, 필터 변경은 method channel로 즉시 전달.
 
 ---
 

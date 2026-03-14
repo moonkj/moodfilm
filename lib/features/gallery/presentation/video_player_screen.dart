@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
@@ -12,7 +12,7 @@ import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';
 
 /// 동영상 재생 + 필터/효과 편집 화면
-/// video_player 패키지 기반 재생 → FilterEngine.processVideo()로 저장
+/// FilterEngine.startVideoPreview() 기반 실시간 필터 프리뷰
 class VideoPlayerScreen extends ConsumerStatefulWidget {
   final String videoPath;
   final String? assetId;
@@ -23,12 +23,17 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
-  late VideoPlayerController _controller;
-  bool _initialized = false;
   bool _isProcessing = false;
 
   // 공유 버튼 위치 (iOS sharePositionOrigin 용)
   final _shareButtonKey = GlobalKey();
+
+  // 네이티브 텍스처 기반 프리뷰
+  int? _textureId;
+  int _textureW = 16;
+  int _textureH = 9;
+  bool _previewReady = false;
+  bool _previewPlaying = true;
 
   // 필터
   bool _noFilter = true;
@@ -51,6 +56,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   double _dreamyGlow = 0;
 
   String _activeTab = 'filter';
+
+  // 네이티브 업데이트 throttle
+  Timer? _filterUpdateTimer;
 
   bool get _hasEffectChanges =>
       _brightness != 0 || _contrast != 0 || _saturation != 0 ||
@@ -101,20 +109,58 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     super.initState();
     final camera = ref.read(cameraProvider);
     _noFilter = camera.activeFilter == null;
-    _controller = VideoPlayerController.file(File(widget.videoPath))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() => _initialized = true);
-          _controller.play();
-          _controller.setLooping(true);
-        }
-      });
+    _startNativePreview();
+  }
+
+  Future<void> _startNativePreview() async {
+    final camera = ref.read(cameraProvider);
+    final lutFile = _noFilter ? '' : (camera.activeFilter?.lutFileName ?? '');
+    final intensity = _noFilter ? 0.0 : camera.filterIntensity;
+
+    try {
+      final result = await FilterEngine.startVideoPreview(
+        videoPath: widget.videoPath,
+        lutFileName: lutFile,
+        intensity: intensity,
+        effects: _currentEffects,
+      );
+      if (result != null && mounted) {
+        setState(() {
+          _textureId = result['textureId'] as int?;
+          _textureW  = (result['width']  as int?) ?? 16;
+          _textureH  = (result['height'] as int?) ?? 9;
+          _previewReady = true;
+        });
+        FilterEngine.playVideoPreview();
+      }
+    } catch (e) {
+      // 네이티브 프리뷰 실패 시 무음 처리 (저장/공유는 여전히 가능)
+      if (mounted) setState(() => _previewReady = true);
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _filterUpdateTimer?.cancel();
+    FilterEngine.stopVideoPreview();
     super.dispose();
+  }
+
+  // MARK: - 네이티브 프리뷰 필터 업데이트
+
+  /// 50ms throttle — 슬라이더 드래그 중 과도한 method channel 호출 방지
+  void _scheduleFilterUpdate() {
+    _filterUpdateTimer?.cancel();
+    _filterUpdateTimer = Timer(const Duration(milliseconds: 50), _applyFilterToPreview);
+  }
+
+  void _applyFilterToPreview() {
+    final camera = ref.read(cameraProvider);
+    FilterEngine.setVideoPreviewFilter(
+      lutFileName: _noFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
+      intensity:   _noFilter ? 0.0 : camera.filterIntensity,
+    );
+    FilterEngine.setVideoPreviewEffects(_currentEffects);
   }
 
   // MARK: - 저장
@@ -171,7 +217,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         return Rect.fromLTWH(pos.dx, pos.dy, box.size.width, box.size.height);
       }
     }
-    // fallback: 우상단 추정
     final w = MediaQuery.sizeOf(context).width;
     return Rect.fromLTWH(w - 52, 48, 44, 44);
   }
@@ -267,7 +312,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     ref.listen(cameraProvider, (prev, next) {
       final prevId = prev?.activeFilter?.id;
       final nextId = next.activeFilter?.id;
-      if (prevId != nextId) setState(() => _noFilter = nextId == null);
+      if (prevId != nextId) {
+        setState(() => _noFilter = nextId == null);
+        _applyFilterToPreview();
+      }
     });
 
     final camera = ref.watch(cameraProvider);
@@ -280,7 +328,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Column(
               children: [
                 _buildTopBar(camera),
-                // 동영상 영역 — 편집기와 동일한 카드 스타일
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -319,7 +366,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  // MARK: - 동영상 섹션 (편집기 사진과 동일한 카드 스타일)
+  // MARK: - 동영상 섹션 (네이티브 텍스처 실시간 프리뷰)
 
   Widget _buildVideoSection() {
     return LayoutBuilder(
@@ -327,21 +374,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         final cardW = constraints.maxWidth;
         final cardH = constraints.maxHeight;
 
-        // 비디오 표시 크기: 항상 카드 너비를 꽉 채움 (좌우 크림 띠 없음)
-        final ar = (_initialized && _controller.value.aspectRatio > 0)
-            ? _controller.value.aspectRatio
-            : 0.75;
+        final ar = _textureW > 0 && _textureH > 0
+            ? _textureW / _textureH
+            : 16 / 9;
         final double videoW = cardW;
         final double videoH = (cardW / ar).clamp(0.0, cardH);
 
         return GestureDetector(
           onTap: () {
-            if (_initialized) {
-              setState(() {
-                _controller.value.isPlaying
-                    ? _controller.pause()
-                    : _controller.play();
-              });
+            if (!_previewReady || _textureId == null) return;
+            setState(() => _previewPlaying = !_previewPlaying);
+            if (_previewPlaying) {
+              FilterEngine.playVideoPreview();
+            } else {
+              FilterEngine.pauseVideoPreview();
             }
           },
           child: ClipRRect(
@@ -353,20 +399,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 alignment: Alignment.center,
                 children: [
                   // 크림 배경
-                  Positioned.fill(
-                    child: const ColoredBox(color: Color(0xFFF5F2EF)),
+                  const Positioned.fill(
+                    child: ColoredBox(color: Color(0xFFF5F2EF)),
                   ),
-                  // 비디오 — 명시적 크기
-                  if (_initialized)
+                  // 네이티브 텍스처 프리뷰
+                  if (_previewReady && _textureId != null)
                     SizedBox(
                       width: videoW,
                       height: videoH,
-                      child: VideoPlayer(_controller),
+                      child: Texture(textureId: _textureId!),
                     )
                   else
                     const CircularProgressIndicator(color: Colors.black26),
-                  // 재생 버튼
-                  if (_initialized && !_controller.value.isPlaying)
+                  // 일시정지 아이콘
+                  if (_previewReady && _textureId != null && !_previewPlaying)
                     Container(
                       width: 56, height: 56,
                       decoration: BoxDecoration(
@@ -375,32 +421,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                       ),
                       child: const Icon(Icons.play_arrow_rounded,
                           color: Colors.white, size: 32),
-                    ),
-                  // 필터 적용 중 안내 배너 (동영상은 실시간 미리보기 불가)
-                  if (!_noFilter)
-                    Positioned(
-                      bottom: 10,
-                      left: 12,
-                      right: 12,
-                      child: IgnorePointer(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: const Text(
-                            '필터는 저장 / 공유 시 적용됩니다',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
                     ),
                 ],
               ),
@@ -433,6 +453,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   _brightness = 0; _contrast = 0; _saturation = 0;
                   _softness = 0; _beauty = 0; _dreamyGlow = 0;
                 });
+                _applyFilterToPreview();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -532,7 +553,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  // MARK: - 슬라이더
+  // MARK: - 슬라이더 (효과)
 
   Widget _buildTickSlider() {
     final param = _params[_activeParamIndex];
@@ -553,7 +574,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           min: param.min,
           max: param.max,
           divisions: 200,
-          onChanged: (v) => setState(() => _setParam(_activeParamIndex, v)),
+          onChanged: (v) {
+            setState(() => _setParam(_activeParamIndex, v));
+            _scheduleFilterUpdate();
+          },
         ),
       ),
     );
@@ -573,6 +597,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             onNoFilterSelected: () {
               ref.read(cameraProvider.notifier).clearFilter();
               setState(() => _noFilter = true);
+              _applyFilterToPreview();
             },
           ),
         ),
@@ -593,8 +618,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 value: intensity.clamp(0.0, 1.0),
                 min: 0.0,
                 max: 1.0,
-                onChanged: (v) =>
-                    ref.read(cameraProvider.notifier).setFilterIntensity(v),
+                onChanged: (v) {
+                  ref.read(cameraProvider.notifier).setFilterIntensity(v);
+                  _scheduleFilterUpdate();
+                },
               ),
             ),
           )
