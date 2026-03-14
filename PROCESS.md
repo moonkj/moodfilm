@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 61)
+> 마지막 업데이트: 2026-03-15 (세션 62)
 
 ---
 
@@ -1902,4 +1902,26 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 
 ### iOS 실기기 설치 (세션 61)
 - `flutter build ios --release` → 74.1MB ✅
-- `xcrun devicectl device install app` → 기기 미연결로 대기 중
+- `xcrun devicectl device install app` ✅
+
+## 세션 62 변경사항 (2026-03-15) — 필터 강도 기본값 상향 + LUT 품질 분석
+
+### LUT 파일 품질 분석 결과
+- `vivid`: 중간 회색(0.5→0.5) identity 매핑 — 색 변환 없이 콘트라스트만
+- `retro_ccd`: RMSE 0.0576 — 전체 26종 중 가장 약한 LUT
+- `film03`: RMSE 0.0562 — 두 번째로 약한 LUT
+- 웜톤 계열 10종 이상이 비슷한 방향 → 필터 간 체감 차이 희석
+
+### 수정 내용
+- **defaultIntensities 전반 상향**: 0.55~0.75 → 0.85~1.00
+  - 효과 약한 LUT (film03, retro_ccd, vivid): 1.00으로
+  - 일반 필터: 0.85~0.95로 통일
+- **StorageService 마이그레이션**: 저장값 < 새 기본값이면 초기화 → 새 기본값 적용
+
+### 변경 파일
+- `lib/core/models/filter_model.dart`
+- `lib/core/services/storage_service.dart`
+
+### iOS 실기기 설치 (세션 62)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅
