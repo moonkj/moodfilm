@@ -28,9 +28,10 @@ class CameraScreen extends ConsumerStatefulWidget {
 }
 
 class _CameraScreenState extends ConsumerState<CameraScreen>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin, RouteAware {
+    with WidgetsBindingObserver, TickerProviderStateMixin, RouteAware {
 
   late final AnimationController _flipController;
+  late final AnimationController _recPulseController;
 
   bool _filterFlash = false;
   bool _showIntensitySlider = false;
@@ -88,6 +89,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+    _recPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -201,6 +206,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     _sideButtonsHideTimer?.cancel();
     _countdownTimer?.cancel();
     _flipController.dispose();
+    _recPulseController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     ref.read(cameraProvider.notifier).disposeCamera();
     super.dispose();
@@ -440,6 +446,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         if (_isSplitMode && !cameraState.isRecording) _buildSplitOverlay(cameraState),
         if (_isSplitMode && !cameraState.isRecording) _buildSplitDragLayer(cameraState, screenW),
         _buildPreviewSideButtons(cameraState),
+        if (cameraState.isRecording) _buildRecBadge(),
         // 타이머 카운트다운 오버레이
         if (_isCountingDown)
           IgnorePointer(
@@ -539,10 +546,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (cameraState.isRecording) ...[
-            _buildRecordingTimer(cameraState.recordingSeconds),
-            const SizedBox(height: 10),
-          ],
           _timerSideBtn(l10n),
           const SizedBox(height: 10),
           _sideLabeledBtn(
@@ -1051,18 +1054,51 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   // MARK: - 녹화 타이머
 
-  Widget _buildRecordingTimer(int seconds) {
-    final mm = (seconds ~/ 60).toString().padLeft(2, '0');
-    final ss = (seconds % 60).toString().padLeft(2, '0');
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(width: 8, height: 8,
-          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text('$mm:$ss',
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 1.0)),
-      ],
+  Widget _buildRecBadge() {
+    return Positioned(
+      top: 16,
+      right: 16,
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _recPulseController,
+          builder: (context, child) {
+            // 0.3 → 1.0 으로 천천히 왕복 (부드러운 점멸)
+            final dotOpacity = 0.3 + _recPulseController.value * 0.7;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Opacity(
+                    opacity: dotOpacity,
+                    child: Container(
+                      width: 7, height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF3B30),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'REC',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 

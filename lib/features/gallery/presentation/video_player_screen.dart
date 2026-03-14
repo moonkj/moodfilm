@@ -236,7 +236,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Column(
               children: [
                 _buildTopBar(camera),
-                // 편집기와 동일한 스타일: 흰 배경 + 패딩 + 라운드 카드
+                // 동영상 영역 — 편집기와 동일한 카드 스타일
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -278,56 +278,66 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   // MARK: - 동영상 섹션 (편집기 사진과 동일한 카드 스타일)
 
   Widget _buildVideoSection() {
-    return GestureDetector(
-      onTap: () {
-        if (_initialized) {
-          setState(() {
-            _controller.value.isPlaying
-                ? _controller.pause()
-                : _controller.play();
-          });
-        }
-      },
-      child: Stack(
-        children: [
-          // 배경: 크림 화이트 (letterbox 영역)
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: const ColoredBox(color: Color(0xFFF5F2EF)),
-            ),
-          ),
-          // 비디오 카드
-          ClipRRect(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardW = constraints.maxWidth;
+        final cardH = constraints.maxHeight;
+
+        // 비디오 표시 크기: 항상 카드 너비를 꽉 채움 (좌우 크림 띠 없음)
+        final ar = (_initialized && _controller.value.aspectRatio > 0)
+            ? _controller.value.aspectRatio
+            : 0.75;
+        final double videoW = cardW;
+        final double videoH = (cardW / ar).clamp(0.0, cardH);
+
+        return GestureDetector(
+          onTap: () {
+            if (_initialized) {
+              setState(() {
+                _controller.value.isPlaying
+                    ? _controller.pause()
+                    : _controller.play();
+              });
+            }
+          },
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: _initialized
-                ? FittedBox(
-                    fit: BoxFit.contain,
-                    child: SizedBox(
-                      width: _controller.value.size.width,
-                      height: _controller.value.size.height,
-                      child: VideoPlayer(_controller),
-                    ),
-                  )
-                : const Center(
-                    child: CircularProgressIndicator(color: Colors.black26),
+            child: SizedBox(
+              width: cardW,
+              height: cardH,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 크림 배경
+                  Positioned.fill(
+                    child: const ColoredBox(color: Color(0xFFF5F2EF)),
                   ),
-          ),
-          // 재생 버튼 오버레이
-          if (_initialized && !_controller.value.isPlaying)
-            Center(
-              child: Container(
-                width: 56, height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_arrow_rounded,
-                    color: Colors.white, size: 32),
+                  // 비디오 — 명시적 크기
+                  if (_initialized)
+                    SizedBox(
+                      width: videoW,
+                      height: videoH,
+                      child: VideoPlayer(_controller),
+                    )
+                  else
+                    const CircularProgressIndicator(color: Colors.black26),
+                  // 재생 버튼
+                  if (_initialized && !_controller.value.isPlaying)
+                    Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: Colors.white, size: 32),
+                    ),
+                ],
               ),
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 

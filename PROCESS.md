@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 45)
+> 마지막 업데이트: 2026-03-14 (세션 46)
 
 ---
 
@@ -1436,6 +1436,25 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 46 변경사항 (2026-03-14) — 녹화 타이머 제거 + 우상단 REC 뱃지 추가
+
+### 변경 파일
+- `lib/features/camera/presentation/camera_screen.dart`
+  - `SingleTickerProviderStateMixin` → `TickerProviderStateMixin` (AnimationController 2개)
+  - `_recPulseController` 추가 (900ms, repeat reverse) — REC 점 점멸용
+  - `_buildRecordingTimer()` (사이드바 타이머) 제거
+  - `_buildRecBadge()` 추가 — `isRecording` 시 우상단에 `● REC` 필 모양 배지
+    - 검정 반투명 배경, 빨간 점 0.3→1.0 천천히 점멸
+  - `_buildPreviewStack`에 `if (cameraState.isRecording) _buildRecBadge()` 추가
+- `lib/features/gallery/presentation/video_player_screen.dart`
+  - `_buildVideoSection()` 레이아웃 변경: `videoW = cardW` 항상 카드 너비 꽉 채움 (좌우 크림 띠 제거)
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 
