@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 39)
+> 마지막 업데이트: 2026-03-14 (세션 40)
 
 ---
 
@@ -1436,6 +1436,21 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 40 변경사항 (2026-03-14) — 버전 1.0.1+2 빌드 및 실기기 설치
+
+### 변경 파일
+- `pubspec.yaml` — version 1.0.0+1 → 1.0.1+2 (App Store Connect 업로드용)
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.2MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
+
+### 검증 필요
+- 새 3:4 동영상 촬영 후 갤러리에서 비율 확인 (세션 38 수정 결과 검증)
+- 기존 갤러리의 이전 동영상(세션 37 이전)은 landscape로 표시됨 — 정상
 
 ---
 
