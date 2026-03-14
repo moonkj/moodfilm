@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 58)
+> 마지막 업데이트: 2026-03-14 (세션 59)
 
 ---
 
@@ -1833,3 +1833,23 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 - `lib/features/gallery/presentation/video_player_screen.dart`
 - `ios/Runner/NativeCamera/FilterEnginePlugin.swift`
 - `lib/native_plugins/filter_engine/filter_engine.dart`
+
+---
+
+## 세션 59 변경사항 (2026-03-14) — 디버거 수정 + GitHub 동기화
+
+### 카드 스와이프 버그 3종 수정
+1. 크로스 타입(사진↔동영상) 전환 시 `_dragOffset = 0` 초기화 누락
+   → `Navigator.pushReplacement` 전 setState로 초기화 (카드가 화면 밖에 걸리는 현상 방지)
+2. 동영상→동영상 스와이프 후 트림 슬라이더 범위가 이전 영상 길이로 남는 버그
+   → `_startNativePreview()` 후 `_loadDuration()` 재호출, 트림 state 초기화
+3. `_animateDragTo` 리스너 누적 가능성
+   → `try/finally`로 항상 `anim.removeListener(tick)` 보장
+
+### 변경 파일
+- `lib/features/editor/presentation/editor_screen.dart`
+- `lib/features/gallery/presentation/video_player_screen.dart`
+
+### iOS 실기기 설치 (세션 58 + 59 포함)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅
