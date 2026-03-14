@@ -26,6 +26,14 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
   bool _isLoading = true;
   bool _permissionDenied = false;
 
+  // 페이지네이션
+  static const int _pageSize = 80;
+  int _currentPage = 0;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  AssetPathEntity? _album;
+  final ScrollController _scrollController = ScrollController();
+
   // 다중 선택 모드
   bool _isMultiSelectMode = false;
   final Set<String> _selectedIds = {};
@@ -38,15 +46,24 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
   void initState() {
     super.initState();
     _loadPhotos();
+    _scrollController.addListener(_onScroll);
     PhotoManager.addChangeCallback(_onPhotosChanged);
     PhotoManager.startChangeNotify();
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     PhotoManager.removeChangeCallback(_onPhotosChanged);
     PhotoManager.stopChangeNotify();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 400) {
+      _loadMore();
+    }
   }
 
   void _onPhotosChanged(MethodCall call) {
@@ -61,8 +78,15 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       onlyAll: true,
     );
     if (albums.isEmpty || !mounted) return;
-    final assets = await albums.first.getAssetListPaged(page: 0, size: 200);
-    if (mounted) setState(() => _assets = assets);
+    final assets = await albums.first.getAssetListPaged(page: 0, size: _pageSize);
+    if (mounted) {
+      setState(() {
+        _album = albums.first;
+        _assets = assets;
+        _currentPage = 0;
+        _hasMore = assets.length == _pageSize;
+      });
+    }
   }
 
   Future<void> _loadPhotos() async {
@@ -82,11 +106,31 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       return;
     }
 
-    final assets = await albums.first.getAssetListPaged(page: 0, size: 200);
+    final album = albums.first;
+    final assets = await album.getAssetListPaged(page: 0, size: _pageSize);
     if (mounted) {
       setState(() {
+        _album = album;
         _assets = assets;
+        _currentPage = 0;
+        _hasMore = assets.length == _pageSize;
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore || _album == null) return;
+    setState(() => _isLoadingMore = true);
+
+    final nextPage = _currentPage + 1;
+    final more = await _album!.getAssetListPaged(page: nextPage, size: _pageSize);
+    if (mounted) {
+      setState(() {
+        _assets.addAll(more);
+        _currentPage = nextPage;
+        _hasMore = more.length == _pageSize;
+        _isLoadingMore = false;
       });
     }
   }
@@ -445,15 +489,30 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
   // MARK: - 3컬럼 균등 격자 그리드
 
   Widget _buildMasonryGrid() {
+    // 마지막 셀: 로딩 인디케이터용 슬롯
+    final itemCount = _assets.length + (_isLoadingMore ? 1 : 0);
+
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         mainAxisSpacing: 2,
         crossAxisSpacing: 2,
       ),
-      itemCount: _assets.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        // 마지막 슬롯 = 로딩 스피너
+        if (index >= _assets.length) {
+          return const Center(
+            child: SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(
+                color: AppColors.accent, strokeWidth: 2),
+            ),
+          );
+        }
+
         final asset = _assets[index];
         final isSelected = _selectedIds.contains(asset.id);
         return _AssetThumbnail(

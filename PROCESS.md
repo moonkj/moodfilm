@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 49)
+> 마지막 업데이트: 2026-03-14 (세션 50)
 
 ---
 
@@ -1436,6 +1436,20 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 50 변경사항
+
+### 변경 파일
+- `lib/features/gallery/presentation/gallery_picker_screen.dart`
+
+### 구현 내용
+- 갤러리 무한 스크롤 페이지네이션 구현 (80장씩 추가 로드)
+- `ScrollController` 리스너: 스크롤 끝 400px 전 자동 다음 페이지 로드
+- 하단 스피너로 로딩 중 표시
+- `_hasMore` 플래그로 마지막 페이지 감지 (더 이상 로드 없음)
+- 초기 로드도 200→80장으로 변경 (첫 로드 속도 개선)
 
 ---
 
