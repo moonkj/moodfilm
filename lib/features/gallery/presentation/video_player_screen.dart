@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,8 +56,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   String _activeTab = 'filter';
 
-  // 네이티브 업데이트 throttle
-  Timer? _filterUpdateTimer;
 
   bool get _hasEffectChanges =>
       _brightness != 0 || _contrast != 0 || _saturation != 0 ||
@@ -141,18 +138,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   @override
   void dispose() {
-    _filterUpdateTimer?.cancel();
     FilterEngine.stopVideoPreview();
     super.dispose();
   }
 
   // MARK: - 네이티브 프리뷰 필터 업데이트
-
-  /// 50ms throttle — 슬라이더 드래그 중 과도한 method channel 호출 방지
-  void _scheduleFilterUpdate() {
-    _filterUpdateTimer?.cancel();
-    _filterUpdateTimer = Timer(const Duration(milliseconds: 50), _applyFilterToPreview);
-  }
 
   void _applyFilterToPreview() {
     final camera = ref.read(cameraProvider);
@@ -576,7 +566,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           divisions: 200,
           onChanged: (v) {
             setState(() => _setParam(_activeParamIndex, v));
-            _scheduleFilterUpdate();
+            _applyFilterToPreview();
           },
         ),
       ),
@@ -620,7 +610,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 max: 1.0,
                 onChanged: (v) {
                   ref.read(cameraProvider.notifier).setFilterIntensity(v);
-                  _scheduleFilterUpdate();
+                  _applyFilterToPreview();
                 },
               ),
             ),
