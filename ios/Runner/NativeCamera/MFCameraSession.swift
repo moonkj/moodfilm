@@ -403,7 +403,13 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
             let needsCrop = cropR.size != CGSize(width: CVPixelBufferGetWidth(outputBuffer),
                                                   height: CVPixelBufferGetHeight(outputBuffer))
             if needsCrop {
-                let ciImg = CIImage(cvPixelBuffer: outputBuffer).cropped(to: cropR)
+                // CIImage.cropped()는 원본 좌표계를 유지 (예: origin이 x=240).
+                // render(bounds:)에서 bounds.origin이 pixel buffer (0,0)에 매핑되지 않으므로
+                // 반드시 원점(0,0)으로 이동 후 렌더해야 검은 줄 없이 올바르게 기록됨.
+                let ciImg = CIImage(cvPixelBuffer: outputBuffer)
+                    .cropped(to: cropR)
+                    .transformed(by: CGAffineTransform(translationX: -cropR.origin.x,
+                                                       y: -cropR.origin.y))
                 let cw = Int(cropR.width)
                 let ch = Int(cropR.height)
                 var croppedBuf: CVPixelBuffer?
@@ -416,7 +422,7 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
                                        kCVPixelFormatType_32BGRA, attrs as CFDictionary, &croppedBuf) == kCVReturnSuccess,
                    let cb = croppedBuf {
                     MFLUTEngine.ciContext.render(ciImg, to: cb,
-                                                bounds: cropR,
+                                                bounds: CGRect(x: 0, y: 0, width: cw, height: ch),
                                                 colorSpace: CGColorSpaceCreateDeviceRGB())
                     bufferForRecording = cb
                 } else {

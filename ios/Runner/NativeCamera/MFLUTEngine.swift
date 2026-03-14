@@ -273,7 +273,8 @@ class MFLUTEngine {
 
     private func applySoftness(to image: CIImage, intensity: Float) -> CIImage {
         guard let blurFilter = CIFilter(name: "CIGaussianBlur") else { return image }
-        blurFilter.setValue(image, forKey: kCIInputImageKey)
+        // clampedToExtent(): 경계 바깥을 투명(검정)이 아닌 가장자리 픽셀로 채워 검은 테두리 방지
+        blurFilter.setValue(image.clampedToExtent(), forKey: kCIInputImageKey)
         blurFilter.setValue(intensity * 10.0, forKey: kCIInputRadiusKey)  // radius: 최대 10
         guard let blurred = blurFilter.outputImage?.cropped(to: image.extent) else { return image }
 
@@ -300,7 +301,7 @@ class MFLUTEngine {
         // 1. 피부 소프트닝: Gaussian Blur를 원본과 부드럽게 블렌딩
         if let blurFilter = CIFilter(name: "CIGaussianBlur"),
            let blendFilter = CIFilter(name: "CISoftLightBlendMode") {
-            blurFilter.setValue(result, forKey: kCIInputImageKey)
+            blurFilter.setValue(result.clampedToExtent(), forKey: kCIInputImageKey)
             blurFilter.setValue(intensity * 4.0, forKey: kCIInputRadiusKey)
             if let blurred = blurFilter.outputImage?.cropped(to: image.extent) {
                 // 소프트 라이트로 원본과 블렌딩 (intensity * 0.5 opacity)
