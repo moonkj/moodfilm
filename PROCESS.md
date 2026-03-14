@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 59)
+> 마지막 업데이트: 2026-03-14 (세션 60)
 
 ---
 
@@ -1853,3 +1853,17 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 58 + 59 포함)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅
+
+## 세션 60 변경사항 (2026-03-14) — App Store Connect 1.0.2 업로드
+
+### pubspec.yaml 버전 변경
+- `version: 1.0.1+2` → `version: 1.0.2+3`
+
+### App Store Connect 업로드 완료
+- `flutter build ipa --release` → `Like it!.ipa` (43.6MB) 생성
+- `xcrun altool --upload-app` 성공
+- Delivery UUID: `31b5acde-32da-4cc2-a0a9-a1a87ac80165`
+- 전송: 43.2MB / 7.9초, processingState: PROCESSING
+
+### 변경 파일
+- `pubspec.yaml` (version: 1.0.2+3)
