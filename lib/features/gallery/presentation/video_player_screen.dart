@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
@@ -25,6 +26,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   late VideoPlayerController _controller;
   bool _initialized = false;
   bool _isProcessing = false;
+
+  // 공유 버튼 위치 (iOS sharePositionOrigin 용)
+  final _shareButtonKey = GlobalKey();
 
   // 필터
   bool _noFilter = true;
@@ -157,12 +161,47 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
+  /// iOS UIActivityViewController 앵커 위치 계산
+  Rect _shareOrigin() {
+    final ctx = _shareButtonKey.currentContext;
+    if (ctx != null) {
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        final pos = box.localToGlobal(Offset.zero);
+        return Rect.fromLTWH(pos.dx, pos.dy, box.size.width, box.size.height);
+      }
+    }
+    // fallback: 우상단 추정
+    final w = MediaQuery.sizeOf(context).width;
+    return Rect.fromLTWH(w - 52, 48, 44, 44);
+  }
+
   Future<void> _shareVideo() async {
     final camera = ref.read(cameraProvider);
     final hasFilter = !_noFilter && camera.activeFilter != null;
+    final origin = _shareOrigin();
 
     if (!hasFilter && !_hasEffectChanges) {
-      await Share.shareXFiles([XFile(widget.videoPath)]);
+      // 필터/효과 없음: 파일을 임시 디렉토리로 복사 후 공유 (iOS sandbox 대응)
+      try {
+        final src = File(widget.videoPath);
+        final tmpDir = await getTemporaryDirectory();
+        final ext = widget.videoPath.split('.').last.toLowerCase();
+        final tmpPath = '${tmpDir.path}/share_video.$ext';
+        await src.copy(tmpPath);
+        if (!mounted) return;
+        await Share.shareXFiles(
+          [XFile(tmpPath, mimeType: 'video/mp4')],
+          sharePositionOrigin: origin,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('공유 실패: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
       return;
     }
 
@@ -183,7 +222,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      if (result != null) await Share.shareXFiles([XFile(result)]);
+      if (result != null) {
+        await Share.shareXFiles(
+          [XFile(result, mimeType: 'video/mp4')],
+          sharePositionOrigin: origin,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -332,6 +376,32 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                       child: const Icon(Icons.play_arrow_rounded,
                           color: Colors.white, size: 32),
                     ),
+                  // 필터 적용 중 안내 배너 (동영상은 실시간 미리보기 불가)
+                  if (!_noFilter)
+                    Positioned(
+                      bottom: 10,
+                      left: 12,
+                      right: 12,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: const Text(
+                            '필터는 저장 / 공유 시 적용됩니다',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -384,7 +454,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _topIconBtn(Icons.delete_outline_rounded, onTap: _deleteVideo),
             const SizedBox(width: 8),
           ],
-          _topIconBtn(Icons.ios_share_rounded, onTap: _shareVideo),
+          _topIconBtn(Icons.ios_share_rounded, onTap: _shareVideo, key: _shareButtonKey),
           const SizedBox(width: 8),
           _topIconBtn(Icons.download_rounded, onTap: _saveVideo),
         ],
@@ -392,8 +462,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  Widget _topIconBtn(IconData icon, {required VoidCallback onTap}) {
+  Widget _topIconBtn(IconData icon, {required VoidCallback onTap, Key? key}) {
     return GestureDetector(
+      key: key,
       onTap: onTap,
       child: Container(
         width: 36, height: 36,

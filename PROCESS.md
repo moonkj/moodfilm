@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 47)
+> 마지막 업데이트: 2026-03-14 (세션 48)
 
 ---
 
@@ -1436,6 +1436,31 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 48 변경사항 (2026-03-14) — 동영상 공유 버튼 오류 수정 + 필터 안내
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart`
+  - `path_provider` import 추가
+  - `_shareButtonKey` (GlobalKey) 추가 — iOS sharePositionOrigin 계산용
+  - `_shareOrigin()` 헬퍼 추가 — RenderBox 기반 버튼 위치 → Rect 반환 (fallback: 우상단 추정)
+  - `_shareVideo()` 수정:
+    - 필터/효과 없는 경우: 임시 디렉토리 복사 후 `sharePositionOrigin` 포함 공유 (iOS sandbox 대응)
+    - 필터/효과 있는 경우: FilterEngine 처리 후 `sharePositionOrigin` 포함 공유
+    - try-catch 에러 처리 추가
+  - `_topIconBtn` key 파라미터 추가, share 버튼에 `_shareButtonKey` 연결
+  - 필터 선택 시 비디오 카드 하단에 "필터는 저장 / 공유 시 적용됩니다" 안내 배너 표시
+    - 동영상은 실시간 LUT 필터 미리보기 불가 → 사용자에게 명확히 안내
+
+### 문제 및 해결
+- **공유 오류**: `PlatformException(sharePositionOrigin: argument must be set...)` → `_shareOrigin()` Rect 계산 후 전달
+- **필터 미리보기 불가**: VideoPlayer는 실시간 LUT 적용 불가 → 저장/공유 시 FilterEngine으로 적용
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (74.1MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 
