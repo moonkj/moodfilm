@@ -33,6 +33,11 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   bool _isProcessing = false;
 
+  // 현재 에셋 (스와이프 내비게이션으로 변경 가능)
+  late String _currentPath;
+  String? _currentAssetId;
+  int _stateIndex = 0;
+
   // 인접 에셋 스와이프 내비게이션
   bool _isNavigating = false;
 
@@ -116,6 +121,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _currentPath = widget.videoPath;
+    _currentAssetId = widget.assetId;
+    _stateIndex = widget.currentIndex;
     // 녹화된 영상에는 카메라 필터가 이미 베이크되어 있음.
     // 에디터에서 필터를 다시 적용하면 2중 적용되어 효과가 매우 강해짐.
     // 따라서 항상 _noFilter = true로 시작. 원하면 필터바에서 새로 선택.
@@ -130,7 +138,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     try {
       final result = await FilterEngine.startVideoPreview(
-        videoPath: widget.videoPath,
+        videoPath: _currentPath,
         lutFileName: lutFile,
         intensity: intensity,
         effects: _currentEffects,
@@ -185,7 +193,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     try {
       final result = await FilterEngine.processVideo(
-        sourcePath:    widget.videoPath,
+        sourcePath:    _currentPath,
         lutFileName:   lutFile,
         intensity:     _noFilter ? 0.0 : camera.filterIntensity,
         effects:       _currentEffects,
@@ -233,9 +241,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (!hasFilter && !_hasEffectChanges) {
       // 필터/효과 없음: 파일을 임시 디렉토리로 복사 후 공유 (iOS sandbox 대응)
       try {
-        final src = File(widget.videoPath);
+        final src = File(_currentPath);
         final tmpDir = await getTemporaryDirectory();
-        final ext = widget.videoPath.split('.').last.toLowerCase();
+        final ext = _currentPath.split('.').last.toLowerCase();
         final tmpPath = '${tmpDir.path}/share_video.$ext';
         await src.copy(tmpPath);
         if (!mounted) return;
@@ -263,7 +271,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     try {
       final result = await FilterEngine.processVideo(
-        sourcePath:    widget.videoPath,
+        sourcePath:    _currentPath,
         lutFileName:   _noFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
         intensity:     _noFilter ? 0.0 : camera.filterIntensity,
         effects:       _currentEffects,
@@ -289,7 +297,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   Future<void> _deleteVideo() async {
-    if (widget.assetId == null) return;
+    if (_currentAssetId == null) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -305,7 +313,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       ),
     );
     if (confirm != true || !mounted) return;
-    await PhotoManager.editor.deleteWithIds([widget.assetId!]);
+    await PhotoManager.editor.deleteWithIds([_currentAssetId!]);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -314,7 +322,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Future<void> _goToAdjacent(int delta) async {
     final assets = widget.assets;
     if (assets == null || _isNavigating) return;
-    final newIdx = widget.currentIndex + delta;
+    final newIdx = _stateIndex + delta;
     if (newIdx < 0 || newIdx >= assets.length) return;
 
     setState(() => _isNavigating = true);
@@ -325,35 +333,41 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       return;
     }
 
-    final isForward = delta > 0;
-    final Widget nextScreen = asset.type == AssetType.video
-        ? VideoPlayerScreen(
-            videoPath: file.path,
-            assetId: asset.id,
-            assets: assets,
-            currentIndex: newIdx,
-          )
-        : EditorScreen(
+    if (asset.type != AssetType.video) {
+      // 타입 경계: 사진 에디터로 전환
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EditorScreen(
             imagePath: file.path,
             assetId: asset.id,
             assets: assets,
             currentIndex: newIdx,
-          );
-
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 220),
-        pageBuilder: (context, a1, a2) => nextScreen,
-        transitionsBuilder: (context, anim, a2, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: Offset(isForward ? 1 : -1, 0),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
-          child: child,
+          ),
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    // 같은 타입(동영상→동영상): 프리뷰만 인플레이스 교체
+    await FilterEngine.stopVideoPreview();
+    if (!mounted) return;
+    setState(() {
+      _currentPath = file.path;
+      _currentAssetId = asset.id;
+      _stateIndex = newIdx;
+      _textureId = null;
+      _textureW = 16;
+      _textureH = 9;
+      _previewReady = false;
+      _previewPlaying = true;
+      _noFilter = true;
+      _brightness = 0; _contrast = 0; _saturation = 0;
+      _softness = 0; _beauty = 0; _dreamyGlow = 0;
+      _activeParamIndex = 0;
+      _isNavigating = false;
+    });
+    _startNativePreview();
   }
 
   // MARK: - Build
@@ -532,7 +546,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
             const SizedBox(width: 8),
           ],
-          if (widget.assetId != null) ...[
+          if (_currentAssetId != null) ...[
             _topIconBtn(Icons.delete_outline_rounded, onTap: _deleteVideo),
             const SizedBox(width: 8),
           ],

@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 56)
+> 마지막 업데이트: 2026-03-14 (세션 57)
 
 ---
 
@@ -1793,3 +1793,21 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
 - `lib/features/editor/presentation/editor_screen.dart` — assets/currentIndex 파라미터, _goToAdjacent(), GestureDetector on preview
 - `lib/features/gallery/presentation/video_player_screen.dart` — 동일
 - `lib/features/gallery/presentation/gallery_picker_screen.dart` — _selectAsset() 직접 push, go_router 제거
+
+---
+
+## 세션 57 변경사항 (2026-03-14) — 갤러리 스와이프: 프리뷰 영역만 인플레이스 교체
+
+### 문제
+Navigator.pushReplacement도 전체화면이 전환됨 (AppBar/컨트롤까지 이동)
+
+### 해결책
+widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAssetId, _stateIndex)로 변환.
+스와이프 시 Navigator 없이 setState로 _currentPath만 교체 → 프리뷰 영역만 갱신.
+- 사진→사진: disposeImagePreview → setState(새 path) → initImagePreview
+- 동영상→동영상: stopVideoPreview → setState(새 path) → startNativePreview
+- 타입 경계 (사진↔동영상): Navigator.pushReplacement (불가피)
+
+### 변경 파일
+- `lib/features/editor/presentation/editor_screen.dart`
+- `lib/features/gallery/presentation/video_player_screen.dart`

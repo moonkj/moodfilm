@@ -54,6 +54,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   double _lightLeak = 0;
   double _filmGrain = 0;
 
+  // 현재 에셋 (스와이프 내비게이션으로 변경 가능)
+  String? _currentPath;
+  String? _currentAssetId;
+  int _stateIndex = 0;
+
   bool _editorNoFilter = true;
   ProviderSubscription<dynamic>? _filterSubscription;
 
@@ -144,6 +149,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   @override
   void initState() {
     super.initState();
+    _currentPath = widget.imagePath;
+    _currentAssetId = widget.assetId;
+    _stateIndex = widget.currentIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) => _initImagePreview());
     _filterSubscription = ref.listenManual(cameraProvider, (prev, next) {
       final prevId = prev?.activeFilter?.id;
@@ -169,7 +177,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 이미지 프리뷰 텍스처
 
   Future<void> _initImagePreview() async {
-    if (widget.imagePath == null) return;
+    if (_currentPath == null) return;
     await FilterEngine.disposeImagePreview();
     final cam = ref.read(cameraProvider);
     final result = await FilterEngine.initImagePreview(
@@ -203,7 +211,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   Future<void> _goToAdjacent(int delta) async {
     final assets = widget.assets;
     if (assets == null || _isNavigating) return;
-    final newIdx = widget.currentIndex + delta;
+    final newIdx = _stateIndex + delta;
     if (newIdx < 0 || newIdx >= assets.length) return;
 
     setState(() => _isNavigating = true);
@@ -214,35 +222,43 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       return;
     }
 
-    final isForward = delta > 0;
-    final Widget nextScreen = asset.type == AssetType.video
-        ? VideoPlayerScreen(
+    if (asset.type == AssetType.video) {
+      // 타입 경계: 동영상 화면으로 전환
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
             videoPath: file.path,
             assetId: asset.id,
             assets: assets,
             currentIndex: newIdx,
-          )
-        : EditorScreen(
-            imagePath: file.path,
-            assetId: asset.id,
-            assets: assets,
-            currentIndex: newIdx,
-          );
-
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 220),
-        pageBuilder: (context, a1, a2) => nextScreen,
-        transitionsBuilder: (context, anim, a2, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: Offset(isForward ? 1 : -1, 0),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
-          child: child,
+          ),
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    // 같은 타입(사진→사진): 프리뷰만 인플레이스 교체
+    await FilterEngine.disposeImagePreview();
+    if (!mounted) return;
+    setState(() {
+      _currentPath = file.path;
+      _currentAssetId = asset.id;
+      _stateIndex = newIdx;
+      _croppedSourcePath = null;
+      _imageTextureId = null;
+      _imageTextureW = 1;
+      _imageTextureH = 1;
+      _editorNoFilter = true;
+      _exposure = 0; _contrast = 0; _saturation = 0;
+      _beauty = 0; _fade = 0; _dreamyGlow = 0;
+      _lightLeak = 0; _filmGrain = 0;
+      _highlights = 0; _shadows = 0; _temperature = 0;
+      _tint = 0; _sharpness = 0; _vignette = 0; _skinTone = 0;
+      _activeTab = 'effect';
+      _isNavigating = false;
+    });
+    _initImagePreview();
   }
 
   // MARK: - Build
@@ -338,7 +354,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
             const SizedBox(width: 8),
           ],
-          if (widget.assetId != null) ...[
+          if (_currentAssetId != null) ...[
             GestureDetector(
               onTap: _deletePhoto,
               child: Container(
@@ -391,13 +407,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 이미지 섹션 (Before/After 스플릿)
 
   Widget _buildImageSection() {
-    if (widget.imagePath == null) {
+    if (_currentPath == null) {
       return const Center(
         child: Icon(Icons.add_photo_alternate_outlined,
             color: Colors.black26, size: 64),
       );
     }
-    final displayPath = _croppedSourcePath ?? widget.imagePath!;
+    final displayPath = _croppedSourcePath ?? _currentPath!;
     return Stack(
       children: [
         // 배경: 사진이 contain으로 letterbox될 때 보이는 영역
@@ -831,7 +847,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   Future<void> _applyCrop() async {
-    final sourcePath = _croppedSourcePath ?? widget.imagePath;
+    final sourcePath = _croppedSourcePath ?? _currentPath;
     if (sourcePath == null) return;
 
     // 이미지 디코딩
@@ -879,7 +895,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   Future<void> _loadImageSize() async {
-    final sourcePath = _croppedSourcePath ?? widget.imagePath;
+    final sourcePath = _croppedSourcePath ?? _currentPath;
     if (sourcePath == null || _sourceImageSize != null) return;
     final bytes = await File(sourcePath).readAsBytes();
     final codec = await ui.instantiateImageCodec(bytes);
@@ -970,7 +986,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 프리뷰 생성
 
   String get _effectiveSourcePath =>
-      _croppedSourcePath ?? widget.imagePath ?? '';
+      _croppedSourcePath ?? _currentPath ?? '';
 
   Map<String, double> get _adjustmentsMap => {
     'exposure': _exposure,
@@ -996,7 +1012,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 저장
 
   Future<void> _saveImage() async {
-    if (widget.imagePath == null) return;
+    if (_currentPath == null) return;
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1071,7 +1087,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   Future<void> _shareImage() async {
-    if (widget.imagePath == null) return;
+    if (_currentPath == null) return;
 
     final camera = ref.read(cameraProvider);
     final hasFilter = !_editorNoFilter && camera.activeFilter != null;
@@ -1151,7 +1167,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // MARK: - 삭제
 
   Future<void> _deletePhoto() async {
-    if (widget.imagePath == null || widget.assetId == null) return;
+    if (_currentPath == null || _currentAssetId == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1179,7 +1195,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await PhotoManager.editor.deleteWithIds([widget.assetId!]);
+    await PhotoManager.editor.deleteWithIds([_currentAssetId!]);
     if (mounted) Navigator.of(context).pop();
   }
 }
