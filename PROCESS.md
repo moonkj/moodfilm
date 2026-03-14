@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 38)
+> 마지막 업데이트: 2026-03-14 (세션 39)
 
 ---
 
@@ -1436,6 +1436,28 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 39 변경사항 (2026-03-14) — 동영상 플레이어 레이아웃 Expanded 전환
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart` — previewH 고정값 → Expanded
+
+### 문제
+- 동영상 비율에 따라 previewH가 너무 작아 컨테이너가 짧고 하단에 빈 공간 대량 발생
+- 예: landscape 동영상(1080×810) → previewH=295 → 컨테이너 短 → 하단 500px+ 빈 공간
+- 역으로 portrait 동영상은 previewH=528 → 패널+탭바 포함 시 SafeArea 오버플로우
+
+### 수정
+- `GestureDetector(Container(height: previewH))` → `Expanded(GestureDetector(Container))`
+- 동영상 컨테이너가 SafeArea 내 남은 공간 전체를 채움
+- FittedBox(contain)으로 비율 유지 + 레터박스(검정 배경)
+- `screenH`, `maxH`, `idealH`, `previewH` 변수 삭제
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.2MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 

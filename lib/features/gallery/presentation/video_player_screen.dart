@@ -341,11 +341,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     });
 
     final screenW = MediaQuery.of(context).size.width;
-    final screenH = MediaQuery.of(context).size.height;
-    // 화면 높이의 62% 까지만 사용, 최소 3:4 비율
-    final maxH = screenH * 0.62;
-    final idealH = screenW * _videoHeight / _videoWidth;
-    final previewH = idealH.clamp(screenW * 3.0 / 4.0, maxH);
     final camera = ref.watch(cameraProvider);
 
     return Scaffold(
@@ -356,41 +351,42 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Column(
               children: [
                 _buildTopBar(camera),
-                // 동영상 프리뷰 (필터 실시간 적용)
-                GestureDetector(
-                  onTap: () {
-                    if (!_isInitializing) _togglePlayPause();
-                  },
-                  child: Container(
-                    width: screenW,
-                    height: previewH,
-                    color: Colors.black,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (_textureId != null)
-                          FittedBox(
-                            fit: BoxFit.contain,
-                            child: SizedBox(
-                              width: _videoWidth,
-                              height: _videoHeight,
-                              child: Texture(textureId: _textureId!),
+                // 동영상 프리뷰 — 남은 공간 전체 사용, 비율 유지(FittedBox)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (!_isInitializing) _togglePlayPause();
+                    },
+                    child: Container(
+                      width: screenW,
+                      color: Colors.black,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (_textureId != null)
+                            FittedBox(
+                              fit: BoxFit.contain,
+                              child: SizedBox(
+                                width: _videoWidth,
+                                height: _videoHeight,
+                                child: Texture(textureId: _textureId!),
+                              ),
+                            )
+                          else
+                            const CircularProgressIndicator(
+                                color: Colors.white38),
+                          if (!_isInitializing && !_isPlaying)
+                            Container(
+                              width: 56, height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.play_arrow_rounded,
+                                  color: Colors.white, size: 32),
                             ),
-                          )
-                        else
-                          const CircularProgressIndicator(
-                              color: Colors.white38),
-                        if (!_isInitializing && !_isPlaying)
-                          Container(
-                            width: 56, height: 56,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.play_arrow_rounded,
-                                color: Colors.white, size: 32),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
