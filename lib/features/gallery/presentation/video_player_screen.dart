@@ -104,8 +104,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    final camera = ref.read(cameraProvider);
-    _noFilter = camera.activeFilter == null;
+    // 녹화된 영상에는 카메라 필터가 이미 베이크되어 있음.
+    // 에디터에서 필터를 다시 적용하면 2중 적용되어 효과가 매우 강해짐.
+    // 따라서 항상 _noFilter = true로 시작. 원하면 필터바에서 새로 선택.
+    _noFilter = true;
     _startNativePreview();
   }
 
