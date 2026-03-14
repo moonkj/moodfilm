@@ -733,7 +733,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         const SizedBox(height: 8),
         // 패널 영역: 고정 높이로 사진/동영상 텍스트 위치 고정
         SizedBox(
-          height: 116,
+          height: AppDimensions.filterBarHeight,
           child: AnimatedSwitcher(
             duration: MediaQuery.of(context).disableAnimations
                 ? Duration.zero

@@ -74,6 +74,18 @@ class MFCameraSession: NSObject {
         }
     }
 
+    // MARK: - 동영상 전용 크롭 Rect
+    // 저장 버퍼(landscape)에 π/2 회전 메타데이터 적용 시: display_width = stored_height, display_height = stored_width
+    // "3:4" 포트레이트 표시(1080×1440) → 저장 버퍼는 "4:3" 랜드스케이프(1440×1080) 이어야 함
+    private func videoCropRect(for ratio: String, imageSize: CGSize) -> CGRect {
+        switch ratio {
+        case "3:4": return cropRect(for: "4:3", imageSize: imageSize)
+        case "4:3": return cropRect(for: "3:4", imageSize: imageSize)
+        case "1:1": return cropRect(for: "1:1", imageSize: imageSize)
+        default:    return CGRect(origin: .zero, size: imageSize) // 9:16 / full / 16:9 → 전체 프레임
+        }
+    }
+
     // MARK: - 무음 촬영용 최신 프레임 버퍼
     private var latestProcessedBuffer: CVPixelBuffer?
 
@@ -264,7 +276,7 @@ class MFCameraSession: NSObject {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             let bufSize = CGSize(width: 1920, height: 1080)
-            let cropR = self.cropRect(for: self.currentAspectRatio, imageSize: bufSize)
+            let cropR = self.videoCropRect(for: self.currentAspectRatio, imageSize: bufSize)
             self.recorder.startRecording(
                 outputPath: outputPath,
                 videoSize: CGSize(width: cropR.width, height: cropR.height)
@@ -390,10 +402,11 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
             let ratio = currentAspectRatio
             let bufferForRecording: CVPixelBuffer
-            if ratio != "full" && ratio != "16:9" {
-                var ciImg = CIImage(cvPixelBuffer: outputBuffer)
-                let cropR = cropRect(for: ratio, imageSize: ciImg.extent.size)
-                ciImg = ciImg.cropped(to: cropR)
+            let cropR = videoCropRect(for: ratio, imageSize: CIImage(cvPixelBuffer: outputBuffer).extent.size)
+            let needsCrop = cropR.size != CGSize(width: CVPixelBufferGetWidth(outputBuffer),
+                                                  height: CVPixelBufferGetHeight(outputBuffer))
+            if needsCrop {
+                let ciImg = CIImage(cvPixelBuffer: outputBuffer).cropped(to: cropR)
                 let cw = Int(cropR.width)
                 let ch = Int(cropR.height)
                 var croppedBuf: CVPixelBuffer?
@@ -406,7 +419,7 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
                                        kCVPixelFormatType_32BGRA, attrs as CFDictionary, &croppedBuf) == kCVReturnSuccess,
                    let cb = croppedBuf {
                     MFLUTEngine.ciContext.render(ciImg, to: cb,
-                                                bounds: CGRect(x: 0, y: 0, width: cw, height: ch),
+                                                bounds: cropR,
                                                 colorSpace: CGColorSpaceCreateDeviceRGB())
                     bufferForRecording = cb
                 } else {

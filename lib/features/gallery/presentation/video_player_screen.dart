@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_dimensions.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
@@ -394,7 +395,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   ),
                 ),
                 SizedBox(
-                  height: 152,
+                  height: AppDimensions.filterBarHeight + 52,
                   child: _activeTab == 'effect'
                       ? Column(
                           mainAxisSize: MainAxisSize.min,
@@ -597,7 +598,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 100,
+          height: AppDimensions.filterBarHeight,
           child: FilterScrollBar(
             isNoFilterSelected: _noFilter,
             onNoFilterSelected: () {

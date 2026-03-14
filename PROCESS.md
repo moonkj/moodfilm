@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 37)
+> 마지막 업데이트: 2026-03-14 (세션 38)
 
 ---
 
@@ -1436,6 +1436,30 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 38 변경사항 (2026-03-14) — 동영상 크롭 로직 수정 + 필터바 높이 일관성 + 슬라이더 겹침 수정
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFCameraSession.swift` — videoCropRect 함수 신규 추가 (비율 역전 수정)
+- `lib/features/gallery/presentation/video_player_screen.dart` — 필터바/패널 높이 AppDimensions 사용
+- `lib/features/camera/presentation/camera_screen.dart` — 패널 높이 AppDimensions.filterBarHeight 사용
+
+### 동영상 비율 크롭 수정 (핵심 버그)
+- 기존 cropRect("3:4") = 810×1080 landscape → π/2 회전 → 1080×810 (랜드스케이프! 잘못됨)
+- "위쪽 짤림" 원인: 잘못된 좌표계 (CIContext.render bounds가 (0,0) 기준이었으나 실제 크롭 원점은 (555,0))
+- 신규 videoCropRect: "3:4" → cropRect("4:3") = 1440×1080 → π/2 회전 → 1080×1440 (3:4 포트레이트) ✓
+- CIContext.render bounds를 cropR 원본 좌표로 수정 (이전: CGRect(0,0,w,h) → 검정 출력됐음)
+
+### 필터바 높이 일관성 수정
+- camera_screen: SizedBox(116) → AppDimensions.filterBarHeight (120)
+- video_player: SizedBox(100) 하드코딩 → AppDimensions.filterBarHeight (120)
+- 슬라이더 겹침 수정: video_player 패널 SizedBox(152) → filterBarHeight + 52 (172)
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.2MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 
