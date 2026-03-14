@@ -256,25 +256,30 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
 
     int successCount = 0;
     for (final asset in selected) {
-      if (asset.type == AssetType.video) {
-        if (mounted) setState(() => _processedCount++);
-        continue;
-      }
-
       final file = await asset.file;
       if (file == null) continue;
 
-      final result = await FilterEngine.processImage(
-        sourcePath: file.path,
-        lutFileName: filter.lutFileName,
-        intensity: intensity,
-        adjustments: {},
-        effects: {},
-        saveToGallery: true,
-      );
+      final String? result;
+      if (asset.type == AssetType.video) {
+        result = await FilterEngine.processVideo(
+          sourcePath: file.path,
+          lutFileName: filter.lutFileName,
+          intensity: intensity,
+          effects: {},
+          saveToGallery: true,
+        );
+      } else {
+        result = await FilterEngine.processImage(
+          sourcePath: file.path,
+          lutFileName: filter.lutFileName,
+          intensity: intensity,
+          adjustments: {},
+          effects: {},
+          saveToGallery: true,
+        );
+      }
 
       if (result != null) successCount++;
-
       if (mounted) setState(() => _processedCount++);
     }
 
