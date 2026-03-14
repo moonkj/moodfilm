@@ -14,8 +14,8 @@ class AppDimensions {
   static const double filterThumbnailSize = 52.0;
   static const double filterThumbnailSizeSelected = 58.0;
 
-  // 하단 필터 바
-  static const double filterBarHeight = 112.0;
+  // 하단 필터 바 (선택된 필터 78 + 간격 4 + 텍스트 2줄 28 + 여유 2 = 112, 패딩 8 포함 → 120)
+  static const double filterBarHeight = 120.0;
   static const double filterBarPaddingV = 4.0;
 
   // 갤러리 썸네일 (카메라 화면 우측 하단)

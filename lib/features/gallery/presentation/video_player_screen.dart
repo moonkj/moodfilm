@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -59,14 +58,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   // 필터 디바운스 (빠른 스크롤 시 중간 LUT 로드 방지)
   Timer? _filterDebounce;
-
-  // Before/After 비교
-  bool _showSplit = false;
-  double _splitPosition = 0.5;
-  String? _firstFramePath;
-  String? _filteredFramePath;
-  bool _isGeneratingCompare = false;
-  int _compareToken = 0; // 빠른 비교 프리뷰 stale 결과 무시용
 
   bool get _hasEffectChanges =>
       _brightness != 0 || _contrast != 0 || _saturation != 0 ||
@@ -167,13 +158,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         lutFileName: _noFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
         intensity:   _noFilter ? 0.0 : camera.filterIntensity,
       );
-      if (_showSplit) _generateCompare();
     });
   }
 
   void _onEffectsChanged() {
     FilterEngine.setVideoPreviewEffects(_currentEffects);
-    // 비교 모드이면 정지된 프레임도 갱신 (onChangeEnd에서만)
   }
 
   // MARK: - 재생 제어
@@ -333,71 +322,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
-  // MARK: - Before/After 비교
-
-  Future<void> _generateCompare({bool quickMode = false}) async {
-    // 프레임 추출은 최초 1회만 (quickMode 무관)
-    if (_firstFramePath == null) {
-      if (_isGeneratingCompare) return;
-      setState(() => _isGeneratingCompare = true);
-      final frame = await FilterEngine.extractVideoFrame(sourcePath: widget.videoPath);
-      if (!mounted) return;
-      if (frame == null) { setState(() => _isGeneratingCompare = false); return; }
-      _firstFramePath = frame;
-      setState(() => _isGeneratingCompare = false);
-    }
-
-    final camera = ref.read(cameraProvider);
-    final hasFilter = !_noFilter && camera.activeFilter != null;
-
-    if (quickMode) {
-      // 빠른 프리뷰: 다운스케일, 최신 결과만 반영
-      final token = ++_compareToken;
-      if (_isGeneratingCompare) return; // 풀해상도 처리 중엔 skip
-      final path = await FilterEngine.processImage(
-        sourcePath:  _firstFramePath!,
-        lutFileName: _noFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
-        intensity:   _noFilter ? 0.0 : camera.filterIntensity,
-        adjustments: {},
-        effects:     _currentEffects,
-        maxSize:     480,
-      );
-      if (!mounted || _compareToken != token) return;
-      setState(() => _filteredFramePath = (!hasFilter && !_hasEffectChanges) ? null : path);
-      return;
-    }
-
-    // 풀해상도 처리
-    if (_isGeneratingCompare) return;
-    setState(() => _isGeneratingCompare = true);
-    final path = await FilterEngine.processImage(
-      sourcePath:  _firstFramePath!,
-      lutFileName: _noFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
-      intensity:   _noFilter ? 0.0 : camera.filterIntensity,
-      adjustments: {},
-      effects:     _currentEffects,
-    );
-    if (mounted) {
-      setState(() {
-        _filteredFramePath = (!hasFilter && !_hasEffectChanges) ? null : path;
-        _isGeneratingCompare = false;
-      });
-    }
-  }
-
-  Future<void> _toggleCompare() async {
-    if (_showSplit) {
-      setState(() => _showSplit = false);
-      FilterEngine.playVideoPreview();
-      setState(() => _isPlaying = true);
-      return;
-    }
-    FilterEngine.pauseVideoPreview();
-    setState(() => _isPlaying = false);
-    await _generateCompare();
-    if (mounted) setState(() => _showSplit = true);
-  }
-
   // MARK: - Build
 
   @override
@@ -434,49 +358,39 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 // 동영상 프리뷰 (필터 실시간 적용)
                 GestureDetector(
                   onTap: () {
-                    if (_showSplit) return;
                     if (!_isInitializing) _togglePlayPause();
                   },
-                  onHorizontalDragUpdate: _showSplit
-                      ? (d) => setState(() {
-                            _splitPosition =
-                                (_splitPosition + d.delta.dx / screenW)
-                                    .clamp(0.05, 0.95);
-                          })
-                      : null,
                   child: Container(
                     width: screenW,
                     height: previewH,
                     color: Colors.black,
-                    child: _showSplit
-                        ? _buildCompareView(screenW, previewH)
-                        : Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              if (_textureId != null)
-                                FittedBox(
-                                  fit: BoxFit.contain,
-                                  child: SizedBox(
-                                    width: _videoWidth,
-                                    height: _videoHeight,
-                                    child: Texture(textureId: _textureId!),
-                                  ),
-                                )
-                              else
-                                const CircularProgressIndicator(
-                                    color: Colors.white38),
-                              if (!_isInitializing && !_isPlaying)
-                                Container(
-                                  width: 56, height: 56,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.45),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.play_arrow_rounded,
-                                      color: Colors.white, size: 32),
-                                ),
-                            ],
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_textureId != null)
+                          FittedBox(
+                            fit: BoxFit.contain,
+                            child: SizedBox(
+                              width: _videoWidth,
+                              height: _videoHeight,
+                              child: Texture(textureId: _textureId!),
+                            ),
+                          )
+                        else
+                          const CircularProgressIndicator(
+                              color: Colors.white38),
+                        if (!_isInitializing && !_isPlaying)
+                          Container(
+                            width: 56, height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded,
+                                color: Colors.white, size: 32),
                           ),
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(
@@ -511,78 +425,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  // MARK: - 비교 뷰
-
-  Widget _buildCompareView(double w, double h) {
-    // 첫 로딩 시에만 스피너, 이후 업데이트 중엔 기존 이미지 유지 (깜박임 방지)
-    if (_firstFramePath == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2),
-      );
-    }
-
-    final original = _firstFramePath!;
-    final filtered = _filteredFramePath ?? original;
-    final lineX = w * _splitPosition;
-
-    return SizedBox(
-      width: w, height: h,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.file(File(filtered), fit: BoxFit.contain,
-                gaplessPlayback: true),
-          ),
-          ClipRect(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              widthFactor: _splitPosition,
-              child: SizedBox(
-                width: w, height: h,
-                child: Image.file(File(original), fit: BoxFit.contain,
-                    gaplessPlayback: true),
-              ),
-            ),
-          ),
-          Positioned(
-            left: lineX - 1, top: 0, bottom: 0,
-            child: Container(width: 2, color: Colors.white.withValues(alpha: 0.9)),
-          ),
-          Positioned(
-            left: lineX - 14, top: h / 2 - 14,
-            child: Container(
-              width: 28, height: 28,
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(Icons.compare_arrows_rounded,
-                  color: Colors.black54, size: 16),
-            ),
-          ),
-          Positioned(
-            right: (w - lineX + 8).clamp(8.0, w - 8),
-            top: h / 2 + 18,
-            child: _splitLabel('Before'),
-          ),
-          Positioned(
-            left: (lineX + 8).clamp(8.0, w - 56),
-            top: h / 2 + 18,
-            child: _splitLabel('After'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _splitLabel(String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Text(text,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-      );
-
   // MARK: - 상단 바
 
   Widget _buildTopBar(dynamic camera) {
@@ -607,7 +449,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 });
                 _onFilterChanged();
                 _onEffectsChanged();
-                if (_showSplit) _generateCompare();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -625,8 +466,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
             const SizedBox(width: 8),
           ],
-          _topIconBtn(Icons.compare_rounded, onTap: _toggleCompare, active: _showSplit),
-          const SizedBox(width: 8),
           if (widget.assetId != null) ...[
             _topIconBtn(Icons.delete_outline_rounded,
                 onTap: _deleteVideo, iconColor: Colors.red),
@@ -741,12 +580,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           divisions: 200,
           onChanged: (v) {
             setState(() => _setParam(_activeParamIndex, v));
-            _onEffectsChanged(); // 라이브 텍스처 실시간 반영
-            if (_showSplit) _generateCompare(quickMode: true); // 비교 프리뷰 빠른 갱신
+            _onEffectsChanged();
           },
-          onChangeEnd: (_) {
-            if (_showSplit) _generateCompare(); // 비교 프리뷰 풀해상도 확정
-          },
+          onChangeEnd: (_) {},
         ),
       ),
     );
@@ -768,7 +604,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               ref.read(cameraProvider.notifier).clearFilter();
               setState(() => _noFilter = true);
               _onFilterChanged();
-              if (_showSplit) _generateCompare();
             },
           ),
         ),
@@ -790,11 +625,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 max: 1.0,
                 onChanged: (v) {
                   ref.read(cameraProvider.notifier).setFilterIntensity(v);
-                  if (_showSplit) _generateCompare(quickMode: true);
                 },
-                onChangeEnd: (_) {
-                  if (_showSplit) _generateCompare();
-                },
+                onChangeEnd: (_) {},
               ),
             ),
           )

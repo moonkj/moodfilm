@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-13 (세션 36)
+> 마지막 업데이트: 2026-03-14 (세션 37)
 
 ---
 
@@ -1436,6 +1436,32 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 37 변경사항 (2026-03-14) — 동영상 비율 버그 수정 + 비교 기능 삭제 + 필터바 수정
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFCameraSession.swift` — 동영상 녹화 시 비율 크롭 적용
+- `lib/features/gallery/presentation/video_player_screen.dart` — Before/After 비교 기능 삭제
+- `lib/core/constants/app_dimensions.dart` — filterBarHeight 112→120 (2줄 필터명 짤림 수정)
+
+### 동영상 비율 버그 수정
+- 문제: 3:4 등 비율 선택 후 녹화 시 갤러리에 원본 9:16(1920×1080)으로 저장되던 버그
+- 원인: `captureOutput`에서 recorder에 버퍼 전달 시 crop 미적용, videoSize 항상 1920×1080 고정
+- 수정: `startRecording`에서 `currentAspectRatio` 기반으로 videoSize 계산
+- 수정: recorder에 전달 전 `cropRect`로 픽셀 버퍼 크롭하여 정확한 비율 저장
+
+### 비교 기능 삭제 (video_player_screen)
+- Before/After 비교 버튼, Split View, 관련 state/메서드 전체 제거
+
+### 필터바 높이 수정
+- "Kodak Soft", "Soft Pink" 등 2단어 필터명 2번째 줄 짤리던 문제 수정
+- filterBarHeight: 112 → 120 (선택 썸네일 78 + 간격 4 + 텍스트 2줄 28 + 여유 10)
+
+### iOS 실기기 설치
+- `flutter build ios --release` → `build/ios/iphoneos/Runner.app` (73.2MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 

@@ -263,9 +263,11 @@ class MFCameraSession: NSObject {
     func startRecording(outputPath: String) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
+            let bufSize = CGSize(width: 1920, height: 1080)
+            let cropR = self.cropRect(for: self.currentAspectRatio, imageSize: bufSize)
             self.recorder.startRecording(
                 outputPath: outputPath,
-                videoSize: CGSize(width: 1920, height: 1080)
+                videoSize: CGSize(width: cropR.width, height: cropR.height)
             )
         }
     }
@@ -383,10 +385,37 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
         // 프리뷰 업데이트
         delegate?.cameraSession(self, didOutput: outputBuffer)
 
-        // 녹화 중이면 recorder에 전달
+        // 녹화 중이면 recorder에 전달 (비율 크롭 적용)
         if recorder.isRecording {
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-            recorder.appendVideoBuffer(outputBuffer, timestamp: timestamp)
+            let ratio = currentAspectRatio
+            let bufferForRecording: CVPixelBuffer
+            if ratio != "full" && ratio != "16:9" {
+                var ciImg = CIImage(cvPixelBuffer: outputBuffer)
+                let cropR = cropRect(for: ratio, imageSize: ciImg.extent.size)
+                ciImg = ciImg.cropped(to: cropR)
+                let cw = Int(cropR.width)
+                let ch = Int(cropR.height)
+                var croppedBuf: CVPixelBuffer?
+                let attrs: [String: Any] = [
+                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                    kCVPixelBufferMetalCompatibilityKey as String: true,
+                    kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+                ]
+                if CVPixelBufferCreate(kCFAllocatorDefault, cw, ch,
+                                       kCVPixelFormatType_32BGRA, attrs as CFDictionary, &croppedBuf) == kCVReturnSuccess,
+                   let cb = croppedBuf {
+                    MFLUTEngine.ciContext.render(ciImg, to: cb,
+                                                bounds: CGRect(x: 0, y: 0, width: cw, height: ch),
+                                                colorSpace: CGColorSpaceCreateDeviceRGB())
+                    bufferForRecording = cb
+                } else {
+                    bufferForRecording = outputBuffer
+                }
+            } else {
+                bufferForRecording = outputBuffer
+            }
+            recorder.appendVideoBuffer(bufferForRecording, timestamp: timestamp)
         }
     }
 }
