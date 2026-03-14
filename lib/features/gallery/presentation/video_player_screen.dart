@@ -226,7 +226,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (prevId != nextId) setState(() => _noFilter = nextId == null);
     });
 
-    final screenW = MediaQuery.of(context).size.width;
     final camera = ref.watch(cameraProvider);
 
     return Scaffold(
@@ -237,41 +236,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Column(
               children: [
                 _buildTopBar(camera),
-                // 동영상 프리뷰 — Expanded로 남은 공간 채움, AVPlayerLayer resizeAspect로 비율 유지
+                // 편집기와 동일한 스타일: 흰 배경 + 패딩 + 라운드 카드
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      if (_initialized) {
-                        setState(() {
-                          _controller.value.isPlaying
-                              ? _controller.pause()
-                              : _controller.play();
-                        });
-                      }
-                    },
-                    child: Container(
-                      width: screenW,
-                      color: Colors.black,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (_initialized)
-                            Center(child: _buildVideoWithCorrectAspect())
-                          else
-                            const CircularProgressIndicator(color: Colors.white38),
-                          if (_initialized && !_controller.value.isPlaying)
-                            Container(
-                              width: 56, height: 56,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.45),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.play_arrow_rounded,
-                                  color: Colors.white, size: 32),
-                            ),
-                        ],
-                      ),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: _buildVideoSection(),
                   ),
                 ),
                 SizedBox(
@@ -306,19 +275,60 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  // MARK: - 회전 보정 AspectRatio 빌드
+  // MARK: - 동영상 섹션 (편집기 사진과 동일한 카드 스타일)
 
-  Widget _buildVideoWithCorrectAspect() {
-    final size = _controller.value.size;
-    final rotation = _controller.value.rotationCorrection;
-    // video_player iOS: 물리 크기(landscape 1440×1080) + rotationCorrection=90 반환
-    // 실제 표시 비율 = 세로/가로 (90° 또는 270° 회전 시 swap)
-    final double ratio = (size.width > 0 && size.height > 0)
-        ? ((rotation == 90 || rotation == 270)
-            ? size.height / size.width   // 3:4 portrait (1080/1440 = 0.75)
-            : size.width / size.height)
-        : 3.0 / 4.0;
-    return AspectRatio(aspectRatio: ratio, child: VideoPlayer(_controller));
+  Widget _buildVideoSection() {
+    return GestureDetector(
+      onTap: () {
+        if (_initialized) {
+          setState(() {
+            _controller.value.isPlaying
+                ? _controller.pause()
+                : _controller.play();
+          });
+        }
+      },
+      child: Stack(
+        children: [
+          // 배경: 크림 화이트 (letterbox 영역)
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: const ColoredBox(color: Color(0xFFF5F2EF)),
+            ),
+          ),
+          // 비디오 카드
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: _initialized
+                ? FittedBox(
+                    fit: BoxFit.contain,
+                    child: SizedBox(
+                      width: _controller.value.size.width,
+                      height: _controller.value.size.height,
+                      child: VideoPlayer(_controller),
+                    ),
+                  )
+                : const Center(
+                    child: CircularProgressIndicator(color: Colors.black26),
+                  ),
+          ),
+          // 재생 버튼 오버레이
+          if (_initialized && !_controller.value.isPlaying)
+            Center(
+              child: Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow_rounded,
+                    color: Colors.white, size: 32),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   // MARK: - 상단 바

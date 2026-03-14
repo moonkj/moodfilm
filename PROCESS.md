@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 43)
+> 마지막 업데이트: 2026-03-14 (세션 45)
 
 ---
 
@@ -1436,6 +1436,40 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 45 변경사항 (2026-03-14) — 동영상 플레이어 사진 편집기와 동일한 카드 스타일 적용
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart` — 흰 배경 + 라운드 카드 레이아웃
+
+### 수정
+- 검은 배경 + 전체 화면 비디오 → 편집기(EditorScreen)와 동일한 구조로 변경
+  - `Expanded(Padding(16, 8, 16, 12))` 안에 카드 배치
+  - `ClipRRect(borderRadius: 14)` + 크림 배경(`0xFFF5F2EF`)
+  - `FittedBox(contain)` + `SizedBox(videoNaturalSize)` + `VideoPlayer` — 이미지와 동일 방식
+- 재생 버튼 오버레이 `Center()` 로 카드 내 중앙 배치
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
+
+---
+
+## 세션 44 변경사항 (2026-03-14) — 동영상 플레이어 디버그 오버레이 제거 (최종 정리)
+
+### 변경 파일
+- `lib/features/gallery/presentation/video_player_screen.dart` — 디버그 텍스트 오버레이 제거
+
+### 확인된 사항
+- 디바이스 실측: `ar=0.750, size=1080x1440, rot=0` → 비디오 값 정상
+- `AspectRatio(_controller.value.aspectRatio)` + `Container(alignment: Alignment.center)` 로 검정 영역 없이 정상 표시
+- 동영상 플레이어 최종 완료
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 
