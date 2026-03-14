@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 46)
+> 마지막 업데이트: 2026-03-14 (세션 47)
 
 ---
 
@@ -1436,6 +1436,23 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 47 변경사항 (2026-03-14) — 동영상 갤러리 버튼 썸네일 표시
+
+### 변경 파일
+- `pubspec.yaml` — `video_thumbnail: ^0.5.3` 패키지 추가
+- `lib/features/camera/presentation/camera_screen.dart`
+  - `_buildGalleryButton`: 비디오 파일 경우 `_VideoThumbnail` 위젯 사용
+  - `_VideoThumbnail` StatefulWidget 추가 (파일 맨 하단)
+    - `VideoThumbnail.thumbnailData()` 비동기 호출 → `Image.memory` 표시
+    - path 변경 시 `didUpdateWidget`으로 재로드
+    - 로딩 중 / 실패 시 검은 배경 + 재생 아이콘 fallback
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (74.1MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 

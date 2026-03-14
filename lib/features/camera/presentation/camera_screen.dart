@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' show pi;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/services/storage_service.dart';
@@ -973,13 +975,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(7),
                 child: _isVideoFile(cameraState.lastCapturedPath!)
-                    ? const ColoredBox(
-                        color: Color(0xFF1A1A1A),
-                        child: Center(
-                          child: Icon(Icons.play_circle_outline_rounded,
-                              color: Colors.white70, size: 22),
-                        ),
-                      )
+                    ? _VideoThumbnail(path: cameraState.lastCapturedPath!)
                     : Image.file(
                         File(cameraState.lastCapturedPath!),
                         fit: BoxFit.cover,
@@ -1258,6 +1254,59 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 0.5),
         ),
         child: Icon(icon, color: active ? AppColors.accent : Colors.white, size: 18),
+      ),
+    );
+  }
+}
+
+/// 비디오 파일 경로에서 첫 프레임 썸네일을 비동기 추출해 표시
+class _VideoThumbnail extends StatefulWidget {
+  final String path;
+  const _VideoThumbnail({required this.path});
+
+  @override
+  State<_VideoThumbnail> createState() => _VideoThumbnailState();
+}
+
+class _VideoThumbnailState extends State<_VideoThumbnail> {
+  Uint8List? _thumb;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_VideoThumbnail old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) {
+      _thumb = null;
+      _loaded = false;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final data = await VideoThumbnail.thumbnailData(
+      video: widget.path,
+      imageFormat: ImageFormat.JPEG,
+      maxWidth: 128,
+      quality: 75,
+    );
+    if (mounted) setState(() { _thumb = data; _loaded = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_thumb != null) {
+      return Image.memory(_thumb!, fit: BoxFit.cover);
+    }
+    return const ColoredBox(
+      color: Color(0xFF1A1A1A),
+      child: Center(
+        child: Icon(Icons.play_circle_outline_rounded, color: Colors.white70, size: 22),
       ),
     );
   }
