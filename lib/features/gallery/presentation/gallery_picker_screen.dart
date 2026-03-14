@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
@@ -8,7 +7,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/models/filter_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
-import 'gallery_editor_page_view.dart';
+import '../../editor/presentation/editor_screen.dart';
+import 'video_player_screen.dart';
 
 /// 갤러리에서 사진 선택
 /// - 단일 탭: EditorScreen으로 이동
@@ -146,15 +146,31 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
       return;
     }
 
-    if (!mounted) return;
+    final file = await asset.file;
+    if (file == null || !mounted) return;
 
     final index = _assets.indexOf(asset);
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GalleryEditorPageView(
-        assets: _assets,
-        initialIndex: index < 0 ? 0 : index,
-      ),
-    ));
+    final currentIndex = index < 0 ? 0 : index;
+
+    if (asset.type == AssetType.video) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          videoPath: file.path,
+          assetId: asset.id,
+          assets: _assets,
+          currentIndex: currentIndex,
+        ),
+      ));
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => EditorScreen(
+          imagePath: file.path,
+          assetId: asset.id,
+          assets: _assets,
+          currentIndex: currentIndex,
+        ),
+      ));
+    }
   }
 
   void _toggleMultiSelectMode() {
@@ -324,7 +340,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
               color: const Color(0xFF3D3531),
               size: 20,
             ),
-            onPressed: _isMultiSelectMode ? _toggleMultiSelectMode : () => context.pop(),
+            onPressed: _isMultiSelectMode ? _toggleMultiSelectMode : () => Navigator.of(context).pop(),
           ),
           Expanded(
             child: _isMultiSelectMode
@@ -406,7 +422,7 @@ class _GalleryPickerScreenState extends State<GalleryPickerScreen> {
         children: [
           _bottomTab(Icons.photo_library_rounded, AppLocalizations.of(context).album, selected: true),
           GestureDetector(
-            onTap: () => context.pop(),
+            onTap: () => Navigator.of(context).pop(),
             child: _bottomTab(Icons.camera_alt_rounded, AppLocalizations.of(context).camera, selected: false),
           ),
         ],

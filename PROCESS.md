@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 55)
+> 마지막 업데이트: 2026-03-14 (세션 56)
 
 ---
 
@@ -1773,3 +1773,23 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
 - `lib/features/gallery/presentation/gallery_picker_screen.dart`
   - `_selectAsset()` 단순화: 파일 미리 로드 제거, `GalleryEditorPageView` push
   - `import video_player_screen.dart` → `import gallery_editor_page_view.dart` 변경
+
+---
+
+## 세션 56 변경사항 (2026-03-14) — 갤러리 에디터 스와이프: 미디어 영역만 전환
+
+### 문제
+이전 구현(GalleryEditorPageView)에서 PageView로 전체 화면이 슬라이드되어 AppBar/컨트롤까지 이동
+
+### 해결책
+- GalleryEditorPageView 삭제
+- EditorScreen/VideoPlayerScreen에 `assets`+`currentIndex` 파라미터 추가
+- 프리뷰 영역(Expanded)에만 GestureDetector 추가 → onHorizontalDragEnd 감지
+- Navigator.pushReplacement + PageRouteBuilder(수평 슬라이드 220ms) 사용
+- 같은 구조의 화면이 수평 전환되므로 AppBar/컨트롤은 시각적으로 고정된 효과
+
+### 변경 파일
+- `lib/features/gallery/presentation/gallery_editor_page_view.dart` — 삭제
+- `lib/features/editor/presentation/editor_screen.dart` — assets/currentIndex 파라미터, _goToAdjacent(), GestureDetector on preview
+- `lib/features/gallery/presentation/video_player_screen.dart` — 동일
+- `lib/features/gallery/presentation/gallery_picker_screen.dart` — _selectAsset() 직접 push, go_router 제거

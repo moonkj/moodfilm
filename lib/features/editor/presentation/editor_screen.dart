@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../gallery/presentation/video_player_screen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
@@ -15,9 +16,17 @@ import '../../camera/providers/camera_provider.dart';
 enum _CropHandle { tl, tr, bl, br }
 
 class EditorScreen extends ConsumerStatefulWidget {
-  const EditorScreen({super.key, this.imagePath, this.assetId});
+  const EditorScreen({
+    super.key,
+    this.imagePath,
+    this.assetId,
+    this.assets,
+    this.currentIndex = 0,
+  });
   final String? imagePath;
   final String? assetId; // 갤러리 삭제용 (nullable)
+  final List<AssetEntity>? assets;
+  final int currentIndex;
 
   @override
   ConsumerState<EditorScreen> createState() => _EditorScreenState();
@@ -47,6 +56,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   bool _editorNoFilter = true;
   ProviderSubscription<dynamic>? _filterSubscription;
+
+  // 인접 에셋 스와이프 내비게이션
+  bool _isNavigating = false;
 
   // 실시간 이미지 프리뷰 텍스처
   int? _imageTextureId;
@@ -186,6 +198,53 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     );
   }
 
+  // MARK: - 스와이프 내비게이션
+
+  Future<void> _goToAdjacent(int delta) async {
+    final assets = widget.assets;
+    if (assets == null || _isNavigating) return;
+    final newIdx = widget.currentIndex + delta;
+    if (newIdx < 0 || newIdx >= assets.length) return;
+
+    setState(() => _isNavigating = true);
+    final asset = assets[newIdx];
+    final file = await asset.file;
+    if (!mounted || file == null) {
+      if (mounted) setState(() => _isNavigating = false);
+      return;
+    }
+
+    final isForward = delta > 0;
+    final Widget nextScreen = asset.type == AssetType.video
+        ? VideoPlayerScreen(
+            videoPath: file.path,
+            assetId: asset.id,
+            assets: assets,
+            currentIndex: newIdx,
+          )
+        : EditorScreen(
+            imagePath: file.path,
+            assetId: asset.id,
+            assets: assets,
+            currentIndex: newIdx,
+          );
+
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, a1, a2) => nextScreen,
+        transitionsBuilder: (context, anim, a2, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset(isForward ? 1 : -1, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   // MARK: - Build
 
   @override
@@ -201,7 +260,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: _buildImageSection(),
+                    child: _activeTab == 'crop' || widget.assets == null
+                        ? _buildImageSection()
+                        : GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onHorizontalDragEnd: (d) {
+                              final v = d.primaryVelocity ?? 0;
+                              if (v < -500) { _goToAdjacent(1); }
+                              else if (v > 500) { _goToAdjacent(-1); }
+                            },
+                            child: _buildImageSection(),
+                          ),
                   ),
                 ),
                 SizedBox(

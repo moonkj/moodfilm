@@ -9,13 +9,22 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';
+import '../../editor/presentation/editor_screen.dart';
 
 /// 동영상 재생 + 필터/효과 편집 화면
 /// FilterEngine.startVideoPreview() 기반 실시간 필터 프리뷰
 class VideoPlayerScreen extends ConsumerStatefulWidget {
   final String videoPath;
   final String? assetId;
-  const VideoPlayerScreen({super.key, required this.videoPath, this.assetId});
+  final List<AssetEntity>? assets;
+  final int currentIndex;
+  const VideoPlayerScreen({
+    super.key,
+    required this.videoPath,
+    this.assetId,
+    this.assets,
+    this.currentIndex = 0,
+  });
 
   @override
   ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -23,6 +32,9 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   bool _isProcessing = false;
+
+  // 인접 에셋 스와이프 내비게이션
+  bool _isNavigating = false;
 
   // 공유 버튼 위치 (iOS sharePositionOrigin 용)
   final _shareButtonKey = GlobalKey();
@@ -297,6 +309,53 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  // MARK: - 스와이프 내비게이션
+
+  Future<void> _goToAdjacent(int delta) async {
+    final assets = widget.assets;
+    if (assets == null || _isNavigating) return;
+    final newIdx = widget.currentIndex + delta;
+    if (newIdx < 0 || newIdx >= assets.length) return;
+
+    setState(() => _isNavigating = true);
+    final asset = assets[newIdx];
+    final file = await asset.file;
+    if (!mounted || file == null) {
+      if (mounted) setState(() => _isNavigating = false);
+      return;
+    }
+
+    final isForward = delta > 0;
+    final Widget nextScreen = asset.type == AssetType.video
+        ? VideoPlayerScreen(
+            videoPath: file.path,
+            assetId: asset.id,
+            assets: assets,
+            currentIndex: newIdx,
+          )
+        : EditorScreen(
+            imagePath: file.path,
+            assetId: asset.id,
+            assets: assets,
+            currentIndex: newIdx,
+          );
+
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, a1, a2) => nextScreen,
+        transitionsBuilder: (context, anim, a2, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset(isForward ? 1 : -1, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   // MARK: - Build
 
   @override
@@ -323,7 +382,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: _buildVideoSection(),
+                    child: widget.assets == null
+                        ? _buildVideoSection()
+                        : GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onHorizontalDragEnd: (d) {
+                              final v = d.primaryVelocity ?? 0;
+                              if (v < -500) { _goToAdjacent(1); }
+                              else if (v > 500) { _goToAdjacent(-1); }
+                            },
+                            child: _buildVideoSection(),
+                          ),
                   ),
                 ),
                 SizedBox(
