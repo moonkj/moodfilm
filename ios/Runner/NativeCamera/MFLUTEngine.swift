@@ -130,16 +130,20 @@ class MFLUTEngine {
         let originalExtent = image.extent  // 원본 extent 저장 — 마지막에 크롭 기준으로 사용
 
         // 1. LUT 필터 적용 (강도 블렌딩) + 채도/대비 부스트
-        // LUT 적용 + 강도 블렌딩 + 필터 개성 보정
+        // LUT 적용 + 필터 개성 보정 → 강도 블렌딩 순서 (개성이 intensity에 비례하도록)
         if let lutFilter = currentLUTFilter, intensity > 0 {
             let base = result
             lutFilter.setValue(base, forKey: kCIInputImageKey)
             if let filtered = lutFilter.outputImage {
-                result = intensity >= 1.0
-                    ? filtered
-                    : lerpCI(fg: filtered, bg: base, alpha: CGFloat(intensity))
+                // 개성 보정을 먼저 LUT 이미지에 적용 (blend 전)
+                let filteredWithPersonality = applyFilterPersonality(to: filtered, extent: filtered.extent)
 
-                // 미세 부스트 (LUT 고유 색감 보존)
+                // 그 다음 intensity로 blend → 개성 효과도 intensity에 비례
+                result = intensity >= 1.0
+                    ? filteredWithPersonality
+                    : lerpCI(fg: filteredWithPersonality, bg: base, alpha: CGFloat(intensity))
+
+                // 미세 부스트 (LUT 고유 색감 보존 — intensity에 비례)
                 let boost = CGFloat(min(intensity, 1.0))
                 if boost > 0, let vivid = CIFilter(name: "CIColorControls") {
                     vivid.setValue(result, forKey: kCIInputImageKey)
@@ -147,9 +151,6 @@ class MFLUTEngine {
                     vivid.setValue(1.0 + boost * 0.10, forKey: kCIInputSaturationKey)
                     result = vivid.outputImage?.cropped(to: result.extent) ?? result
                 }
-
-                // 필터별 개성 보정 (비슷한 LUT 차별화 + 약한 LUT 보완)
-                result = applyFilterPersonality(to: result, extent: result.extent)
             }
         }
 
