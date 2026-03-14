@@ -280,8 +280,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
             }
         }
 
-        // Device RGB로 고정 — 카메라 CVPixelBuffer 파이프라인과 컬러 스페이스 통일
-        let ciOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpaceCreateDeviceRGB()]
+        let ciOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!]
         guard var ciImage = CIImage(image: uiImage, options: ciOptions) else { return nil }
 
         // UIImage orientation 보정: CIImage는 픽셀 기준이므로 orientation을 무시함.
@@ -542,7 +541,7 @@ class FilterEnginePlugin: NSObject, FlutterPlugin {
         let thumbImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
 
-        let thumbOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpaceCreateDeviceRGB()]
+        let thumbOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!]
         guard let thumb = thumbImage, var ciImage = CIImage(image: thumb, options: thumbOptions) else { return nil }
 
         // LUT 적용

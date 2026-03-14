@@ -378,7 +378,7 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
             if status == kCVReturnSuccess, let proc = processed {
                 MFLUTEngine.ciContext.render(ciImage, to: proc,
                                              bounds: CGRect(x: 0, y: 0, width: outW, height: outH),
-                                             colorSpace: CGColorSpaceCreateDeviceRGB())
+                                             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
                 outputBuffer = proc
             } else {
                 print("[MFCameraSession] CVPixelBufferCreate 실패: \(status)")
@@ -423,7 +423,7 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
                    let cb = croppedBuf {
                     MFLUTEngine.ciContext.render(ciImg, to: cb,
                                                 bounds: CGRect(x: 0, y: 0, width: cw, height: ch),
-                                                colorSpace: CGColorSpaceCreateDeviceRGB())
+                                                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
                     bufferForRecording = cb
                 } else {
                     bufferForRecording = outputBuffer

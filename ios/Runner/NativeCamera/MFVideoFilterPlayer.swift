@@ -227,7 +227,7 @@ final class MFVideoFilterPlayer: NSObject, FlutterTexture {
         MFLUTEngine.ciContext.render(
             ciImage, to: out,
             bounds: CGRect(origin: .zero, size: CGSize(width: outW, height: outH)),
-            colorSpace: CGColorSpaceCreateDeviceRGB()
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
         )
 
         lock.lock()

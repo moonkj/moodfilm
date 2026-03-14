@@ -10,11 +10,12 @@ class MFLUTEngine {
         guard let device = MTLCreateSystemDefaultDevice() else {
             return CIContext()
         }
+        let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
         return CIContext(
             mtlDevice: device,
             options: [
-                .workingColorSpace: CGColorSpaceCreateDeviceRGB(),
-                .outputColorSpace: CGColorSpaceCreateDeviceRGB(),
+                .workingColorSpace: sRGB,
+                .outputColorSpace: sRGB,
                 .useSoftwareRenderer: false,
             ]
         )
@@ -114,7 +115,7 @@ class MFLUTEngine {
         let filter = CIFilter(name: "CIColorCubeWithColorSpace")
         filter?.setValue(size, forKey: "inputCubeDimension")
         filter?.setValue(data as AnyObject, forKey: "inputCubeData")
-        filter?.setValue(CGColorSpaceCreateDeviceRGB(), forKey: "inputColorSpace")
+        filter?.setValue(CGColorSpace(name: CGColorSpace.sRGB)!, forKey: "inputColorSpace")
 
         return filter
     }
@@ -136,12 +137,12 @@ class MFLUTEngine {
                     ? filtered
                     : lerpCI(fg: filtered, bg: base, alpha: CGFloat(intensity))
 
-                // 강도 비례 채도/대비 부스트 (잡음 없이 색감 강화)
+                // 강도 비례 채도/대비 미세 부스트 (LUT 고유 색감 최대 보존)
                 let boost = CGFloat(min(intensity, 1.0))
                 if boost > 0, let vivid = CIFilter(name: "CIColorControls") {
                     vivid.setValue(result, forKey: kCIInputImageKey)
-                    vivid.setValue(1.0 + boost * 0.35, forKey: kCIInputContrastKey)
-                    vivid.setValue(1.0 + boost * 0.45, forKey: kCIInputSaturationKey)
+                    vivid.setValue(1.0 + boost * 0.08, forKey: kCIInputContrastKey)
+                    vivid.setValue(1.0 + boost * 0.10, forKey: kCIInputSaturationKey)
                     result = vivid.outputImage?.cropped(to: result.extent) ?? result
                 }
             }
@@ -330,11 +331,11 @@ class MFLUTEngine {
         }
 
         // 3. 따뜻한 피부톤 (CITemperatureAndTint)
+        // inputNeutral=중립(6500K), inputTargetNeutral=목표 색온도(더 높을수록 따뜻하게)
         if let tempFilter = CIFilter(name: "CITemperatureAndTint") {
             tempFilter.setValue(result, forKey: kCIInputImageKey)
-            let temp = 6500.0 + CGFloat(intensity) * 500.0
-            tempFilter.setValue(CIVector(x: temp, y: 0), forKey: "inputNeutral")
-            tempFilter.setValue(CIVector(x: 6500, y: 0), forKey: "inputTargetNeutral")
+            tempFilter.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
+            tempFilter.setValue(CIVector(x: 6500.0 + CGFloat(intensity) * 400.0, y: 0), forKey: "inputTargetNeutral")
             result = tempFilter.outputImage?.cropped(to: image.extent) ?? result
         }
 

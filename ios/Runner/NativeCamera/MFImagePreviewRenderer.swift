@@ -60,7 +60,7 @@ final class MFImagePreviewRenderer: NSObject, FlutterTexture {
             UIGraphicsEndImageContext()
         }
 
-        let ciOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpaceCreateDeviceRGB()]
+        let ciOptions: [CIImageOption: Any] = [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!]
         guard var ci = CIImage(image: image, options: ciOptions) else { return false }
 
         let orient = CGImagePropertyOrientation(image.imageOrientation)
@@ -162,7 +162,7 @@ final class MFImagePreviewRenderer: NSObject, FlutterTexture {
             MFLUTEngine.ciContext.render(
                 ci, to: out,
                 bounds: CGRect(origin: .zero, size: CGSize(width: outW, height: outH)),
-                colorSpace: CGColorSpaceCreateDeviceRGB()
+                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
             )
 
             self.lock.lock()

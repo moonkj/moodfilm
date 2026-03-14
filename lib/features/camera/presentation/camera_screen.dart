@@ -64,8 +64,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     'brightness': 0.0,
     'contrast':   0.0,
     'saturation': 0.0,
-    'softness':   0.3,  // 기본 솜결 30%
-    'beauty':     0.25, // 기본 뽀얀 25%
+    'softness':   0.2,  // 기본 솜결 20%
+    'beauty':     0.12, // 기본 뽀얀 12%
     'glow':       0.0,
   };
 

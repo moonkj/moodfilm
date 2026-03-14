@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 60)
+> 마지막 업데이트: 2026-03-15 (세션 61)
 
 ---
 
@@ -1867,3 +1867,39 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 
 ### 변경 파일
 - `pubspec.yaml` (version: 1.0.2+3)
+
+## 세션 61 변경사항 (2026-03-15) — 필터 색감 + 피부톤 붉음 수정
+
+### 문제
+1. 모든 필터가 비슷하게 보임 (채도 강제 부스트가 LUT 고유색을 균일하게 덮어씌움)
+2. 얼굴 촬영 시 피부가 붉게 나옴 (채도 과포화 + 색공간 불일치)
+
+### 원인 분석
+- LUT 적용 후 채도 +45%, 대비 +35% 강제 부스트 → 필터 간 차이 희석 + 피부 과포화
+- 전 파이프라인이 `CGColorSpaceCreateDeviceRGB()` 사용 → iPhone P3 카메라 데이터와 불일치로 빨강 계열 과장
+- Beauty CITemperatureAndTint inputNeutral/inputTargetNeutral 반전 → 의도와 반대 방향(차갑게) 적용
+- 기본 beautyIntensity 25%가 항상 켜져 추가 색조 왜곡
+
+### 수정 내용
+1. **채도/대비 부스트 축소**: `0.45 → 0.10`, `0.35 → 0.08` (LUT 색 특성 보존)
+2. **색공간 sRGB 통일**: 전 파이프라인 DeviceRGB → sRGB
+   - `MFLUTEngine.ciContext` (workingColorSpace, outputColorSpace)
+   - `CIColorCubeWithColorSpace` inputColorSpace
+   - `MFCameraSession.swift` render() × 2
+   - `FilterEnginePlugin.swift` CIImage 생성 × 2
+   - `MFImagePreviewRenderer.swift` CIImage 생성 + render()
+   - `MFVideoFilterPlayer.swift` render()
+3. **Beauty CITemperatureAndTint 수정**: inputNeutral=6500(고정), inputTargetNeutral=6500+intensity*400 (따뜻하게)
+4. **기본값 조정**: softness 30%→20%, beauty 25%→12%
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`
+- `ios/Runner/NativeCamera/MFCameraSession.swift`
+- `ios/Runner/NativeCamera/FilterEnginePlugin.swift`
+- `ios/Runner/NativeCamera/MFImagePreviewRenderer.swift`
+- `ios/Runner/NativeCamera/MFVideoFilterPlayer.swift`
+- `lib/features/camera/presentation/camera_screen.dart`
+
+### iOS 실기기 설치 (세션 61)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` → 기기 미연결로 대기 중
