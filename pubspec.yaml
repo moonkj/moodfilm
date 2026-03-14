@@ -1,7 +1,7 @@
 name: moodfilm
 description: Like it! - 감성 필터 카메라 앱
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.11.0
