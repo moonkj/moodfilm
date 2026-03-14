@@ -1,17 +1,17 @@
-import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
-import '../../../core/models/filter_model.dart';
 import '../../../native_plugins/filter_engine/filter_engine.dart';
 import '../../camera/presentation/widgets/filter_scroll_bar.dart';
 import '../../camera/providers/camera_provider.dart';
 
-/// 동영상 재생 + 실시간 필터/효과 편집 화면
-/// AVPlayerItemVideoOutput → MFLUTEngine → FlutterTexture 파이프라인
+/// 동영상 재생 + 필터/효과 편집 화면
+/// video_player 패키지 기반 재생 → FilterEngine.processVideo()로 저장
 class VideoPlayerScreen extends ConsumerStatefulWidget {
   final String videoPath;
   final String? assetId;
@@ -22,17 +22,8 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
-  // 공유 버튼 위치 (iOS sharePositionOrigin용)
-  final _shareButtonKey = GlobalKey();
-
-  // 텍스처
-  int? _textureId;
-  double _videoWidth  = 1080;
-  double _videoHeight = 1920;
-
-  // 재생 상태
-  bool _isPlaying = false;
-  bool _isInitializing = true;
+  late VideoPlayerController _controller;
+  bool _initialized = false;
   bool _isProcessing = false;
 
   // 필터
@@ -40,12 +31,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   // 효과 파라미터
   static const _params = [
-    (label: '밝기',   icon: Icons.wb_sunny_outlined,               min: -1.0, max: 1.0),
-    (label: '대비',   icon: Icons.contrast,                         min: -1.0, max: 1.0),
-    (label: '채도',   icon: Icons.palette_outlined,                 min: -1.0, max: 1.0),
-    (label: '솜결',   icon: Icons.face_retouching_natural_rounded,  min: 0.0,  max: 1.0),
-    (label: '뽀얀',   icon: Icons.blur_circular_rounded,            min: 0.0,  max: 1.0),
-    (label: '글로우',  icon: Icons.flare_rounded,                   min: 0.0,  max: 1.0),
+    (label: '밝기',   icon: Icons.wb_sunny_outlined,              min: -1.0, max: 1.0),
+    (label: '대비',   icon: Icons.contrast,                        min: -1.0, max: 1.0),
+    (label: '채도',   icon: Icons.palette_outlined,                min: -1.0, max: 1.0),
+    (label: '솜결',   icon: Icons.face_retouching_natural_rounded, min: 0.0,  max: 1.0),
+    (label: '뽀얀',   icon: Icons.blur_circular_rounded,           min: 0.0,  max: 1.0),
+    (label: '글로우',  icon: Icons.flare_rounded,                  min: 0.0,  max: 1.0),
   ];
   int _activeParamIndex = 0;
   double _brightness = 0;
@@ -56,9 +47,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   double _dreamyGlow = 0;
 
   String _activeTab = 'filter';
-
-  // 필터 디바운스 (빠른 스크롤 시 중간 LUT 로드 방지)
-  Timer? _filterDebounce;
 
   bool get _hasEffectChanges =>
       _brightness != 0 || _contrast != 0 || _saturation != 0 ||
@@ -109,72 +97,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     super.initState();
     final camera = ref.read(cameraProvider);
     _noFilter = camera.activeFilter == null;
-    _startPreview();
-  }
-
-  Future<void> _startPreview() async {
-    final camera = ref.read(cameraProvider);
-    final lutFile  = _noFilter ? '' : (camera.activeFilter?.lutFileName ?? '');
-    final intensity = _noFilter ? 0.0 : camera.filterIntensity;
-
-    // 전체 LUT 목록을 네이티브에 전달 → 백그라운드에서 캐시 선점
-    final allLuts = FilterData.all.map((f) => f.lutFileName).toList();
-
-    final result = await FilterEngine.startVideoPreview(
-      videoPath:   widget.videoPath,
-      lutFileName: lutFile,
-      intensity:   intensity,
-      effects:     _currentEffects,
-      preloadLuts: allLuts,
-    );
-
-    if (!mounted || result == null) return;
-
-    final textureId = result['textureId'] as int?;
-    final w = (result['width']  as int? ?? 1080).toDouble();
-    final h = (result['height'] as int? ?? 1920).toDouble();
-
-    setState(() {
-      _textureId = textureId;
-      if (w > 0 && h > 0) { _videoWidth = w; _videoHeight = h; }
-      _isInitializing = false;
-      _isPlaying = true;
-    });
+    _controller = VideoPlayerController.file(File(widget.videoPath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _initialized = true);
+          _controller.play();
+          _controller.setLooping(true);
+        }
+      });
   }
 
   @override
   void dispose() {
-    _filterDebounce?.cancel();
-    FilterEngine.stopVideoPreview();
+    _controller.dispose();
     super.dispose();
-  }
-
-  // MARK: - 필터/효과 업데이트 (실시간)
-
-  void _onFilterChanged() {
-    _filterDebounce?.cancel();
-    _filterDebounce = Timer(const Duration(milliseconds: 120), () {
-      final camera = ref.read(cameraProvider);
-      FilterEngine.setVideoPreviewFilter(
-        lutFileName: _noFilter ? '' : (camera.activeFilter?.lutFileName ?? ''),
-        intensity:   _noFilter ? 0.0 : camera.filterIntensity,
-      );
-    });
-  }
-
-  void _onEffectsChanged() {
-    FilterEngine.setVideoPreviewEffects(_currentEffects);
-  }
-
-  // MARK: - 재생 제어
-
-  void _togglePlayPause() {
-    if (_isPlaying) {
-      FilterEngine.pauseVideoPreview();
-    } else {
-      FilterEngine.playVideoPreview();
-    }
-    setState(() => _isPlaying = !_isPlaying);
   }
 
   // MARK: - 저장
@@ -221,45 +157,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  /// 공유 버튼의 화면 좌표 (iOS sharePositionOrigin 필수)
-  Rect get _shareButtonRect {
-    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) {
-      final w = MediaQuery.of(context).size.width;
-      return Rect.fromLTWH(w - 96, 4, 36, 36);
-    }
-    final pos = box.localToGlobal(Offset.zero);
-    return pos & box.size;
-  }
-
   Future<void> _shareVideo() async {
-    if (_isProcessing) return;
-
     final camera = ref.read(cameraProvider);
     final hasFilter = !_noFilter && camera.activeFilter != null;
 
-    // 필터/효과 없으면 원본 바로 공유
     if (!hasFilter && !_hasEffectChanges) {
-      try {
-        await Share.shareXFiles(
-          [XFile(widget.videoPath, mimeType: 'video/mp4')],
-          sharePositionOrigin: _shareButtonRect,
-        );
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('공유 실패: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ));
-        }
-      }
+      await Share.shareXFiles([XFile(widget.videoPath)]);
       return;
     }
 
-    // 필터/효과 있으면 export 후 공유
-    if (!mounted) return;
-    setState(() => _isProcessing = true);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('공유 준비 중...'),
       backgroundColor: Color(0xFF3D3531),
@@ -277,18 +183,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      if (result != null) {
-        await Share.shareXFiles(
-          [XFile(result, mimeType: 'video/mp4')],
-          sharePositionOrigin: _shareButtonRect,
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('공유 준비 실패'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
+      if (result != null) await Share.shareXFiles([XFile(result)]);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -297,8 +192,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ));
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -330,17 +223,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     ref.listen(cameraProvider, (prev, next) {
       final prevId = prev?.activeFilter?.id;
       final nextId = next.activeFilter?.id;
-      if (prevId != nextId) {
-        setState(() => _noFilter = nextId == null);
-        _onFilterChanged();
-      }
-      // 강도 변경 시 실시간 반영
-      if (prev?.filterIntensity != next.filterIntensity && !_noFilter) {
-        _onFilterChanged();
-      }
+      if (prevId != nextId) setState(() => _noFilter = nextId == null);
     });
 
     final screenW = MediaQuery.of(context).size.width;
+    // 3:4 비율 고정 컨테이너 (레퍼런스 방식)
+    final previewH = screenW * 4.0 / 3.0;
     final camera = ref.watch(cameraProvider);
 
     return Scaffold(
@@ -351,42 +239,42 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Column(
               children: [
                 _buildTopBar(camera),
-                // 동영상 프리뷰 — 남은 공간 전체 사용, 비율 유지(FittedBox)
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      if (!_isInitializing) _togglePlayPause();
-                    },
-                    child: Container(
-                      width: screenW,
-                      color: Colors.black,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (_textureId != null)
-                            FittedBox(
-                              fit: BoxFit.contain,
-                              child: SizedBox(
-                                width: _videoWidth,
-                                height: _videoHeight,
-                                child: Texture(textureId: _textureId!),
-                              ),
-                            )
-                          else
-                            const CircularProgressIndicator(
-                                color: Colors.white38),
-                          if (!_isInitializing && !_isPlaying)
-                            Container(
-                              width: 56, height: 56,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.45),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.play_arrow_rounded,
-                                  color: Colors.white, size: 32),
+                // 동영상 프리뷰 — 3:4 고정 컨테이너, 영상 비율 유지
+                GestureDetector(
+                  onTap: () {
+                    if (_initialized) {
+                      setState(() {
+                        _controller.value.isPlaying
+                            ? _controller.pause()
+                            : _controller.play();
+                      });
+                    }
+                  },
+                  child: Container(
+                    width: screenW,
+                    height: previewH,
+                    color: Colors.black,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_initialized)
+                          AspectRatio(
+                            aspectRatio: _controller.value.aspectRatio,
+                            child: VideoPlayer(_controller),
+                          )
+                        else
+                          const CircularProgressIndicator(color: Colors.white38),
+                        if (_initialized && !_controller.value.isPlaying)
+                          Container(
+                            width: 56, height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
                             ),
-                        ],
-                      ),
+                            child: const Icon(Icons.play_arrow_rounded,
+                                color: Colors.white, size: 32),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -401,7 +289,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                             const SizedBox(height: 4),
                           ],
                         )
-                      : _buildFilterSection(),
+                      : _buildFilterSection(camera),
                 ),
                 _buildBottomTabBar(camera),
               ],
@@ -444,8 +332,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   _brightness = 0; _contrast = 0; _saturation = 0;
                   _softness = 0; _beauty = 0; _dreamyGlow = 0;
                 });
-                _onFilterChanged();
-                _onEffectsChanged();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -464,12 +350,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             const SizedBox(width: 8),
           ],
           if (widget.assetId != null) ...[
-            _topIconBtn(Icons.delete_outline_rounded,
-                onTap: _deleteVideo, iconColor: Colors.red),
+            _topIconBtn(Icons.delete_outline_rounded, onTap: _deleteVideo),
             const SizedBox(width: 8),
           ],
-          _topIconBtn(Icons.ios_share_rounded, onTap: _shareVideo,
-              widgetKey: _shareButtonKey),
+          _topIconBtn(Icons.ios_share_rounded, onTap: _shareVideo),
           const SizedBox(width: 8),
           _topIconBtn(Icons.download_rounded, onTap: _saveVideo),
         ],
@@ -477,21 +361,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  Widget _topIconBtn(IconData icon,
-      {required VoidCallback onTap, bool active = false, Color? iconColor, Key? widgetKey}) {
+  Widget _topIconBtn(IconData icon, {required VoidCallback onTap}) {
     return GestureDetector(
-      key: widgetKey,
       onTap: onTap,
       child: Container(
         width: 36, height: 36,
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF3D3531) : const Color(0xFFF5F0EC),
+          color: const Color(0xFFF5F0EC),
           shape: BoxShape.circle,
           border: Border.all(color: const Color(0xFFE0DAD4), width: 0.5),
         ),
-        child: Icon(icon,
-            color: active ? Colors.white : (iconColor ?? const Color(0xFF3D3531)),
-            size: 18),
+        child: Icon(icon, color: const Color(0xFF3D3531), size: 18),
       ),
     );
   }
@@ -502,51 +382,47 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     return SizedBox(
       height: 68,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(_params.length, (i) {
           final isActive = i == _activeParamIndex;
           final param = _params[i];
-          return Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _activeParamIndex = i),
-              child: SizedBox(
-                height: 68,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 52, height: 28,
-                      child: Center(
-                        child: isActive
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFADDE6),
-                                  borderRadius: BorderRadius.circular(100),
-                                ),
-                                child: Text(_formatValue(i),
-                                    style: const TextStyle(
-                                        color: Color(0xFFB06878),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700)),
-                              )
-                            : Icon(param.icon,
-                                color: const Color(0xFF8A8480), size: 20),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(param.label,
-                        style: TextStyle(
-                          color: isActive
-                              ? const Color(0xFFB06878)
-                              : const Color(0xFF8A8480),
-                          fontSize: 11,
-                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                        )),
-                  ],
+          return GestureDetector(
+            onTap: () => setState(() => _activeParamIndex = i),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 52, height: 28,
+                  child: Center(
+                    child: isActive
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFADDE6),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(_formatValue(i),
+                                style: const TextStyle(
+                                    color: Color(0xFFB06878),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700)),
+                          )
+                        : Icon(param.icon,
+                            color: const Color(0xFF8A8480), size: 20),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(param.label,
+                    style: TextStyle(
+                      color: isActive
+                          ? const Color(0xFFB06878)
+                          : const Color(0xFF8A8480),
+                      fontSize: 11,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.w400,
+                    )),
+              ],
             ),
           );
         }),
@@ -560,7 +436,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final param = _params[_activeParamIndex];
     final value = _getParamValue(_activeParamIndex);
     return Padding(
-      padding: const EdgeInsets.only(top: 24, left: 20, right: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: SliderTheme(
         data: SliderTheme.of(context).copyWith(
           trackHeight: 2,
@@ -575,11 +451,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           min: param.min,
           max: param.max,
           divisions: 200,
-          onChanged: (v) {
-            setState(() => _setParam(_activeParamIndex, v));
-            _onEffectsChanged();
-          },
-          onChangeEnd: (_) {},
+          onChanged: (v) => setState(() => _setParam(_activeParamIndex, v)),
         ),
       ),
     );
@@ -587,9 +459,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   // MARK: - 필터 섹션
 
-  Widget _buildFilterSection() {
-    final camera = ref.watch(cameraProvider);
-    final intensity = _noFilter ? 1.0 : camera.filterIntensity;
+  Widget _buildFilterSection(dynamic camera) {
+    final intensity = _noFilter ? 1.0 : (camera.filterIntensity as double);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -600,7 +471,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             onNoFilterSelected: () {
               ref.read(cameraProvider.notifier).clearFilter();
               setState(() => _noFilter = true);
-              _onFilterChanged();
             },
           ),
         ),
@@ -610,7 +480,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 2,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 8),
                 overlayShape: SliderComponentShape.noOverlay,
                 activeTrackColor: const Color(0xFFD4A0B0),
                 inactiveTrackColor: const Color(0xFFEAE4E0),
@@ -620,10 +491,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 value: intensity.clamp(0.0, 1.0),
                 min: 0.0,
                 max: 1.0,
-                onChanged: (v) {
-                  ref.read(cameraProvider.notifier).setFilterIntensity(v);
-                },
-                onChangeEnd: (_) {},
+                onChanged: (v) =>
+                    ref.read(cameraProvider.notifier).setFilterIntensity(v),
               ),
             ),
           )
@@ -639,13 +508,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFEDE8E4), width: 0.5)),
+        border:
+            Border(top: BorderSide(color: Color(0xFFEDE8E4), width: 0.5)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildTab('필터', Icons.auto_awesome_rounded, 'filter', hasDot: !_noFilter),
-          _buildTab('효과', Icons.flare_rounded, 'effect', hasDot: _hasEffectChanges),
+          _buildTab('필터', Icons.auto_awesome_rounded, 'filter',
+              hasDot: !_noFilter),
+          _buildTab('효과', Icons.flare_rounded, 'effect',
+              hasDot: _hasEffectChanges),
         ],
       ),
     );
@@ -677,7 +549,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                           ? const Color(0xFF3D3531)
                           : const Color(0xFFBBB6B2),
                       fontSize: 12,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: isActive
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     )),
               ],
             ),

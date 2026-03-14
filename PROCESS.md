@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-14 (세션 40)
+> 마지막 업데이트: 2026-03-14 (세션 41)
 
 ---
 
@@ -1436,6 +1436,35 @@ overlayColor: Colors.transparent,  // noOverlay 대신 사용
   - 코드 수정 후 자동 실행 체크리스트 (세션 번호 증가, PROCESS.md 기록, git commit)
   - "사용자 요청 없이 자동으로 실행한다" 명시
 - Claude 메모리(`feedback_workflow.md`)에도 동일 규칙 저장
+
+---
+
+## 세션 41 변경사항 (2026-03-14) — 동영상 플레이어 완전 재구현 + videoCropRect 수정
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFCameraSession.swift` — videoCropRect 이중 반전 버그 수정
+- `lib/features/gallery/presentation/video_player_screen.dart` — video_player 패키지 기반 재구현
+
+### 버그 수정 1: videoCropRect 이중 반전
+- **원인**: `camera_state.dart`의 `nativeKey`가 이미 역방향 매핑 (`ratio3_4 → "4:3"`)이었는데,
+  `videoCropRect`에서 또 반전하여 이중 반전 발생
+- **결과**: ratio3_4 → nativeKey "4:3" → `videoCropRect("4:3")` → `cropRect("3:4")` = 810×1080 → π/2 → **1080×810 (4:3 landscape)** ❌
+- **수정**: `videoCropRect`를 단순 pass-through로 변경 (`return cropRect(for: ratio, ...)`)
+- **올바른 결과**: ratio3_4 → "4:3" → `cropRect("4:3")` = 1440×1080 → π/2 → **1080×1440 (3:4 portrait)** ✓
+
+### 버그 수정 2: 동영상 플레이어 전면 재구현 (레퍼런스 참조)
+- **기존**: 커스텀 `MFVideoFilterPlayer` + `FlutterTexture` (복잡한 native 파이프라인)
+- **문제**: 레이아웃 불안정, 비율 왜곡, 초기화 지연 등 다수 문제
+- **수정**: `video_player` 패키지 기반으로 전면 재작성
+  - `VideoPlayerController.file()` → `VideoPlayer()` + `AspectRatio` 위젯
+  - 3:4 고정 컨테이너 (`previewH = screenW * 4/3`)
+  - 필터는 저장/공유 시 `FilterEngine.processVideo()`로 적용 (오프라인)
+  - 실시간 필터 프리뷰 제거 (FilterEngine.startVideoPreview 제거)
+- **레퍼런스**: `/Users/kjmoon/Like this!/likethis/lib/features/gallery/presentation/video_player_screen.dart`
+
+### iOS 실기기 설치
+- `flutter build ios --release` → Runner.app (73.3MB) ✅
+- `xcrun devicectl device install app --device 00008150-001128391EF0401C` ✅
 
 ---
 

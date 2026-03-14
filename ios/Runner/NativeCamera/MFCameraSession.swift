@@ -75,15 +75,12 @@ class MFCameraSession: NSObject {
     }
 
     // MARK: - 동영상 전용 크롭 Rect
-    // 저장 버퍼(landscape)에 π/2 회전 메타데이터 적용 시: display_width = stored_height, display_height = stored_width
-    // "3:4" 포트레이트 표시(1080×1440) → 저장 버퍼는 "4:3" 랜드스케이프(1440×1080) 이어야 함
+    // Flutter nativeKey가 이미 역방향 매핑됨:
+    //   ratio3_4 → "4:3"  → cropRect("4:3") = 1440×1080 → π/2 → 1080×1440 (3:4 portrait) ✓
+    //   ratio4_3 → "3:4"  → cropRect("3:4") = 810×1080  → π/2 → 1080×810  (4:3 landscape) ✓
+    // 따라서 추가 반전 없이 cropRect 직접 호출
     private func videoCropRect(for ratio: String, imageSize: CGSize) -> CGRect {
-        switch ratio {
-        case "3:4": return cropRect(for: "4:3", imageSize: imageSize)
-        case "4:3": return cropRect(for: "3:4", imageSize: imageSize)
-        case "1:1": return cropRect(for: "1:1", imageSize: imageSize)
-        default:    return CGRect(origin: .zero, size: imageSize) // 9:16 / full / 16:9 → 전체 프레임
-        }
+        return cropRect(for: ratio, imageSize: imageSize)
     }
 
     // MARK: - 무음 촬영용 최신 프레임 버퍼
