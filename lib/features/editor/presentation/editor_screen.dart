@@ -228,8 +228,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
     void tick() { if (mounted) setState(() => _dragOffset = anim.value); }
     anim.addListener(tick);
     _swipeController.reset();
-    try { await _swipeController.forward().orCancel; } catch (_) {}
-    anim.removeListener(tick);
+    try { await _swipeController.forward().orCancel; } catch (_) {} finally {
+      anim.removeListener(tick);
+    }
   }
 
   Future<void> _commitSwipe(int delta) async {
@@ -254,6 +255,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen>
 
     final asset = assets[newIdx];
     if (asset.type == AssetType.video) {
+      setState(() => _dragOffset = 0);
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(

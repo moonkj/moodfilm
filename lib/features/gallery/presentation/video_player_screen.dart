@@ -355,8 +355,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     void tick() { if (mounted) setState(() => _dragOffset = anim.value); }
     anim.addListener(tick);
     _swipeController.reset();
-    try { await _swipeController.forward().orCancel; } catch (_) {}
-    anim.removeListener(tick);
+    try { await _swipeController.forward().orCancel; } catch (_) {} finally {
+      anim.removeListener(tick);
+    }
   }
 
   Future<void> _commitSwipe(int delta) async {
@@ -381,6 +382,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
     final asset = assets[newIdx];
     if (asset.type != AssetType.video) {
+      setState(() => _dragOffset = 0);
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
@@ -416,9 +418,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _brightness = 0; _contrast = 0; _saturation = 0;
       _softness = 0; _beauty = 0; _dreamyGlow = 0;
       _activeParamIndex = 0;
+      _videoDuration = 0; _trimStart = 0; _trimEnd = 0; // 트림 범위 초기화
       _isNavigating = false;
     });
     _startNativePreview();
+    _loadDuration(); // 새 동영상 길이 로드 (트림 슬라이더 갱신)
   }
 
   // MARK: - Build
