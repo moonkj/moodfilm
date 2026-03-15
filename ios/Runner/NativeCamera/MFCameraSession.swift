@@ -306,10 +306,10 @@ class MFCameraSession: NSObject {
             let cropR = self.cropRect(for: self.currentAspectRatio, imageSize: ciImage.extent.size)
             ciImage = ciImage.cropped(to: cropR)
 
-            // CIImage → CGImage (displayP3) → UIImage (EXIF 방향 포함하여 portrait 저장)
-            let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
+            // CIImage → CGImage → UIImage (EXIF 방향 포함하여 portrait 저장)
+            // format 파라미터 없이 호출: CIContext outputColorSpace(P3)로 자동 렌더
             guard let cgImg = MFLUTEngine.ciContext.createCGImage(
-                ciImage, from: ciImage.extent, format: .RGBA8, colorSpace: p3) else {
+                ciImage, from: ciImage.extent) else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
@@ -473,12 +473,10 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
         let filteredImage = lutEngine.apply(to: ciImage)
 
         // Step 4: CGImage → UIImage(portrait orientation) → JPEG
-        // displayP3로 출력: 프리뷰 render와 동일한 색공간 → 프리뷰 ↔ 갤러리 색감 일치
-        // UIImage.jpegData()는 CGImage의 color profile(P3)을 JPEG에 embed
-        let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
+        // format 파라미터 없이 호출: CIContext outputColorSpace(P3)로 자동 렌더
+        // RGBA8 강제 제거 → CIContext가 내부 float precision을 유지하며 최적 format 선택
         guard let cgImg = MFLUTEngine.ciContext.createCGImage(
-            filteredImage, from: filteredImage.extent,
-            format: .RGBA8, colorSpace: p3) else { return }
+            filteredImage, from: filteredImage.extent) else { return }
         let orientation: UIImage.Orientation = isFront ? .leftMirrored : .right
         let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
         guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else { return }

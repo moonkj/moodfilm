@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 68)
+> 마지막 업데이트: 2026-03-15 (세션 69)
 
 ---
 
@@ -2091,3 +2091,23 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 68)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12460)
+
+## 세션 69 변경사항 (2026-03-15) — 저장 사진 화질 저하 수정
+
+### 버그 수정: CIContext P3 + format:.RGBA8 화질 손실 제거
+- **원인 1**: `createCGImage(format: .RGBA8)` — CIFilter 내부 float precision 연산 후 8-bit(256 레벨)로 강제 quantize → banding, 계조 손실
+- **원인 2**: `CIContext(workingColorSpace: sRGB)` — LUT 연산이 sRGB 색역 내에서만 진행 → P3 범위의 색상 클리핑
+- **수정**:
+  1. `CIContext` workingColorSpace + outputColorSpace → `displayP3`
+     - LUT/이펙트 처리가 P3 넓은 색역에서 진행 → 색 클리핑 없음
+  2. `createCGImage(format: .RGBA8, colorSpace: p3)` → `createCGImage(image:from:)`
+     - format 파라미터 제거 → CIContext가 outputColorSpace(P3) 기준으로 최적 format 자동 선택
+     - 8-bit 강제 quantize 없음 → 내부 float precision 유지 → 화질 최대 보존
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`: CIContext sRGB → displayP3
+- `ios/Runner/NativeCamera/MFCameraSession.swift`: createCGImage format 파라미터 제거 (photoOutput + captureSilentPhoto)
+
+### iOS 실기기 설치 (세션 69)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12476)

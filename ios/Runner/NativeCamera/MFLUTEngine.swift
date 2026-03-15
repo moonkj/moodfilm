@@ -10,12 +10,14 @@ class MFLUTEngine {
         guard let device = MTLCreateSystemDefaultDevice() else {
             return CIContext()
         }
-        let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+        // displayP3: iPhone 디스플레이(P3) 기준 처리 → 갤러리 저장/프리뷰 색상 일치
+        // sRGB보다 넓은 색역에서 LUT 연산 → 색 클리핑 없이 화질 최대 보존
+        let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
         return CIContext(
             mtlDevice: device,
             options: [
-                .workingColorSpace: sRGB,
-                .outputColorSpace: sRGB,
+                .workingColorSpace: p3,
+                .outputColorSpace: p3,
                 .useSoftwareRenderer: false,
             ]
         )
