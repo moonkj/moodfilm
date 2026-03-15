@@ -325,7 +325,7 @@ class FilterData {
     'film03':      0.30,
     'disposable':  0.30,
     'retro_ccd':   0.30,
-    'kodak_soft':  0.28,
+    'kodak_soft':  0.38,
     // Aesthetic — 감성 계열
     'dream':       0.25,
     'lavender':    0.25,
