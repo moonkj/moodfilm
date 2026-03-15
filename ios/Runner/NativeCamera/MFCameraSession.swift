@@ -306,8 +306,10 @@ class MFCameraSession: NSObject {
             let cropR = self.cropRect(for: self.currentAspectRatio, imageSize: ciImage.extent.size)
             ciImage = ciImage.cropped(to: cropR)
 
-            // CIImage → CGImage → UIImage (EXIF 방향 포함하여 portrait 저장)
-            guard let cgImg = MFLUTEngine.ciContext.createCGImage(ciImage, from: ciImage.extent) else {
+            // CIImage → CGImage (displayP3) → UIImage (EXIF 방향 포함하여 portrait 저장)
+            let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
+            guard let cgImg = MFLUTEngine.ciContext.createCGImage(
+                ciImage, from: ciImage.extent, format: .RGBA8, colorSpace: p3) else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
@@ -376,9 +378,11 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
             let status = CVPixelBufferCreate(kCFAllocatorDefault, outW, outH,
                                 kCVPixelFormatType_32BGRA, attrs as CFDictionary, &processed)
             if status == kCVReturnSuccess, let proc = processed {
+                // displayP3: iPhone 디스플레이 색공간과 일치 → 프리뷰가 선명하게 보임
+                // 저장 사진도 동일하게 displayP3로 출력하여 프리뷰 ↔ 갤러리 색감 일치
                 MFLUTEngine.ciContext.render(ciImage, to: proc,
                                              bounds: CGRect(x: 0, y: 0, width: outW, height: outH),
-                                             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+                                             colorSpace: CGColorSpace(name: CGColorSpace.displayP3)!)
                 outputBuffer = proc
             } else {
                 print("[MFCameraSession] CVPixelBufferCreate 실패: \(status)")
@@ -451,12 +455,10 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
             return
         }
 
-        // sRGB 색공간 강제 지정: iPhone JPEG는 Display P3로 저장되나,
-        // 프리뷰 CVPixelBuffer는 untagged(sRGB 가정)로 처리됨.
-        // 동일한 색공간 기준에서 LUT를 적용해야 프리뷰와 저장 사진의 색감이 일치함.
-        let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+        // 원본 색공간(Display P3) 유지: sRGB 강제 없이 JPEG embedded profile 그대로 로드
+        // createCGImage 출력 시 displayP3 명시 → 갤러리에서 P3 색역 완전 보존
         guard let imageData = photo.fileDataRepresentation(),
-              var ciImage = CIImage(data: imageData, options: [.colorSpace: sRGB]) else { return }
+              var ciImage = CIImage(data: imageData) else { return }
         // ciImage.extent = 카메라 raw landscape (e.g. iPhone 12: 4032×3024), origin (0,0)
         // UIImage.Orientation.right 적용 후 portrait 3:4로 표시됨 → 프리뷰(3:4 컨테이너)와 비율 일치
 
@@ -471,9 +473,12 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
         let filteredImage = lutEngine.apply(to: ciImage)
 
         // Step 4: CGImage → UIImage(portrait orientation) → JPEG
-        // UIImage.jpegData()는 orientation을 EXIF에 포함 → 갤러리 표시 방향 정상
+        // displayP3로 출력: 프리뷰 render와 동일한 색공간 → 프리뷰 ↔ 갤러리 색감 일치
+        // UIImage.jpegData()는 CGImage의 color profile(P3)을 JPEG에 embed
+        let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
         guard let cgImg = MFLUTEngine.ciContext.createCGImage(
-            filteredImage, from: filteredImage.extent) else { return }
+            filteredImage, from: filteredImage.extent,
+            format: .RGBA8, colorSpace: p3) else { return }
         let orientation: UIImage.Orientation = isFront ? .leftMirrored : .right
         let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
         guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else { return }

@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 67)
+> 마지막 업데이트: 2026-03-15 (세션 68)
 
 ---
 
@@ -2066,3 +2066,28 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 67)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12452)
+
+## 세션 68 변경사항 (2026-03-15) — 갤러리 저장 사진 색 바램 수정
+
+### 버그 수정: Display P3 색공간으로 통일
+- **원인**: 세션 67에서 사진 로드 시 sRGB 강제 지정 → iPhone JPEG의 Display P3 색역이 sRGB로 압축됨
+  → 갤러리에서 색이 바래 보임 (P3의 선명한 색상 손실)
+- **수정**:
+  1. **사진 로드 sRGB 강제 제거**: `CIImage(data: imageData)` (원래 P3 embedded profile 유지)
+  2. **사진 저장 P3 출력**: `createCGImage(format:.RGBA8, colorSpace: displayP3)` → JPEG에 P3 profile embed
+  3. **프리뷰 render P3 통일**: `ciContext.render(colorSpace: displayP3)` → 화면(P3 디스플레이)에 맞는 색상
+  4. **무음촬영(captureSilentPhoto)도 P3**: 프리뷰 버퍼 → P3 저장
+
+### 색공간 파이프라인 최종 (세션 68)
+| 경로 | 입력 | 처리 | 출력 |
+|---|---|---|---|
+| 프리뷰(captureOutput) | CVPixelBuffer(untagged) | CIContext(sRGB 내부) | displayP3 render → 화면 |
+| 사진(photoOutput) | JPEG(P3 profile) | CIContext(sRGB 내부) | displayP3 JPEG 저장 → 갤러리 |
+| 무음촬영(captureSilentPhoto) | 프리뷰 버퍼(P3) | CIContext(sRGB 내부) | displayP3 JPEG 저장 → 갤러리 |
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFCameraSession.swift`
+
+### iOS 실기기 설치 (세션 68)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12460)
