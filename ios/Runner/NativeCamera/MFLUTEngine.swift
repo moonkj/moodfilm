@@ -129,6 +129,11 @@ class MFLUTEngine {
         var result = image
         let originalExtent = image.extent  // 원본 extent 저장 — 마지막에 크롭 기준으로 사용
 
+        // 해상도 스케일 팩터: 프리뷰(1920×1080)와 저장 사진(e.g. 4032×3024)의
+        // blur/bloom radius를 픽셀 단위로 동등하게 보정.
+        // height 기준 1080p = 1.0, 3024p ≈ 2.8배 → 사진에서도 동일한 시각적 강도 유지.
+        let imageScale = max(originalExtent.height / 1080.0, 1.0)
+
         // 1. LUT 필터 적용 (강도 블렌딩) + 채도/대비 부스트
         // LUT 적용 + 필터 개성 보정 → 강도 블렌딩 순서 (개성이 intensity에 비례하도록)
         if let lutFilter = currentLUTFilter, intensity > 0 {
@@ -169,22 +174,22 @@ class MFLUTEngine {
 
         // 3. Softness (솜결) — 부드러운 피부 소프트닝
         if softnessIntensity > 0 {
-            result = applySoftness(to: result, intensity: softnessIntensity)
+            result = applySoftness(to: result, intensity: softnessIntensity, scale: imageScale)
         }
 
         // 4. Dreamy Glow 이펙트 (시그니처)
         if glowIntensity > 0 {
-            result = applyDreamyGlow(to: result, intensity: glowIntensity)
+            result = applyDreamyGlow(to: result, intensity: glowIntensity, scale: imageScale)
         }
 
         // 5. Film Grain
         if grainIntensity > 0 {
-            result = applyFilmGrain(to: result, intensity: grainIntensity)
+            result = applyFilmGrain(to: result, intensity: grainIntensity, scale: imageScale)
         }
 
         // 6. Beauty (뽀샤시)
         if beautyIntensity > 0 {
-            result = applyBeauty(to: result, intensity: beautyIntensity)
+            result = applyBeauty(to: result, intensity: beautyIntensity, scale: imageScale)
         }
 
         // 7. Light Leak
@@ -205,14 +210,14 @@ class MFLUTEngine {
     // MARK: - 시그니처 이펙트: Dreamy Glow
     // CIBloom + Gaussian Blur 조합으로 사진 전체에 몽환적인 빛번짐
 
-    private func applyDreamyGlow(to image: CIImage, intensity: Float) -> CIImage {
+    private func applyDreamyGlow(to image: CIImage, intensity: Float, scale: CGFloat = 1.0) -> CIImage {
         // 지수 곡선 적용: 낮은 값에서 부드럽게, 1.0에서 최대
         // pow(x, 1.5): 0.3→0.16, 0.5→0.35, 0.7→0.59, 1.0→1.0
         let eased = pow(intensity, 1.5)
 
         guard let bloomFilter = CIFilter(name: "CIBloom") else { return image }
         bloomFilter.setValue(image, forKey: kCIInputImageKey)
-        bloomFilter.setValue(eased * 14.0, forKey: kCIInputRadiusKey)
+        bloomFilter.setValue(CGFloat(eased) * 14.0 * scale, forKey: kCIInputRadiusKey)
         bloomFilter.setValue(eased * 0.75, forKey: kCIInputIntensityKey)
 
         guard let bloomed = bloomFilter.outputImage else { return image }
@@ -220,7 +225,7 @@ class MFLUTEngine {
         // Gaussian Blur로 부드러운 빛번짐 강화
         guard let blurFilter = CIFilter(name: "CIGaussianBlur") else { return bloomed }
         blurFilter.setValue(bloomed, forKey: kCIInputImageKey)
-        blurFilter.setValue(eased * 2.5, forKey: kCIInputRadiusKey)
+        blurFilter.setValue(CGFloat(eased) * 2.5 * scale, forKey: kCIInputRadiusKey)
 
         guard let blurred = blurFilter.outputImage else { return bloomed }
 
@@ -248,13 +253,14 @@ class MFLUTEngine {
 
     // MARK: - Film Grain 이펙트
 
-    private func applyFilmGrain(to image: CIImage, intensity: Float) -> CIImage {
+    private func applyFilmGrain(to image: CIImage, intensity: Float, scale: CGFloat = 1.0) -> CIImage {
         guard let noiseFilter = CIFilter(name: "CIRandomGenerator"),
               let noiseImage = noiseFilter.outputImage else { return image }
 
-        // 노이즈 크기와 위치 조정
+        // 노이즈 크기: 고해상도 사진에서도 프리뷰와 동일한 grain 크기로 보이도록 scale 적용
+        let grainScale = 1.5 * scale
         let scaledNoise = noiseImage
-            .transformed(by: CGAffineTransform(scaleX: 1.5, y: 1.5))
+            .transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
             .cropped(to: image.extent)
 
         // 모노크롬 변환
@@ -278,11 +284,11 @@ class MFLUTEngine {
     // MARK: - Softness (솜결) 이펙트
     // 원본과 블러를 블렌딩해 피부를 부드럽게 — Beauty보다 자연스러운 소프트닝
 
-    private func applySoftness(to image: CIImage, intensity: Float) -> CIImage {
+    private func applySoftness(to image: CIImage, intensity: Float, scale: CGFloat = 1.0) -> CIImage {
         guard let blurFilter = CIFilter(name: "CIGaussianBlur") else { return image }
         // clampedToExtent(): 경계 바깥을 투명(검정)이 아닌 가장자리 픽셀로 채워 검은 테두리 방지
         blurFilter.setValue(image.clampedToExtent(), forKey: kCIInputImageKey)
-        blurFilter.setValue(intensity * 10.0, forKey: kCIInputRadiusKey)  // radius: 최대 10
+        blurFilter.setValue(CGFloat(intensity) * 10.0 * scale, forKey: kCIInputRadiusKey)  // radius: 해상도 보정
         guard let blurred = blurFilter.outputImage?.cropped(to: image.extent) else { return image }
 
         // 원본과 블러를 alpha로 블렌딩 (intensity * 0.75 비율)
@@ -302,14 +308,14 @@ class MFLUTEngine {
     // MARK: - Beauty (뽀샤시) 이펙트
     // 피부 보정: 부드럽게 + 밝게 + 따뜻하게 + 은은한 빛번짐
 
-    private func applyBeauty(to image: CIImage, intensity: Float) -> CIImage {
+    private func applyBeauty(to image: CIImage, intensity: Float, scale: CGFloat = 1.0) -> CIImage {
         var result = image
 
         // 1. 피부 소프트닝: Gaussian Blur를 원본과 부드럽게 블렌딩
         if let blurFilter = CIFilter(name: "CIGaussianBlur"),
            let blendFilter = CIFilter(name: "CISoftLightBlendMode") {
             blurFilter.setValue(result.clampedToExtent(), forKey: kCIInputImageKey)
-            blurFilter.setValue(intensity * 7.0, forKey: kCIInputRadiusKey)
+            blurFilter.setValue(CGFloat(intensity) * 7.0 * scale, forKey: kCIInputRadiusKey)
             if let blurred = blurFilter.outputImage?.cropped(to: image.extent) {
                 // 소프트 라이트로 원본과 블렌딩
                 if let alphaFilter = CIFilter(name: "CIColorMatrix"),
@@ -348,7 +354,7 @@ class MFLUTEngine {
         // 4. 은은한 Bloom (뽀샤시 발광)
         if let bloomFilter = CIFilter(name: "CIBloom") {
             bloomFilter.setValue(result, forKey: kCIInputImageKey)
-            bloomFilter.setValue(intensity * 6.0, forKey: kCIInputRadiusKey)
+            bloomFilter.setValue(CGFloat(intensity) * 6.0 * scale, forKey: kCIInputRadiusKey)
             bloomFilter.setValue(intensity * 0.4, forKey: kCIInputIntensityKey)
             result = bloomFilter.outputImage?.cropped(to: image.extent) ?? result
         }

@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 65)
+> 마지막 업데이트: 2026-03-15 (세션 66)
 
 ---
 
@@ -2018,3 +2018,22 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 65)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12372)
+
+## 세션 66 변경사항 (2026-03-15) — 프리뷰 vs 저장 사진 이펙트 차이 수정
+
+### 버그 수정: 해상도별 blur/bloom radius 보정
+- **원인**: `applySoftness`, `applyBeauty`, `applyDreamyGlow`, `applyFilmGrain`의 blur/bloom radius가 픽셀 단위 고정값
+  - 프리뷰: 1920×1080 → softness radius 3.5px → 육안으로 잘 보임
+  - 저장 사진: 4032×3024 → 동일 3.5px → 2.8배 약하게 보임 (사실상 효과 없음)
+- **수정**: `apply()`에 `imageScale = height / 1080.0` 스케일 팩터 도입
+  - 모든 blur/bloom radius에 `* scale` 적용
+  - 프리뷰(1080p): scale=1.0 → 기존 그대로
+  - 저장 사진(3024p): scale≈2.8 → 이펙트 강도 자동 보정 → 프리뷰와 동일하게 보임
+- FilmGrain grain 크기도 scale 비례 적용 (사진에서도 동일한 grain 크기 유지)
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`: `imageScale` 계산 및 4개 이펙트 함수에 scale 파라미터 추가
+
+### iOS 실기기 설치 (세션 66)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12444)
