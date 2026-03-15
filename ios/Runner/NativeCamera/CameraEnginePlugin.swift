@@ -185,14 +185,16 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        // processingQueue에서 쓰기 → captureOutput과 동일 큐 → 레이스 컨디션 완전 차단
-        cameraSession?.processingQueue.async { [weak self] in
-            guard let self, let session = self.cameraSession else { return }
-            if lutFile.isEmpty {
-                session.lutEngine.intensity = 0.0
-            } else {
-                session.lutEngine.loadLUT(named: lutFile)
-                session.lutEngine.intensity = Float(intensity)
+        if lutFile.isEmpty {
+            // 강도 0: 바로 적용 (즉시 반영)
+            cameraSession?.lutEngine.intensity = 0.0
+        } else {
+            // loadLUT(객체 참조 교체)만 processingQueue에서 직렬화 → ARC 안전
+            // intensity(Float 쓰기)는 ARM64 정렬 원자적 → 즉시 반영 가능
+            let newIntensity = Float(intensity)
+            cameraSession?.lutEngine.intensity = newIntensity
+            cameraSession?.processingQueue.async { [weak self] in
+                self?.cameraSession?.lutEngine.loadLUT(named: lutFile)
             }
         }
         result(nil)
@@ -208,21 +210,18 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        // processingQueue에서 쓰기 → captureOutput과 동일 큐 → 레이스 컨디션 완전 차단
-        cameraSession?.processingQueue.async { [weak self] in
-            guard let self, let session = self.cameraSession else { return }
-            let v = Float(intensity)
-            switch effectType {
-            case "dreamyGlow", "glow": session.lutEngine.glowIntensity = v
-            case "filmGrain":          session.lutEngine.grainIntensity = v
-            case "beauty":             session.lutEngine.beautyIntensity = v
-            case "lightLeak":          session.lutEngine.lightLeakIntensity = v
-            case "softness":           session.lutEngine.softnessIntensity = v
-            case "brightness":         session.lutEngine.brightnessIntensity = v
-            case "contrast":           session.lutEngine.contrastIntensity = v
-            case "saturation":         session.lutEngine.saturationIntensity = v
-            default: break
-            }
+        // Float 쓰기는 ARM64 정렬 원자적 → 메인 스레드에서 즉시 반영 (processingQueue 대기 없음)
+        let v = Float(intensity)
+        switch effectType {
+        case "dreamyGlow", "glow": cameraSession?.lutEngine.glowIntensity = v
+        case "filmGrain":          cameraSession?.lutEngine.grainIntensity = v
+        case "beauty":             cameraSession?.lutEngine.beautyIntensity = v
+        case "lightLeak":          cameraSession?.lutEngine.lightLeakIntensity = v
+        case "softness":           cameraSession?.lutEngine.softnessIntensity = v
+        case "brightness":         cameraSession?.lutEngine.brightnessIntensity = v
+        case "contrast":           cameraSession?.lutEngine.contrastIntensity = v
+        case "saturation":         cameraSession?.lutEngine.saturationIntensity = v
+        default: break
         }
         result(nil)
     }
