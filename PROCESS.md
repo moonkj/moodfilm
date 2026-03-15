@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 66)
+> 마지막 업데이트: 2026-03-15 (세션 67)
 
 ---
 
@@ -2037,3 +2037,32 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 66)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12444)
+
+## 세션 67 변경사항 (2026-03-15) — 프리뷰 vs 저장 사진 전체 파이프라인 점검 및 수정
+
+### 추가 버그 수정 (세션 66에서 blur/bloom scale 수정 후 남은 차이)
+
+#### 1. 색공간 mismatch 수정 (핵심)
+- **원인**: iPhone JPEG는 Display P3 ICC profile embedded. `CIImage(data:)` 로드 시 P3 자동 적용.
+  프리뷰 CVPixelBuffer는 untagged → sRGB 가정. 동일 LUT 적용 시 색감 차이 발생.
+- **수정**: `photoOutput` delegate에서 `CIImage(data:imageData, options:[.colorSpace: sRGB])` 명시
+  - P3 embedded profile 무시 → sRGB 기준으로 해석 → 프리뷰와 완전히 동일한 색공간에서 LUT 적용
+
+#### 2. lightLeak 프리뷰 누락 버그 수정
+- `captureOutput`의 `hasEffect` 조건에 `lutEngine.lightLeakIntensity > 0` 추가 누락
+- 수정: `|| lutEngine.lightLeakIntensity > 0` 추가
+
+### 전체 파이프라인 차이 현황 (세션 67 기준)
+| 항목 | 상태 |
+|---|---|
+| blur/bloom/grain radius 해상도 보정 | ✅ 세션 66 수정 |
+| 색공간 mismatch (P3 vs sRGB) | ✅ 세션 67 수정 |
+| lightLeak hasEffect 누락 | ✅ 세션 67 수정 |
+| captureSilentPhoto (무음촬영) | ✅ 원래부터 프리뷰 버퍼 직접 사용 = 완전 일치 |
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFCameraSession.swift`: P3→sRGB 강제, lightLeak hasEffect 추가
+
+### iOS 실기기 설치 (세션 67)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12452)

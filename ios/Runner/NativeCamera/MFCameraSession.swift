@@ -356,7 +356,7 @@ extension MFCameraSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptu
         let hasEffect = lutEngine.glowIntensity > 0 || lutEngine.grainIntensity > 0
             || lutEngine.beautyIntensity > 0 || lutEngine.softnessIntensity > 0
             || lutEngine.brightnessIntensity != 0 || lutEngine.contrastIntensity != 0
-            || lutEngine.saturationIntensity != 0
+            || lutEngine.saturationIntensity != 0 || lutEngine.lightLeakIntensity > 0
         let needsFilter = hasLUTFilter || hasEffect
 
         let outputBuffer: CVPixelBuffer
@@ -451,8 +451,12 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
             return
         }
 
+        // sRGB 색공간 강제 지정: iPhone JPEG는 Display P3로 저장되나,
+        // 프리뷰 CVPixelBuffer는 untagged(sRGB 가정)로 처리됨.
+        // 동일한 색공간 기준에서 LUT를 적용해야 프리뷰와 저장 사진의 색감이 일치함.
+        let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
         guard let imageData = photo.fileDataRepresentation(),
-              var ciImage = CIImage(data: imageData) else { return }
+              var ciImage = CIImage(data: imageData, options: [.colorSpace: sRGB]) else { return }
         // ciImage.extent = 카메라 raw landscape (e.g. iPhone 12: 4032×3024), origin (0,0)
         // UIImage.Orientation.right 적용 후 portrait 3:4로 표시됨 → 프리뷰(3:4 컨테이너)와 비율 일치
 
