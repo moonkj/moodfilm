@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 69)
+> 마지막 업데이트: 2026-03-15 (세션 70)
 
 ---
 
@@ -2111,3 +2111,28 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 69)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12476)
+
+## 세션 70 변경사항 (2026-03-15) — 갤러리 화질/필터 강도 차이 근본 수정
+
+### 핵심 원인 분석
+1. **이중 JPEG 압축**: `fileDataRepresentation()` → JPEG(1차) → 처리 → JPEG(2차) → 화질 아티팩트 누적
+2. **필터 색감 차이**: JPEG P3 tagged vs CVPixelBuffer untagged → CIContext 처리 방식 불일치
+3. **imageScale portrait 불일치**: `height/1080` 기준이 portrait(4032) vs landscape(3024)에서 다름
+
+### 수정
+1. `capturePhoto()`: `AVCapturePhotoSettings(format: BGRA)` → uncompressed raw pixel 요청
+2. `photoOutput` delegate: `photo.pixelBuffer` 직접 사용 (JPEG decode 없음)
+   - `CIImage(cvPixelBuffer:).oriented(cgOrientation)` → portrait 픽셀 변환
+   - 색공간 태그 없음 → 프리뷰와 동일한 CIContext(P3) 처리 → 필터 색감 완전 일치
+   - `UIImage(cgImage:)` orientation .up → 픽셀이 이미 회전됨
+3. `imageScale`: `height/1080` → `sqrt(W×H / 1920×1080)` 면적 기반
+   - portrait/landscape 방향 무관하게 동일한 blur/bloom 강도 보장
+   - 4032×3024 ≈ 2.42 (방향 무관), 1920×1080 = 1.0
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`: imageScale 면적 기반으로 변경
+- `ios/Runner/NativeCamera/MFCameraSession.swift`: capturePhoto uncompressed + pixelBuffer delegate
+
+### iOS 실기기 설치 (세션 70)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12484)

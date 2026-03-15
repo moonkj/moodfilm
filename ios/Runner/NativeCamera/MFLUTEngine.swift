@@ -131,10 +131,10 @@ class MFLUTEngine {
         var result = image
         let originalExtent = image.extent  // 원본 extent 저장 — 마지막에 크롭 기준으로 사용
 
-        // 해상도 스케일 팩터: 프리뷰(1920×1080)와 저장 사진(e.g. 4032×3024)의
-        // blur/bloom radius를 픽셀 단위로 동등하게 보정.
-        // height 기준 1080p = 1.0, 3024p ≈ 2.8배 → 사진에서도 동일한 시각적 강도 유지.
-        let imageScale = max(originalExtent.height / 1080.0, 1.0)
+        // 해상도 스케일 팩터: 프리뷰(1920×1080 landscape)와 저장 사진의 blur/bloom radius 보정.
+        // 면적 기반: sqrt(W×H / 1920×1080) → portrait/landscape 방향 무관하게 동일한 강도 적용.
+        // e.g. 1920×1080=1.0, 4032×3024(landscape)≈2.42, 3024×4032(portrait)≈2.42
+        let imageScale = max(sqrt(originalExtent.width * originalExtent.height / (1920.0 * 1080.0)), 1.0)
 
         // 1. LUT 필터 적용 (강도 블렌딩) + 채도/대비 부스트
         // LUT 적용 + 필터 개성 보정 → 강도 블렌딩 순서 (개성이 intensity에 비례하도록)

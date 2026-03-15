@@ -241,18 +241,16 @@ class MFCameraSession: NSObject {
 
     func capturePhoto() {
         guard let photoOutput = photoOutput else { return }
-        let settings = AVCapturePhotoSettings()
-        settings.isHighResolutionPhotoEnabled = true
 
-        // 라이브포토 활성화 (지원 기기 + 활성화 상태일 때)
-        if isLivePhotoEnabled && photoOutput.isLivePhotoCaptureSupported {
-            let movURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("moodfilm_live_\(Int(Date().timeIntervalSince1970)).mov")
-            livePhotoMovieURL = movURL
-            settings.livePhotoMovieFileURL = movURL
-        } else {
-            livePhotoMovieURL = nil
-        }
+        // Uncompressed BGRA: photo.pixelBuffer로 raw 픽셀 직접 접근
+        // → JPEG 이중 압축 없음 (프리뷰와 동일한 파이프라인) → 화질 최대 보존
+        // → 색공간 태그 없음(CVPixelBuffer) → 프리뷰와 동일하게 CIContext(P3)가 처리 → 필터 색감 일치
+        let settings = AVCapturePhotoSettings(format: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ])
+        settings.isHighResolutionPhotoEnabled = true
+        // 라이브포토: uncompressed format과 동시 사용 불가 → 비활성
+        livePhotoMovieURL = nil
 
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
@@ -455,30 +453,29 @@ extension MFCameraSession: AVCapturePhotoCaptureDelegate {
             return
         }
 
-        // 원본 색공간(Display P3) 유지: sRGB 강제 없이 JPEG embedded profile 그대로 로드
-        // createCGImage 출력 시 displayP3 명시 → 갤러리에서 P3 색역 완전 보존
-        guard let imageData = photo.fileDataRepresentation(),
-              var ciImage = CIImage(data: imageData) else { return }
-        // ciImage.extent = 카메라 raw landscape (e.g. iPhone 12: 4032×3024), origin (0,0)
-        // UIImage.Orientation.right 적용 후 portrait 3:4로 표시됨 → 프리뷰(3:4 컨테이너)와 비율 일치
+        // raw 픽셀 버퍼 직접 사용: JPEG 이중 압축 없음 → 화질 최대 보존
+        // CVPixelBuffer = 색공간 태그 없음 → CIContext(P3)가 프리뷰와 동일하게 처리 → 필터 색감 일치
+        guard let pixelBuffer = photo.pixelBuffer else { return }
 
-        // 사용자 지정 aspect ratio 크롭 (1:1, 9:16 등 선택 시 적용)
+        // landscape 픽셀 버퍼를 portrait으로 직접 회전 (픽셀 변환, EXIF 없음)
+        let cgOrientation: CGImagePropertyOrientation = isFront ? .leftMirrored : .right
+        var ciImage = CIImage(cvPixelBuffer: pixelBuffer).oriented(cgOrientation)
+        // ciImage.extent = portrait (e.g. 3024×4032), origin (0,0)
+
+        // 비율 크롭 (portrait extent 기준으로 cropRect 계산)
         if currentAspectRatio != "full" && currentAspectRatio != "16:9" {
-            var ratioRect = cropRect(for: currentAspectRatio, imageSize: ciImage.extent.size)
-            ratioRect = ratioRect.offsetBy(dx: ciImage.extent.origin.x, dy: ciImage.extent.origin.y)
+            let ratioRect = cropRect(for: currentAspectRatio, imageSize: ciImage.extent.size)
             ciImage = ciImage.cropped(to: ratioRect)
         }
 
-        // Step 3: LUT 필터 적용
+        // LUT + 이펙트 적용 (imageScale은 면적 기반 → portrait/landscape 무관 동일 강도)
         let filteredImage = lutEngine.apply(to: ciImage)
 
-        // Step 4: CGImage → UIImage(portrait orientation) → JPEG
-        // format 파라미터 없이 호출: CIContext outputColorSpace(P3)로 자동 렌더
-        // RGBA8 강제 제거 → CIContext가 내부 float precision을 유지하며 최적 format 선택
+        // P3 CGImage → UIImage → JPEG (한 번만 압축)
+        // oriented()로 픽셀이 이미 회전됨 → UIImage orientation = .up
         guard let cgImg = MFLUTEngine.ciContext.createCGImage(
             filteredImage, from: filteredImage.extent) else { return }
-        let orientation: UIImage.Orientation = isFront ? .leftMirrored : .right
-        let uiImage = UIImage(cgImage: cgImg, scale: 1.0, orientation: orientation)
+        let uiImage = UIImage(cgImage: cgImg)
         guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else { return }
 
         // Step 5: 임시 파일 저장
