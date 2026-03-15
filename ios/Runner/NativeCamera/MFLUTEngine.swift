@@ -696,9 +696,10 @@ class MFLUTEngine {
             result = colorControls(contrast: 0.90, saturation: 0.86, brightness: 0.04)
 
         case "kodak_soft":
-            // 필름 아날로그 — 따뜻함·소프트, film98보다 낮은 대비
-            result = temperature(target: 6900)
-            result = colorControls(contrast: 1.04, saturation: 0.93)
+            // 코닥 필름 — 따뜻한 웜 페이드 + 쉐도우 리프트 + 소프트
+            result = temperature(target: 7200)
+            result = colorMatrix(rBias: 0.025, gBias: 0.018, bBias: 0.008) // 필름 페이드 리프트
+            result = colorControls(contrast: 1.12, saturation: 0.85)
 
         case "film98":
             // 90년대 필름 — 강한 대비 + 웜 마트 페이드
@@ -712,9 +713,10 @@ class MFLUTEngine {
             result = colorMatrix(gScale: 1.01, rBias: 0.006, gBias: 0.010, bBias: -0.012)
 
         case "mocha":
-            // 커피브라운 무드 — 탈포화 + 온기로 브라운 강조
-            result = temperature(target: 6900)
-            result = colorControls(contrast: 1.08, saturation: 0.80)
+            // 커피브라운 무드 — 강한 탈포화 + 진한 온기 + 브라운 채널 편향
+            result = temperature(target: 7800)
+            result = colorMatrix(rBias: 0.035, gBias: 0.015, bBias: -0.025) // 브라운 틴트
+            result = colorControls(contrast: 1.20, saturation: 0.65)
 
         case "latte":
             // 크리미 카페 — mocha보다 밝고 더 크리미한 웜톤
