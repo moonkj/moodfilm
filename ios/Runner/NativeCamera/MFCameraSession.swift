@@ -28,7 +28,7 @@ class MFCameraSession: NSObject {
     private var currentDevice: AVCaptureDevice?
     private var isFront = true
 
-    private let sessionQueue = DispatchQueue(label: "com.moodfilm.camera.session", qos: .userInitiated)
+    let sessionQueue = DispatchQueue(label: "com.moodfilm.camera.session", qos: .userInitiated)
     private let processingQueue = DispatchQueue(label: "com.moodfilm.camera.processing", qos: .userInitiated)
 
     var currentExposure: Float = 0.0 // -2EV ~ +2EV

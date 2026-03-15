@@ -185,12 +185,15 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        // 빈 파일명 = 필터 없음
-        if lutFile.isEmpty {
-            cameraSession?.lutEngine.intensity = 0.0
-        } else {
-            cameraSession?.lutEngine.loadLUT(named: lutFile)
-            cameraSession?.lutEngine.intensity = Float(intensity)
+        // sessionQueue에서 쓰기 → captureOutput과 동일 스레드 → 레이스 컨디션 방지
+        cameraSession?.sessionQueue.async { [weak self] in
+            guard let self, let session = self.cameraSession else { return }
+            if lutFile.isEmpty {
+                session.lutEngine.intensity = 0.0
+            } else {
+                session.lutEngine.loadLUT(named: lutFile)
+                session.lutEngine.intensity = Float(intensity)
+            }
         }
         result(nil)
     }
@@ -205,25 +208,21 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        switch effectType {
-        case "dreamyGlow", "glow":
-            cameraSession?.lutEngine.glowIntensity = Float(intensity)
-        case "filmGrain":
-            cameraSession?.lutEngine.grainIntensity = Float(intensity)
-        case "beauty":
-            cameraSession?.lutEngine.beautyIntensity = Float(intensity)
-        case "lightLeak":
-            cameraSession?.lutEngine.lightLeakIntensity = Float(intensity)
-        case "softness":
-            cameraSession?.lutEngine.softnessIntensity = Float(intensity)
-        case "brightness":
-            cameraSession?.lutEngine.brightnessIntensity = Float(intensity)
-        case "contrast":
-            cameraSession?.lutEngine.contrastIntensity = Float(intensity)
-        case "saturation":
-            cameraSession?.lutEngine.saturationIntensity = Float(intensity)
-        default:
-            break
+        // sessionQueue에서 쓰기 → 레이스 컨디션 방지
+        cameraSession?.sessionQueue.async { [weak self] in
+            guard let self, let session = self.cameraSession else { return }
+            let v = Float(intensity)
+            switch effectType {
+            case "dreamyGlow", "glow": session.lutEngine.glowIntensity = v
+            case "filmGrain":          session.lutEngine.grainIntensity = v
+            case "beauty":             session.lutEngine.beautyIntensity = v
+            case "lightLeak":          session.lutEngine.lightLeakIntensity = v
+            case "softness":           session.lutEngine.softnessIntensity = v
+            case "brightness":         session.lutEngine.brightnessIntensity = v
+            case "contrast":           session.lutEngine.contrastIntensity = v
+            case "saturation":         session.lutEngine.saturationIntensity = v
+            default: break
+            }
         }
         result(nil)
     }
