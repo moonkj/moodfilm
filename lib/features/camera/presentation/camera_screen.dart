@@ -54,6 +54,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   double _splitPosition = 0.5;
   Timer? _splitAutoHideTimer;
 
+  // 필터 강도 쓰로틀: 16ms(60fps) 이상 간격으로만 네이티브 호출
+  DateTime _lastIntensityNativeCall = DateTime.fromMillisecondsSinceEpoch(0);
+
   // 필터 패널 (앱 실행 시 기본 열림)
 
 
@@ -715,9 +718,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 max: 1,
                 onChanged: (v) {
                   _pauseSideButtonsTimer();
-                  ref.read(cameraProvider.notifier).setFilterIntensity(v);
+                  // UI 즉시 반영
+                  ref.read(cameraProvider.notifier).setFilterIntensityUI(v);
+                  // 네이티브 호출은 16ms(60fps) 쓰로틀
+                  final now = DateTime.now();
+                  if (now.difference(_lastIntensityNativeCall).inMilliseconds >= 16) {
+                    _lastIntensityNativeCall = now;
+                    ref.read(cameraProvider.notifier).applyFilterIntensityNative(v);
+                  }
                 },
-                onChangeEnd: (_) => _resetSideButtonsTimer(),
+                onChangeEnd: (v) {
+                  // 손가락 뗄 때 최종값 반드시 반영 + Hive 저장
+                  ref.read(cameraProvider.notifier).applyFilterIntensityNative(v);
+                  ref.read(cameraProvider.notifier).saveFilterIntensity(v);
+                  _resetSideButtonsTimer();
+                },
                 activeColor: Colors.white,
                 inactiveColor: Colors.white30,
               ),
@@ -905,9 +920,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 onChanged: (v) {
                   _pauseSideButtonsTimer();
                   setState(() => _adjustments[key] = v);
-                  CameraEngine.setEffect(effectType: key, intensity: v);
+                  // 16ms 쓰로틀
+                  final now = DateTime.now();
+                  if (now.difference(_lastIntensityNativeCall).inMilliseconds >= 16) {
+                    _lastIntensityNativeCall = now;
+                    CameraEngine.setEffect(effectType: key, intensity: v);
+                  }
                 },
-                onChangeEnd: (_) => _resetSideButtonsTimer(),
+                onChangeEnd: (v) {
+                  // 손가락 뗄 때 최종값 반드시 반영
+                  CameraEngine.setEffect(effectType: key, intensity: v);
+                  _resetSideButtonsTimer();
+                },
               ),
             );
           }),

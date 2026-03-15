@@ -185,8 +185,8 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        // sessionQueue에서 쓰기 → captureOutput과 동일 스레드 → 레이스 컨디션 방지
-        cameraSession?.sessionQueue.async { [weak self] in
+        // processingQueue에서 쓰기 → captureOutput과 동일 큐 → 레이스 컨디션 완전 차단
+        cameraSession?.processingQueue.async { [weak self] in
             guard let self, let session = self.cameraSession else { return }
             if lutFile.isEmpty {
                 session.lutEngine.intensity = 0.0
@@ -208,8 +208,8 @@ class CameraEnginePlugin: NSObject, FlutterPlugin {
             return
         }
 
-        // sessionQueue에서 쓰기 → 레이스 컨디션 방지
-        cameraSession?.sessionQueue.async { [weak self] in
+        // processingQueue에서 쓰기 → captureOutput과 동일 큐 → 레이스 컨디션 완전 차단
+        cameraSession?.processingQueue.async { [weak self] in
             guard let self, let session = self.cameraSession else { return }
             let v = Float(intensity)
             switch effectType {

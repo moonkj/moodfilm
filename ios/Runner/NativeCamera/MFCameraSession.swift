@@ -29,7 +29,7 @@ class MFCameraSession: NSObject {
     private var isFront = true
 
     let sessionQueue = DispatchQueue(label: "com.moodfilm.camera.session", qos: .userInitiated)
-    private let processingQueue = DispatchQueue(label: "com.moodfilm.camera.processing", qos: .userInitiated)
+    let processingQueue = DispatchQueue(label: "com.moodfilm.camera.processing", qos: .userInitiated)
 
     var currentExposure: Float = 0.0 // -2EV ~ +2EV
     var currentZoom: CGFloat = 1.0

@@ -106,11 +106,28 @@ class CameraNotifier extends StateNotifier<CameraState> {
     prefs.save();
   }
 
+  // UI 상태만 즉시 반영 (슬라이더 드래그 중 호출)
+  void setFilterIntensityUI(double intensity) {
+    state = state.copyWith(filterIntensity: intensity);
+  }
+
+  // 네이티브 호출만 (쓰로틀 후 호출)
+  Future<void> applyFilterIntensityNative(double intensity) async {
+    state = state.copyWith(filterIntensity: intensity);
+    await _applyCurrentFilter();
+  }
+
+  // Hive 저장만 (onChangeEnd에서 호출)
+  void saveFilterIntensity(double intensity) {
+    if (state.activeFilter != null) {
+      StorageService.prefs.setIntensity(state.activeFilter!.id, intensity);
+    }
+  }
+
+  // 기존 메서드 유지 (필터 선택 시 등 내부 사용)
   Future<void> setFilterIntensity(double intensity) async {
     state = state.copyWith(filterIntensity: intensity);
     await _applyCurrentFilter();
-
-    // 강도 저장
     if (state.activeFilter != null) {
       StorageService.prefs.setIntensity(state.activeFilter!.id, intensity);
     }
