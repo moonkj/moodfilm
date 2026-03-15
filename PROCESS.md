@@ -1,5 +1,5 @@
 # MoodFilm 개발 진행 현황
-> 마지막 업데이트: 2026-03-15 (세션 64)
+> 마지막 업데이트: 2026-03-15 (세션 65)
 
 ---
 
@@ -1991,3 +1991,30 @@ widget.imagePath/videoPath/assetId를 state variable(_currentPath, _currentAsset
 ### iOS 실기기 설치 (세션 64)
 - `flutter build ios --release` → 74.1MB ✅
 - `xcrun devicectl device install app` ✅
+
+## 세션 65 변경사항 (2026-03-15) — 필터 전체 personality 완성 + 슬라이더 급격한 변화 수정
+
+### 버그 수정
+- **vivid 0%→1% 급격한 변화**: `applyFilterPersonality()`를 `lerpCI` blend 이후 → 이전으로 이동
+  - 이전: blend 후 personality 100% 적용 → 저강도에서 급격한 점프
+  - 이후: LUT 이미지에 personality 먼저 적용 후 intensity로 blend → 자연스러운 선형 증가
+
+### 11종 personality 신규 추가
+- **mood** (시그니처): 7000K + 약한 대비 + 밝음 — 따뜻한 드리미 필름
+- **milk**: 탈포화(0.82) + 밝음(+0.06) + 6800K — 우유빛
+- **cream**: 7100K + rBias/gBias 크림 틴트 + 밝음
+- **butter**: 7400K + 강한 골든 bias + 채도+
+- **honey**: 7600K + 앰버 bias + 채도(1.15) + 대비 — 골든아워
+- **peach**: 7300K + 핑크 rBias + 채도+ + 밝음
+- **ice**: 5700K + 대비+ + 아이시 블루 bBias
+- **sky**: 5900K + 청량함 + gBias/bBias 하늘빛
+- **ocean**: 5500K + 강한 대비 + rScale↓ bScale+ — 깊은 바다
+- **mint**: 5800K + gScale/bScale 그린-블루 틴트 + 탈포화
+- **dream**: rScale↓ bScale+ bBias + 소프트 — 보랏빛 몽환
+
+### 변경 파일
+- `ios/Runner/NativeCamera/MFLUTEngine.swift`
+
+### iOS 실기기 설치 (세션 65)
+- `flutter build ios --release` → 74.1MB ✅
+- `xcrun devicectl device install app` ✅ (databaseSequenceNumber: 12372)

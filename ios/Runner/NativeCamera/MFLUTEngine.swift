@@ -596,6 +596,72 @@ class MFLUTEngine {
 
         switch currentLUTName {
 
+        // ─── Warm 계열 ────────────────────────────────────────────────────
+        case "mood":
+            // 시그니처: 따뜻한 드리미 필름 — 은은한 온기 + 부드러운 밝음
+            result = temperature(target: 7000)
+            result = colorControls(contrast: 1.06, saturation: 0.96, brightness: 0.03)
+
+        case "milk":
+            // 우유빛: 탈포화 + 밝음 + 살짝 따뜻
+            result = colorControls(saturation: 0.82, brightness: 0.06)
+            result = temperature(target: 6800)
+
+        case "cream":
+            // 크림색 오후: 크리미 웜톤
+            result = temperature(target: 7100)
+            result = colorMatrix(rBias: 0.012, gBias: 0.008)
+            result = colorControls(brightness: 0.03)
+
+        case "butter":
+            // 버터 노란빛: 강한 골든 톤
+            result = temperature(target: 7400)
+            result = colorMatrix(rBias: 0.022, gBias: 0.015, bBias: -0.012)
+            result = colorControls(saturation: 1.10)
+
+        case "honey":
+            // 골든아워 꿀빛: 앰버 + 채도 + 강도 높음
+            result = temperature(target: 7600)
+            result = colorMatrix(rBias: 0.028, gBias: 0.012, bBias: -0.018)
+            result = colorControls(contrast: 1.06, saturation: 1.15)
+
+        case "peach":
+            // 복숭아 핑크: 핑크 편향 + 따뜻함
+            result = temperature(target: 7300)
+            result = colorMatrix(rBias: 0.018, gBias: 0.005, bBias: -0.008)
+            result = colorControls(saturation: 1.08, brightness: 0.02)
+
+        // ─── Cool 계열 ────────────────────────────────────────────────────
+        case "ice":
+            // 겨울 크리스프: 차갑고 선명, 아이시 블루
+            result = temperature(target: 5700)
+            result = colorControls(contrast: 1.12, saturation: 1.06, brightness: 0.04)
+            result = colorMatrix(bBias: 0.018)
+
+        case "sky":
+            // 맑은 하늘: 청량하고 밝음
+            result = temperature(target: 5900)
+            result = colorControls(contrast: 1.08, saturation: 1.05, brightness: 0.04)
+            result = colorMatrix(gBias: 0.004, bBias: 0.010)
+
+        case "ocean":
+            // 깊은 바다: 강한 쿨톤 + 대비
+            result = temperature(target: 5500)
+            result = colorControls(contrast: 1.18, saturation: 0.92)
+            result = colorMatrix(rScale: 0.95, bScale: 1.04, bBias: 0.018)
+
+        case "mint":
+            // 민트 쿨: 그린-블루 틴트 + 청량함
+            result = temperature(target: 5800)
+            result = colorMatrix(gScale: 1.02, bScale: 1.02, gBias: 0.012, bBias: 0.006)
+            result = colorControls(saturation: 0.90, brightness: 0.03)
+
+        // ─── Aesthetic 계열 ───────────────────────────────────────────────
+        case "dream":
+            // 보랏빛 몽환: 블루-퍼플 헤이즈 + 소프트
+            result = colorMatrix(rScale: 0.97, gScale: 0.96, bScale: 1.04, bBias: 0.015)
+            result = colorControls(contrast: 0.94, saturation: 0.92, brightness: 0.03)
+
         // ─── LUT 거의 identity → 코드로 색감 완전 정의 ──────────────────────
         case "vivid":
             // 팝아트 선명함 — 전 채널 균등 채도, R 클리핑 방지
