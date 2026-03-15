@@ -309,16 +309,16 @@ class MFLUTEngine {
         if let blurFilter = CIFilter(name: "CIGaussianBlur"),
            let blendFilter = CIFilter(name: "CISoftLightBlendMode") {
             blurFilter.setValue(result.clampedToExtent(), forKey: kCIInputImageKey)
-            blurFilter.setValue(intensity * 4.0, forKey: kCIInputRadiusKey)
+            blurFilter.setValue(intensity * 7.0, forKey: kCIInputRadiusKey)
             if let blurred = blurFilter.outputImage?.cropped(to: image.extent) {
-                // 소프트 라이트로 원본과 블렌딩 (intensity * 0.5 opacity)
+                // 소프트 라이트로 원본과 블렌딩
                 if let alphaFilter = CIFilter(name: "CIColorMatrix"),
                    let composite = CIFilter(name: "CISourceOverCompositing") {
                     alphaFilter.setValue(blurred, forKey: kCIInputImageKey)
                     alphaFilter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
                     alphaFilter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
                     alphaFilter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
-                    alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity * 0.45)), forKey: "inputAVector")
+                    alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(intensity * 0.65)), forKey: "inputAVector")
                     if let semiBlur = alphaFilter.outputImage {
                         composite.setValue(semiBlur, forKey: kCIInputImageKey)
                         composite.setValue(result, forKey: kCIInputBackgroundImageKey)
@@ -331,7 +331,7 @@ class MFLUTEngine {
         // 2. 밝기 + 채도 미세 보정 (CIColorControls)
         if let colorFilter = CIFilter(name: "CIColorControls") {
             colorFilter.setValue(result, forKey: kCIInputImageKey)
-            colorFilter.setValue(CGFloat(intensity) * 0.08, forKey: kCIInputBrightnessKey)
+            colorFilter.setValue(CGFloat(intensity) * 0.16, forKey: kCIInputBrightnessKey)
             colorFilter.setValue(1.0 + CGFloat(intensity) * 0.06, forKey: kCIInputSaturationKey)
             result = colorFilter.outputImage?.cropped(to: image.extent) ?? result
         }
@@ -341,7 +341,7 @@ class MFLUTEngine {
         if let tempFilter = CIFilter(name: "CITemperatureAndTint") {
             tempFilter.setValue(result, forKey: kCIInputImageKey)
             tempFilter.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
-            tempFilter.setValue(CIVector(x: 6500.0 + CGFloat(intensity) * 400.0, y: 0), forKey: "inputTargetNeutral")
+            tempFilter.setValue(CIVector(x: 6500.0 + CGFloat(intensity) * 600.0, y: 0), forKey: "inputTargetNeutral")
             result = tempFilter.outputImage?.cropped(to: image.extent) ?? result
         }
 
