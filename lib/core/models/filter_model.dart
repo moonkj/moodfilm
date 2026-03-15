@@ -304,35 +304,35 @@ class FilterData {
   /// 사용자가 슬라이더로 조정 시 이 값이 덮어씌워짐
   static const Map<String, double> defaultIntensities = {
     // Warm — 따뜻한 계열
-    'mood':        0.90,
-    'milk':        0.85,
-    'cream':       0.88,
-    'butter':      0.88,
-    'honey':       0.90,
-    'peach':       0.88,
-    'latte':       0.88,
-    'mocha':       0.90,
+    'mood':        0.28,
+    'milk':        0.22,
+    'cream':       0.25,
+    'butter':      0.25,
+    'honey':       0.28,
+    'peach':       0.25,
+    'latte':       0.25,
+    'mocha':       0.28,
     // Cool — 쿨톤 계열
-    'sky':         0.88,
-    'ocean':       0.90,
-    'mint':        0.88,
-    'cloud':       0.85,
-    'ice':         0.88,
-    'pale':        0.85,
-    'winter':      0.88,
+    'sky':         0.25,
+    'ocean':       0.28,
+    'mint':        0.25,
+    'cloud':       0.22,
+    'ice':         0.25,
+    'pale':        0.22,
+    'winter':      0.25,
     // Film — 필름 계열
-    'film98':      0.95,
-    'film03':      1.00, // LUT 효과 약함 → 풀강도
-    'disposable':  0.95,
-    'retro_ccd':   1.00, // LUT 효과 매우 약함 → 풀강도
-    'kodak_soft':  0.90,
+    'film98':      0.30,
+    'film03':      0.30,
+    'disposable':  0.30,
+    'retro_ccd':   0.30,
+    'kodak_soft':  0.28,
     // Aesthetic — 감성 계열
-    'dream':       0.88,
-    'lavender':    0.88,
-    'soft_pink':   0.85,
-    'dusty_blue':  0.88,
-    'blossom':     0.88,
-    'vivid':       1.00, // LUT 색 변환 없음 → 풀강도로 콘트라스트 활용
+    'dream':       0.25,
+    'lavender':    0.25,
+    'soft_pink':   0.22,
+    'dusty_blue':  0.25,
+    'blossom':     0.25,
+    'vivid':       0.28,
   };
 
   static List<FilterModel> byCategory(FilterCategory category) =>

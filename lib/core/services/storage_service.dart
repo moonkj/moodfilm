@@ -31,19 +31,19 @@ class StorageService {
     } else {
       debugPrint('[StorageService] 기존 UserPreferences 로드 완료');
       // 강도 마이그레이션: 저장값이 새 기본값과 다르면 제거 → 새 기본값 적용
-      // 기본값을 올렸으므로 저장값 < 새 기본값인 경우 이전 기본값으로 판단 후 초기화
+      // 기본값을 내렸으므로 저장값 > 0.5(구 기본값 범위)인 경우 이전 기본값으로 판단 후 초기화
       final p = _prefsBox.getAt(0)!;
       bool changed = false;
       for (final entry in FilterData.defaultIntensities.entries) {
         final stored = p.filterIntensities[entry.key];
-        if (stored != null && stored < entry.value) {
+        if (stored != null && stored > 0.5) {
           p.filterIntensities.remove(entry.key);
           changed = true;
         }
       }
       if (changed) {
         await p.save();
-        debugPrint('[StorageService] 필터 강도 마이그레이션 완료 (기본값 상향)');
+        debugPrint('[StorageService] 필터 강도 마이그레이션 완료 (기본값 하향)');
       }
     }
   }
